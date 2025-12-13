@@ -1,3 +1,8 @@
+---
+name: security-audit
+description: "Security audit patterns for PHP applications following OWASP guidelines. This skill should be used when conducting security assessments, identifying vulnerabilities (XXE, SQL injection, XSS, CSRF), scoring security risks with CVSS v3.1, or implementing secure coding practices. Covers OWASP Top 10 detection patterns, vulnerability remediation, and security hardening checklists. By Netresearch."
+---
+
 # Security Audit Skill
 
 Expert patterns for conducting security audits, vulnerability assessment, and implementing secure coding practices aligned with OWASP guidelines.
