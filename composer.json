@@ -1,12 +1,12 @@
 {
   "name": "netresearch/agent-security-audit",
-  "description": "Security audit patterns for PHP applications following OWASP guidelines. This skill should be used when conducting security assessments, identifying vulnerabilities (XXE, SQL injection, XSS, CSRF), sc",
+  "description": "Netresearch AI skill for security audits following OWASP guidelines",
   "type": "ai-agent-skill",
   "license": "MIT",
   "authors": [
     {
       "name": "Netresearch DTT GmbH",
-      "email": "plugins@netresearch.de",
+      "email": "info@netresearch.de",
       "homepage": "https://www.netresearch.de/",
       "role": "Manufacturer"
     }
