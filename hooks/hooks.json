@@ -1,0 +1,17 @@
+{
+  "description": "Security audit hooks for detecting risky command patterns before execution",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/check_risky_command.py",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
+}
