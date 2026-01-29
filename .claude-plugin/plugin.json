@@ -1,6 +1,6 @@
 {
   "name": "security-audit",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Security audit patterns for PHP/OWASP with PreToolUse guards for risky commands",
   "repository": "https://github.com/netresearch/security-audit-skill",
   "license": "MIT",
@@ -10,6 +10,5 @@
   },
   "skills": [
     "./skills/security-audit"
-  ],
-  "hooks": "./hooks/hooks.json"
+  ]
 }
