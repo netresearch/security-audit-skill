@@ -1,0 +1,199 @@
+# Checkpoints for security-audit skill
+# Focuses on security best practices for PHP/TYPO3 extensions
+
+version: 1
+skill_id: security-audit
+
+mechanical:
+  # === SECURITY DOCUMENTATION ===
+  - id: SA-01
+    type: file_exists
+    target: SECURITY.md
+    severity: warning
+    desc: "SECURITY.md should exist for vulnerability reporting"
+
+  # === SECRETS NOT IN VCS ===
+  - id: SA-02
+    type: contains
+    target: .gitignore
+    pattern: ".env"
+    severity: error
+    desc: ".env files must be in .gitignore to prevent credential leaks"
+
+  - id: SA-03
+    type: file_not_exists
+    target: .env
+    severity: error
+    desc: ".env file must not be committed to repository"
+
+  - id: SA-04
+    type: not_contains
+    target: "**/*.php"
+    pattern: "password = "
+    severity: warning
+    desc: "PHP files should not contain hardcoded password assignments"
+
+  - id: SA-05
+    type: not_contains
+    target: "**/*.php"
+    pattern: "api_key = "
+    severity: warning
+    desc: "PHP files should not contain hardcoded API key assignments"
+
+  - id: SA-06
+    type: not_contains
+    target: "**/*.php"
+    pattern: "secret = "
+    severity: warning
+    desc: "PHP files should not contain hardcoded secret assignments"
+
+  # === COMPOSER AUDIT IN CI ===
+  - id: SA-07
+    type: regex
+    target: .github/workflows/*.yml
+    pattern: "composer audit"
+    severity: error
+    desc: "CI must run composer audit to detect vulnerable dependencies"
+
+  # === XXE PREVENTION ===
+  - id: SA-08
+    type: regex
+    target: "**/*.php"
+    pattern: "LIBXML_NOENT|LIBXML_DTDLOAD"
+    severity: error
+    desc: "PHP files must not use dangerous LIBXML flags that enable XXE"
+
+  - id: SA-09
+    type: regex
+    target: "**/*.php"
+    pattern: "libxml_disable_entity_loader\\(false\\)"
+    severity: error
+    desc: "Must not explicitly enable XML entity loading (XXE vulnerability)"
+
+  # === SQL INJECTION PREVENTION ===
+  - id: SA-10
+    type: not_contains
+    target: "**/*.php"
+    pattern: "$_GET["
+    severity: warning
+    desc: "Direct use of $_GET should be avoided (use framework request handling)"
+
+  - id: SA-11
+    type: not_contains
+    target: "**/*.php"
+    pattern: "$_POST["
+    severity: warning
+    desc: "Direct use of $_POST should be avoided (use framework request handling)"
+
+  - id: SA-12
+    type: not_contains
+    target: "**/*.php"
+    pattern: "$_REQUEST["
+    severity: warning
+    desc: "Direct use of $_REQUEST should be avoided (use framework request handling)"
+
+  # === XSS PREVENTION ===
+  - id: SA-13
+    type: regex
+    target: "**/*.php"
+    pattern: "echo\\s+\\$"
+    severity: warning
+    desc: "Direct echo of variables may be XSS vulnerable - use htmlspecialchars()"
+
+  # === DEPENDABOT FOR SECURITY ===
+  - id: SA-14
+    type: file_exists
+    target: .github/dependabot.yml
+    severity: warning
+    desc: "Dependabot should be enabled for security updates"
+
+  - id: SA-15
+    type: contains
+    target: .github/dependabot.yml
+    pattern: 'package-ecosystem: "composer"'
+    severity: warning
+    desc: "Dependabot should monitor composer for security vulnerabilities"
+
+llm_reviews:
+  # === HARDCODED CREDENTIALS REVIEW ===
+  - id: SA-16
+    domain: security
+    prompt: |
+      Search for hardcoded credentials in the codebase:
+      1. Look for patterns like: password, secret, api_key, token, credentials
+      2. Check configuration files for plaintext secrets
+      3. Look for Base64-encoded strings that might be credentials
+      4. Check for AWS keys, database connection strings with passwords
+      5. Verify environment variables are used instead of hardcoded values
+
+      Report any findings with file paths and line numbers.
+    severity: error
+    desc: "Verify no hardcoded credentials exist in codebase"
+
+  # === SQL INJECTION REVIEW ===
+  - id: SA-17
+    domain: security
+    prompt: |
+      Audit for SQL injection vulnerabilities:
+      1. Check if database queries use prepared statements/parameterized queries
+      2. Look for string concatenation in SQL queries
+      3. Verify TYPO3 QueryBuilder is used correctly with parameters
+      4. Check for raw SQL with user input
+      5. Look for patterns like: "SELECT * FROM table WHERE id = " . $id
+
+      For TYPO3, verify:
+      - QueryBuilder createNamedParameter() is used for user input
+      - No direct SQL string building with request data
+    severity: error
+    desc: "Verify prepared statements are used to prevent SQL injection"
+
+  # === XXE PREVENTION REVIEW ===
+  - id: SA-18
+    domain: security
+    prompt: |
+      Audit XML parsing for XXE vulnerabilities:
+      1. Check all XML parsing code (DOMDocument, SimpleXML, XMLReader)
+      2. Verify LIBXML_NOENT and LIBXML_DTDLOAD are NOT used
+      3. Look for safe flags: LIBXML_NONET, LIBXML_NOBLANKS
+      4. Check if libxml_disable_entity_loader() is called (deprecated in PHP 8)
+      5. For PHP 8+, verify no external entity loading configuration
+
+      Safe pattern example:
+      $doc = new DOMDocument();
+      $doc->loadXML($xml, LIBXML_NONET | LIBXML_NOBLANKS);
+    severity: error
+    desc: "Verify XML parsing is protected against XXE attacks"
+
+  # === XSS PREVENTION REVIEW ===
+  - id: SA-19
+    domain: security
+    prompt: |
+      Audit for Cross-Site Scripting (XSS) vulnerabilities:
+      1. Check output encoding in PHP files and templates
+      2. Verify htmlspecialchars() or equivalent is used for HTML output
+      3. Check Fluid templates for proper escaping (f:format.htmlspecialchars)
+      4. Look for echo/print of unescaped user input
+      5. Check JavaScript contexts for proper JSON encoding
+
+      For TYPO3/Fluid:
+      - By default Fluid escapes output, but check for f:format.raw usage
+      - Verify ContentObjectRenderer output is properly escaped
+    severity: error
+    desc: "Verify output encoding prevents XSS attacks"
+
+  # === AUTHENTICATION/AUTHORIZATION REVIEW ===
+  - id: SA-20
+    domain: security
+    prompt: |
+      Review authentication and authorization mechanisms:
+      1. Check if backend modules require proper authentication
+      2. Verify frontend plugins validate user permissions
+      3. Look for access control checks before sensitive operations
+      4. Check for proper CSRF token validation
+      5. Verify session handling is secure
+
+      For TYPO3:
+      - Check for proper $GLOBALS['BE_USER'] access checks
+      - Verify Extbase actions use @TYPO3\CMS\Extbase\Annotation\IgnoreValidation carefully
+    severity: warning
+    desc: "Verify proper authentication and authorization controls"
