@@ -57,16 +57,23 @@ mechanical:
 
   # === XXE PREVENTION ===
   - id: SA-08
-    type: regex
+    type: not_contains
     target: "Classes/**/*.php"
-    pattern: "LIBXML_NOENT|LIBXML_DTDLOAD"
+    pattern: "LIBXML_NOENT"
     severity: error
-    desc: "PHP files must not use dangerous LIBXML flags that enable XXE"
+    desc: "PHP files must not use LIBXML_NOENT flag that enables XXE"
+
+  - id: SA-08b
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "LIBXML_DTDLOAD"
+    severity: error
+    desc: "PHP files must not use LIBXML_DTDLOAD flag that enables XXE"
 
   - id: SA-09
-    type: regex
+    type: not_contains
     target: "Classes/**/*.php"
-    pattern: "libxml_disable_entity_loader\\(false\\)"
+    pattern: "libxml_disable_entity_loader(false)"
     severity: error
     desc: "Must not explicitly enable XML entity loading (XXE vulnerability)"
 
@@ -94,9 +101,9 @@ mechanical:
 
   # === XSS PREVENTION ===
   - id: SA-13
-    type: regex
+    type: not_contains
     target: "Classes/**/*.php"
-    pattern: "echo\\s+\\$"
+    pattern: "echo $"
     severity: warning
     desc: "Direct echo of variables may be XSS vulnerable - use htmlspecialchars()"
 
