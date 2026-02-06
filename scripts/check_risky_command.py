@@ -79,7 +79,7 @@ RISKY_PATTERNS = [
     },
     # Force push to main
     {
-        "pattern": r"git\s+push\s+(-f|--force).*\b(main|master)\b",
+        "pattern": r"git\s+push\s+(-f\b|--force\s).*\b(main|master)\b",
         "severity": "high",
         "message": "Force push to main/master - may lose commits",
     },

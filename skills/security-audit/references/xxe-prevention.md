@@ -66,12 +66,10 @@ final class SecureXmlLoader
             $dom = new DOMDocument();
             $dom->preserveWhiteSpace = false;
 
-            // Secure flags
-            $flags = LIBXML_NONET          // Disable network access
-                   | LIBXML_NOENT          // Substitute entities
-                   | LIBXML_DTDLOAD        // Don't load external DTD
-                   | LIBXML_DTDATTR        // Don't process DTD attributes
-                   | LIBXML_PARSEHUGE;     // Enable large doc parsing safely
+            // Secure flags — only LIBXML_NONET is safe for XXE prevention
+            // WARNING: Do NOT use LIBXML_NOENT (enables entity substitution)
+            // WARNING: Do NOT use LIBXML_DTDLOAD (enables external DTD loading)
+            $flags = LIBXML_NONET;         // Disable network access
 
             $success = $dom->loadXML($xml, $flags);
 
@@ -133,7 +131,7 @@ final class SecureSimpleXml
         $previousUseErrors = libxml_use_internal_errors(true);
 
         try {
-            $flags = LIBXML_NONET | LIBXML_NOENT | LIBXML_DTDLOAD;
+            $flags = LIBXML_NONET;
 
             $element = simplexml_load_string($xml, SimpleXMLElement::class, $flags);
 
@@ -167,7 +165,7 @@ final class SecureSimpleXml
         $previousUseErrors = libxml_use_internal_errors(true);
 
         try {
-            $flags = LIBXML_NONET | LIBXML_NOENT | LIBXML_DTDLOAD;
+            $flags = LIBXML_NONET;
 
             $element = simplexml_load_file($path, SimpleXMLElement::class, $flags);
 
@@ -205,7 +203,7 @@ final class SecureXmlReader
         $reader->setParserProperty(XMLReader::LOADDTD, false);
 
         // Use memory stream for string input
-        $reader->XML($xml, 'UTF-8', LIBXML_NONET | LIBXML_NOENT);
+        $reader->XML($xml, 'UTF-8', LIBXML_NONET);
 
         return $reader;
     }
@@ -217,7 +215,7 @@ final class SecureXmlReader
         $reader->setParserProperty(XMLReader::SUBST_ENTITIES, false);
         $reader->setParserProperty(XMLReader::LOADDTD, false);
 
-        $reader->open($path, 'UTF-8', LIBXML_NONET | LIBXML_NOENT);
+        $reader->open($path, 'UTF-8', LIBXML_NONET);
 
         return $reader;
     }
@@ -233,7 +231,7 @@ use Symfony\Component\Serializer\Encoder\XmlEncoder;
 
 // Secure configuration
 $encoder = new XmlEncoder([
-    XmlEncoder::LOAD_OPTIONS => LIBXML_NONET | LIBXML_NOENT | LIBXML_DTDLOAD,
+    XmlEncoder::LOAD_OPTIONS => LIBXML_NONET,
 ]);
 
 // Usage
@@ -297,12 +295,11 @@ $vulnerablePatterns = [
     'DOMDocument->loadHTML',  // Can also be vulnerable
 ];
 
-// Without these mitigations
+// Without these mitigations (LIBXML_NONET is the key safe flag)
+// WARNING: LIBXML_NOENT and LIBXML_DTDLOAD are NOT mitigations — they ENABLE XXE
 $requiredMitigations = [
-    'libxml_disable_entity_loader',
-    'LIBXML_NONET',
-    'LIBXML_NOENT',
-    'LIBXML_DTDLOAD',
+    'libxml_disable_entity_loader',  // PHP < 8.0
+    'LIBXML_NONET',                  // Disable network access
 ];
 ```
 

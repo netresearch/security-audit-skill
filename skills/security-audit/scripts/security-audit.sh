@@ -20,7 +20,7 @@ if [[ -d "$PROJECT_DIR/src" ]]; then
     if [[ -n "$SECRETS" ]]; then
         echo "⚠️  Potential hardcoded secrets found:"
         echo "$SECRETS" | head -5
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     else
         echo "✅ No obvious hardcoded secrets detected"
     fi
@@ -34,7 +34,7 @@ if [[ -d "$PROJECT_DIR/src" ]]; then
     if [[ -n "$SQL_VULN" ]]; then
         echo "⚠️  Potential SQL injection patterns found:"
         echo "$SQL_VULN"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     else
         echo "✅ No obvious SQL injection patterns detected"
     fi
@@ -46,14 +46,22 @@ echo "=== Checking for XXE Vulnerabilities ==="
 if [[ -d "$PROJECT_DIR/src" ]]; then
     XXE_PATTERNS=$(grep -rn -E "(simplexml_load_string|DOMDocument|XMLReader)" "$PROJECT_DIR/src" --include="*.php" 2>/dev/null | head -10 || true)
     if [[ -n "$XXE_PATTERNS" ]]; then
-        # Check if LIBXML_NOENT is used
-        SECURED=$(grep -rn "LIBXML_NOENT\|LIBXML_NONET\|libxml_disable_entity_loader" "$PROJECT_DIR/src" --include="*.php" 2>/dev/null | wc -l || echo "0")
+        # Check for secure flags (LIBXML_NONET, libxml_disable_entity_loader)
+        # WARNING: LIBXML_NOENT and LIBXML_DTDLOAD are NOT mitigations — they enable XXE
+        SECURED=$(grep -rn "LIBXML_NONET\|libxml_disable_entity_loader" "$PROJECT_DIR/src" --include="*.php" 2>/dev/null | wc -l || echo "0")
         if [[ "$SECURED" -eq 0 ]]; then
             echo "⚠️  XML parsing found without obvious XXE protection:"
             echo "$XXE_PATTERNS" | head -5
-            ((WARNINGS++))
+            WARNINGS=$((WARNINGS + 1))
         else
             echo "✅ XML parsing with security flags detected"
+        fi
+        # Check for dangerous flags that enable XXE
+        DANGEROUS_FLAGS=$(grep -rn "LIBXML_NOENT\|LIBXML_DTDLOAD" "$PROJECT_DIR/src" --include="*.php" 2>/dev/null | head -5 || true)
+        if [[ -n "$DANGEROUS_FLAGS" ]]; then
+            echo "⚠️  DANGEROUS: LIBXML_NOENT/LIBXML_DTDLOAD found (these ENABLE XXE, not prevent it):"
+            echo "$DANGEROUS_FLAGS"
+            WARNINGS=$((WARNINGS + 1))
         fi
     else
         echo "✅ No XML parsing detected"
@@ -68,7 +76,7 @@ if [[ -d "$PROJECT_DIR/src" ]]; then
     if [[ -n "$DANGEROUS" ]]; then
         echo "⚠️  Potentially dangerous functions found:"
         echo "$DANGEROUS"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     else
         echo "✅ No obviously dangerous functions detected"
     fi
@@ -82,7 +90,7 @@ if [[ -d "$PROJECT_DIR/src" ]]; then
     if [[ -n "$INCLUDE_VULN" ]]; then
         echo "⚠️  Potential file inclusion vulnerabilities:"
         echo "$INCLUDE_VULN"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     else
         echo "✅ No obvious file inclusion vulnerabilities"
     fi
@@ -96,7 +104,7 @@ if [[ -d "$PROJECT_DIR/src" ]]; then
     if [[ -n "$XSS_PATTERNS" ]]; then
         echo "⚠️  Potential XSS vulnerabilities:"
         echo "$XSS_PATTERNS"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     else
         echo "✅ No obvious XSS patterns detected"
     fi
@@ -112,17 +120,17 @@ if [[ -f "$PROJECT_DIR/composer.lock" ]]; then
         if echo "$AUDIT_OUTPUT" | grep -q "Found"; then
             echo "⚠️  Vulnerable dependencies found:"
             echo "$AUDIT_OUTPUT" | head -20
-            ((WARNINGS++))
+            WARNINGS=$((WARNINGS + 1))
         else
             echo "✅ No known vulnerable dependencies"
         fi
     else
         echo "⚠️  Composer not available for dependency audit"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     fi
 else
     echo "⚠️  No composer.lock found"
-    ((WARNINGS++))
+    WARNINGS=$((WARNINGS + 1))
 fi
 
 # Check security headers in code
@@ -134,7 +142,7 @@ if [[ -d "$PROJECT_DIR/src" ]]; then
         echo "✅ Security headers configuration found ($HEADERS references)"
     else
         echo "⚠️  No security headers configuration detected"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     fi
 fi
 
@@ -147,7 +155,7 @@ if [[ -d "$PROJECT_DIR/src" ]]; then
         echo "✅ CSRF protection references found ($CSRF occurrences)"
     else
         echo "⚠️  No CSRF protection detected"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     fi
 fi
 

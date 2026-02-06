@@ -69,9 +69,7 @@ security-audit-skill/
 ├── references/
 │   ├── xxe-prevention.md                 # XXE vulnerability detection and prevention
 │   ├── owasp-top10.md                    # OWASP Top 10 vulnerability patterns
-│   ├── cvss-scoring.md                   # CVSS scoring methodology and examples
-│   ├── secure-php.md                     # PHP-specific security patterns
-│   └── secure-config.md                  # Secure configuration checklists
+│   └── cvss-scoring.md                   # CVSS scoring methodology and examples
 └── scripts/
     └── security-audit.sh                 # Security audit script
 ```
