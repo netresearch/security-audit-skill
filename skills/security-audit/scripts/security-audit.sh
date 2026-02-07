@@ -75,7 +75,8 @@ fi
 echo ""
 echo "=== Checking for SQL Injection Patterns ==="
 if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
-    # Direct superglobal to database method call
+    # Direct superglobal to database method call (dollar signs are regex literals)
+    # shellcheck disable=SC2016
     SQL_VULN=$(scan_php '\$_(GET|POST|REQUEST|COOKIE).*->(query|execute|prepare)')
     # String concatenation in SQL queries
     SQL_CONCAT=$(scan_php '"(SELECT|INSERT|UPDATE|DELETE)\s.*\.\s*\$' 5)
