@@ -260,7 +260,7 @@ mechanical:
   - id: SA-39
     type: regex
     target: "Classes/**/*.php"
-    pattern: "preg_replace\\s*\\(.*'/e'"
+    pattern: "preg_replace\\s*\\(.*?/e['\"]"
     severity: error
     desc: "Deprecated /e modifier in preg_replace enables code execution (CWE-94)"
 

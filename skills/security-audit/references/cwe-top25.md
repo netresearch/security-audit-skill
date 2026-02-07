@@ -140,7 +140,8 @@ readfile('/uploads/' . $file); // ../../../etc/passwd
 ```php
 $filename = basename($_GET['file']); // Strip path components
 $path = realpath('/uploads/' . $filename);
-if ($path === false || !str_starts_with($path, '/uploads/')) {
+$baseDir = realpath('/uploads');
+if ($path === false || $baseDir === false || !str_starts_with($path, $baseDir . DIRECTORY_SEPARATOR)) {
     throw new SecurityException('Invalid path');
 }
 readfile($path);
@@ -597,7 +598,7 @@ if (!$this->rateLimiter->consume($clientIp)->isAccepted()) {
 | 17 | 863 | Incorrect Authz | — | SA-20 | — | authentication-patterns |
 | 18 | 20 | Input Validation | — | — | — | input-validation |
 | 19 | 284 | Access Control | — | SA-LLM-31 | — | authentication-patterns |
-| 20 | 200 | Info Exposure | SA-31,SEC-01..04 | SA-LLM-30 | Yes | — |
+| 20 | 200 | Info Exposure | SA-31, SA-SEC-01..04 | SA-LLM-30 | Yes | — |
 | 21 | 306 | Missing Auth | — | SA-20 | — | authentication-patterns |
 | 22 | 918 | SSRF | — | SA-LLM-26 | Yes | modern-attacks |
 | 23 | 77 | Cmd Injection | SA-25..28 | — | Yes | owasp-top10 |

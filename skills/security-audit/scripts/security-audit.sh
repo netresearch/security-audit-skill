@@ -306,7 +306,7 @@ echo ""
 echo "=== Checking for SSRF Patterns ==="
 if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
     # shellcheck disable=SC2016
-    SSRF_PATTERNS=$(scan_php '(file_get_contents|curl_init|curl_setopt.*CURLOPT_URL)\s*\(.*\$_(GET|POST|REQUEST)')
+    SSRF_PATTERNS=$(scan_php '(file_get_contents|curl_init|curl_setopt.*CURLOPT_URL)\s*\([^)]*\$_(GET|POST|REQUEST)')
     if [[ -n "$SSRF_PATTERNS" ]]; then
         echo "🔴 Potential SSRF vulnerability (user-controlled URL in HTTP request):"
         echo "$SSRF_PATTERNS"
