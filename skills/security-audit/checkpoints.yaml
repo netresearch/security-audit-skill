@@ -325,7 +325,7 @@ mechanical:
   - id: SA-42
     type: regex
     target: "Classes/**/*.php"
-    pattern: "in_array\\(\\$_.*(?!true\\s*\\))"
+    pattern: "in_array\\s*\\(\\s*\\$_(GET|POST|REQUEST|COOKIE)[^,)]*,[^,)]*(?:,\\s*(?!true)[^)]*)?\\)"
     severity: warning
     desc: "in_array() with superglobal without strict flag enables type juggling (CWE-843)"
 
@@ -389,7 +389,7 @@ mechanical:
   - id: SA-50
     type: regex
     target: "Classes/**/*.php"
-    pattern: "\\$_SERVER\\[.HTTP_HOST.\\].*(/reset|/confirm|/verify|/activate)"
+    pattern: "\\$_SERVER\\[['\"]HTTP_HOST['\"]\\].*(/reset|/confirm|/verify|/activate)"
     severity: warning
     desc: "HTTP_HOST used in security-critical URL construction enables host header poisoning (CWE-644)"
 
