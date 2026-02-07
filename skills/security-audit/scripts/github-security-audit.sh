@@ -26,6 +26,19 @@ echo "=== GitHub Security Audit ==="
 echo "Repository: $REPO"
 echo ""
 
+# Verify sufficient API permissions before running checks
+PERM_CHECK=$(gh api "repos/$REPO" --jq '.permissions.admin // false' 2>/dev/null || echo "unknown")
+if [[ "$PERM_CHECK" == "false" ]]; then
+    echo "WARNING: You do not have admin access to this repository."
+    echo "         Some checks (branch protection, vulnerability alerts, workflow"
+    echo "         permissions) may return incomplete results or false positives."
+    echo ""
+elif [[ "$PERM_CHECK" == "unknown" ]]; then
+    echo "WARNING: Could not determine your access level for this repository."
+    echo "         Results may be incomplete if you lack admin/security permissions."
+    echo ""
+fi
+
 # Helper: record a finding
 finding() {
     local severity="$1"

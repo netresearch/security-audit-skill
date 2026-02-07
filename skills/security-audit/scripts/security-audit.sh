@@ -68,6 +68,10 @@ if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
 fi
 
 # === Check for SQL injection patterns ===
+# NOTE: This grep-based check only catches direct superglobal-to-query flows and
+# obvious string concatenation. It cannot track indirect data flows where user input
+# is assigned to a variable first. For deeper taint analysis, use PHPStan (level 9+)
+# with phpstan-strict-rules or Psalm with taint analysis (@psalm-taint-source).
 echo ""
 echo "=== Checking for SQL Injection Patterns ==="
 if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then

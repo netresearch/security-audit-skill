@@ -142,6 +142,36 @@ RISKY_PATTERNS = [
         "severity": "high",
         "message": "Download to temp and execute pattern - verify source",
     },
+    # Filesystem formatting
+    {
+        "pattern": r"mkfs\.\w+\s+/dev/",
+        "severity": "high",
+        "message": "Formatting a block device - will destroy all data",
+    },
+    # Firewall flush
+    {
+        "pattern": r"iptables\s+(-F|--flush)",
+        "severity": "high",
+        "message": "Flushing all firewall rules - may expose services",
+    },
+    # Kill init/systemd
+    {
+        "pattern": r"kill\s+(-9\s+)?1\b",
+        "severity": "high",
+        "message": "Killing PID 1 (init/systemd) - may crash the system",
+    },
+    # Redirect truncation of critical files
+    {
+        "pattern": r">\s*/etc/(passwd|shadow|sudoers|hosts|fstab|resolv\.conf)",
+        "severity": "high",
+        "message": "Redirect truncation of critical system file",
+    },
+    # History clearing (audit trail destruction)
+    {
+        "pattern": r"history\s+-c|>\s*~/\.bash_history|>\s*~/\.(zsh_)?history",
+        "severity": "medium",
+        "message": "Clearing shell history - destroys audit trail",
+    },
 ]
 
 

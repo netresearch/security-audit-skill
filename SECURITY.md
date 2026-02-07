@@ -106,6 +106,16 @@ Reference documents and audit scripts are aligned with:
 - Vulnerable code examples are clearly marked with `// VULNERABLE - DO NOT USE`.
 - Secure alternatives are provided with `// SECURE:` annotations.
 
+### Known Limitations
+
+- **Hook integrity:** The PreToolUse hook script (`scripts/check_risky_command.py`) has
+  no post-installation integrity verification. If an attacker gains write access to the
+  installed skill directory, they could modify the hook to suppress warnings. Users
+  should monitor file modifications in their skill installation directory.
+- **Hook scope:** The PreToolUse hook only intercepts the `Bash` tool. Commands executed
+  via other tool types (e.g., writing a script file and executing it separately) are not
+  inspected by the hook.
+
 ## Recognition
 
 We credit responsible reporters in release notes (unless anonymity is requested).

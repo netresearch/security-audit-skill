@@ -38,7 +38,7 @@ jobs:
           [ -d "skills/security-audit/templates" ] && cp -r skills/security-audit/templates dist/
           # Include hooks and root-level scripts
           [ -d "hooks" ] && cp -r hooks dist/
-          [ -d "scripts" ] && cp -r scripts dist/
+          [ -d "scripts" ] && cp -r scripts dist/ && find dist/scripts -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
           # Include plugin manifest
           [ -d ".claude-plugin" ] && cp -r .claude-plugin dist/
           cd dist
