@@ -36,6 +36,9 @@ jobs:
           [ -d "skills/security-audit/scripts" ] && cp -r skills/security-audit/scripts dist/
           [ -d "skills/security-audit/assets" ] && cp -r skills/security-audit/assets dist/
           [ -d "skills/security-audit/templates" ] && cp -r skills/security-audit/templates dist/
+          # Include hooks and root-level scripts
+          [ -d "hooks" ] && cp -r hooks dist/
+          [ -d "scripts" ] && cp -r scripts dist/
           # Include plugin manifest
           [ -d ".claude-plugin" ] && cp -r .claude-plugin dist/
           cd dist

@@ -1,4 +1,4 @@
-# CVSS v3.1 Scoring Guide
+# CVSS Scoring Guide (v3.1 & v4.0)
 
 ## Base Metrics
 
@@ -293,13 +293,13 @@ final class CvssCalculator
 ```
                     IMPACT
               Low   Medium   High
-         ┌────────┬────────┬────────┐
-    High │ Medium │  High  │Critical│
-         ├────────┼────────┼────────┤
-L  Medium│  Low   │ Medium │  High  │
-I        ├────────┼────────┼────────┤
-K    Low │  Low   │  Low   │ Medium │
-E        └────────┴────────┴────────┘
+         +--------+--------+--------+
+    High | Medium |  High  |Critical|
+         +--------+--------+--------+
+L  Medium|  Low   | Medium |  High  |
+I        +--------+--------+--------+
+K    Low |  Low   |  Low   | Medium |
+E        +--------+--------+--------+
 L
 I   Legend:
 H     Critical: Immediate action required
@@ -307,6 +307,67 @@ O     High: Address within 24 hours
 O     Medium: Address within 1 week
 D     Low: Address within 1 month
 ```
+
+## CVSS v4.0 (Current Standard)
+
+CVSS v4.0 was released November 2023 and is the current standard.
+
+### Key Changes from v3.1
+- New metric group: Supplemental Metrics (Automatable, Recovery, Value Density, Provider Urgency)
+- Attack Requirements (AT) replaces some Attack Complexity nuances
+- User Interaction split into None/Passive/Active
+- Subsequent System impact metrics (for scope-like changes)
+- No more "Scope" metric - replaced by Vulnerable/Subsequent system impact separation
+- New nomenclature: CVSS-B (Base), CVSS-BT (Base+Threat), CVSS-BE (Base+Environmental), CVSS-BTE (all)
+
+### v4.0 Base Metrics
+
+| Metric | Values |
+|--------|--------|
+| Attack Vector (AV) | Network, Adjacent, Local, Physical |
+| Attack Complexity (AC) | Low, High |
+| Attack Requirements (AT) | None, Present |
+| Privileges Required (PR) | None, Low, High |
+| User Interaction (UI) | None, Passive, Active |
+| Vulnerable System CIA | High, Low, None |
+| Subsequent System CIA | High, Low, None |
+
+### v4.0 Vector String Format
+```
+CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N
+```
+
+### Example: SQLi (v3.1 vs v4.0)
+```yaml
+# v3.1
+CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H = 9.8 CRITICAL
+
+# v4.0
+CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N = 9.3 CRITICAL
+```
+
+### Example: Stored XSS (v3.1 vs v4.0)
+```yaml
+# v3.1
+CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:L/I:L/A:N = 5.4 MEDIUM
+
+# v4.0
+CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:A/VC:N/VI:N/VA:N/SC:L/SI:L/SA:N = 5.1 MEDIUM
+```
+
+### Severity Ratings (v4.0 - same scale)
+| Score Range | Severity |
+|-------------|----------|
+| 0.0 | None |
+| 0.1 - 3.9 | Low |
+| 4.0 - 6.9 | Medium |
+| 7.0 - 8.9 | High |
+| 9.0 - 10.0 | Critical |
+
+### Migration Notes
+- Use v4.0 for new assessments
+- Existing v3.1 scores remain valid for historical reference
+- FIRST.org CVSS v4.0 calculator: https://www.first.org/cvss/calculator/4.0
 
 ## Reporting Template
 

@@ -1,7 +1,7 @@
 {
   "name": "security-audit",
-  "version": "1.3.1",
-  "description": "Security audit patterns for PHP/OWASP with PreToolUse warnings for risky commands",
+  "version": "2.0.0",
+  "description": "Comprehensive PHP security audit: OWASP Top 10, CWE Top 25, CVSS v4.0, 17 reference guides, 45+ checkpoints, CI/CD pipeline security, PreToolUse warnings",
   "repository": "https://github.com/netresearch/security-audit-skill",
   "license": "MIT",
   "author": {

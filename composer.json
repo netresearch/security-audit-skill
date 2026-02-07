@@ -15,6 +15,6 @@
     "netresearch/composer-agent-skill-plugin": "^1.0"
   },
   "extra": {
-    "ai-agent-skill": "SKILL.md"
+    "ai-agent-skill": "skills/security-audit/SKILL.md"
   }
 }

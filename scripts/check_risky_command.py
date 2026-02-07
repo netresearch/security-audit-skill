@@ -55,7 +55,7 @@ RISKY_PATTERNS = [
         "message": "Hardcoded credential in command - use environment variables",
     },
     {
-        "pattern": r"echo\s+['\"]?(\$\{?(PASSWORD|SECRET|TOKEN|API_KEY)",
+        "pattern": r"echo\s+['\"]?\$\{?(PASSWORD|SECRET|TOKEN|API_KEY)",
         "severity": "medium",
         "message": "Echoing sensitive variable - may appear in logs",
     },
@@ -82,6 +82,65 @@ RISKY_PATTERNS = [
         "pattern": r"git\s+push\s+(-f\b|--force\s).*\b(main|master)\b",
         "severity": "high",
         "message": "Force push to main/master - may lose commits",
+    },
+    # Reverse shell / remote access
+    {
+        "pattern": r"\b(nc|ncat|netcat)\s+(-[a-z]*[le]|.*\|.*(ba)?sh)",
+        "severity": "high",
+        "message": "Possible reverse shell via netcat",
+    },
+    # Obfuscated command execution
+    {
+        "pattern": r"base64\s+(-d|--decode).*\|\s*(ba)?sh",
+        "severity": "high",
+        "message": "Base64-decoded content piped to shell - obfuscated execution",
+    },
+    # Dangerous dd targets
+    {
+        "pattern": r"dd\s+.*of=/dev/(sd[a-z]|nvme|disk|mmcblk)",
+        "severity": "high",
+        "message": "dd writing to raw block device - may destroy data",
+    },
+    # Database destructive operations
+    {
+        "pattern": r"(DROP\s+(DATABASE|TABLE|SCHEMA)|TRUNCATE\s+TABLE|DELETE\s+FROM\s+\w+\s*;)",
+        "severity": "high",
+        "message": "Destructive database operation detected",
+    },
+    # sudo with dangerous commands
+    {
+        "pattern": r"sudo\s+(rm|dd|mkfs|fdisk|chmod\s+777|chown\s+-R)",
+        "severity": "medium",
+        "message": "Elevated privileges with potentially destructive command",
+    },
+    # Package install without verification
+    {
+        "pattern": r"(pip|pip3)\s+install.*--no-verify",
+        "severity": "medium",
+        "message": "Package install skipping verification - supply chain risk",
+    },
+    {
+        "pattern": r"npm\s+install.*--ignore-scripts\s*$",
+        "severity": "medium",
+        "message": "npm install with --ignore-scripts may skip security checks",
+    },
+    # Dangerous environment variable exposure
+    {
+        "pattern": r"printenv|env\s*$|set\s*$",
+        "severity": "medium",
+        "message": "Environment dump may expose secrets in logs",
+    },
+    # SSH/SCP with disabled host key checking
+    {
+        "pattern": r"(ssh|scp).*StrictHostKeyChecking\s*=?\s*no",
+        "severity": "medium",
+        "message": "Disabled SSH host key checking - vulnerable to MITM",
+    },
+    # Wget/curl to suspicious paths
+    {
+        "pattern": r"(wget|curl).*-o\s*/tmp/.*&&.*(chmod\s+\+x|sh\s|bash\s)",
+        "severity": "high",
+        "message": "Download to temp and execute pattern - verify source",
     },
 ]
 

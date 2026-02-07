@@ -1,7 +1,7 @@
 # Checkpoints for security-audit skill
 # Focuses on security best practices for PHP/TYPO3 extensions
 
-version: 1
+version: 2
 skill_id: security-audit
 
 mechanical:
@@ -121,6 +121,205 @@ mechanical:
     severity: warning
     desc: "Dependabot should monitor composer for security vulnerabilities"
 
+  # === DESERIALIZATION PREVENTION ===
+  - id: SA-21
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "unserialize($_"
+    severity: error
+    desc: "Never unserialize user input - use json_decode instead"
+
+  - id: SA-22
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "unserialize($"
+    severity: warning
+    desc: "unserialize() should use allowed_classes parameter or be replaced with json_decode"
+
+  # === INSECURE PASSWORD HASHING ===
+  - id: SA-23
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "md5($pass"
+    severity: error
+    desc: "md5 must not be used for password hashing - use password_hash()"
+
+  - id: SA-24
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "sha1($pass"
+    severity: error
+    desc: "sha1 must not be used for password hashing - use password_hash()"
+
+  # === COMMAND INJECTION ===
+  - id: SA-25
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "exec($_"
+    severity: error
+    desc: "Running commands with user input is a command injection vulnerability"
+
+  - id: SA-26
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "system($_"
+    severity: error
+    desc: "system() with user input is a command injection vulnerability"
+
+  - id: SA-27
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "shell_exec($_"
+    severity: error
+    desc: "shell_exec() with user input is a command injection vulnerability"
+
+  - id: SA-28
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "passthru($_"
+    severity: error
+    desc: "passthru() with user input is a command injection vulnerability"
+
+  # === INSECURE RANDOMNESS ===
+  - id: SA-29
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "rand()"
+    severity: warning
+    desc: "rand() should not be used for security purposes - use random_int()"
+
+  - id: SA-30
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "mt_rand()"
+    severity: warning
+    desc: "mt_rand() should not be used for security purposes - use random_int()"
+
+  # === INFORMATION DISCLOSURE ===
+  - id: SA-31
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "phpinfo()"
+    severity: warning
+    desc: "phpinfo() should not be in production code - information disclosure risk"
+
+  # === FILE UPLOAD SAFETY ===
+  - id: SA-32
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "move_uploaded_file($_"
+    severity: warning
+    desc: "Direct move_uploaded_file with superglobal needs security review - use framework file handling"
+
+  # === COOKIE SECURITY ===
+  - id: SA-33
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "$_COOKIE["
+    severity: warning
+    desc: "Direct use of $_COOKIE should be avoided (use framework request handling)"
+
+  # === OPEN REDIRECT ===
+  - id: SA-34
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "header('Location: ' . $_"
+    severity: error
+    desc: "Open redirect vulnerability - never use user input directly in Location header"
+
+  - id: SA-35
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: 'header("Location: " . $_'
+    severity: error
+    desc: "Open redirect vulnerability - never use user input directly in Location header"
+
+  # === SECURITY HEADERS ===
+  - id: SA-36
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "X-XSS-Protection: 1"
+    severity: warning
+    desc: "X-XSS-Protection is deprecated - use Content-Security-Policy instead"
+
+  # === SECRET SCANNING ===
+  - id: SA-SEC-01
+    type: not_contains
+    target: "**/*.php"
+    pattern: "AKIA"
+    severity: error
+    desc: "Possible AWS access key found in source code"
+
+  - id: SA-SEC-02
+    type: not_contains
+    target: "**/*.php"
+    pattern: "sk-ant-"
+    severity: error
+    desc: "Possible Anthropic API key found in source code"
+
+  - id: SA-SEC-03
+    type: not_contains
+    target: "**/*.php"
+    pattern: "sk-proj-"
+    severity: error
+    desc: "Possible OpenAI API key found in source code"
+
+  - id: SA-SEC-04
+    type: file_exists
+    target: .gitignore
+    severity: error
+    desc: ".gitignore must exist to prevent accidental secret commits"
+
+  # === SUPPLY CHAIN ===
+  - id: SA-SC-01
+    type: file_exists
+    target: composer.lock
+    severity: warning
+    desc: "composer.lock should exist for reproducible builds (apps, not libraries)"
+
+  - id: SA-SC-02
+    type: not_contains
+    target: "composer.json"
+    pattern: '"*"'
+    severity: error
+    desc: "Wildcard (*) version constraints in composer.json are insecure"
+
+  # === SAST TOOLING ===
+  - id: SA-SAST-01
+    type: regex
+    target: .github/workflows/*.yml
+    pattern: "phpstan"
+    severity: warning
+    desc: "PHPStan should be configured in CI for static analysis"
+
+  # === DEPENDENCY SCANNING ===
+  - id: SA-DEP-01
+    type: file_exists
+    target: .github/dependabot.yml
+    severity: warning
+    desc: "Dependabot or Renovate should be configured for dependency updates"
+
+  - id: SA-DEP-02
+    type: regex
+    target: .github/workflows/*.yml
+    pattern: "composer audit|trivy|snyk"
+    severity: warning
+    desc: "CI should include dependency vulnerability scanning"
+
+  # === SECURITY POLICY ===
+  - id: SA-SP-01
+    type: file_exists
+    target: SECURITY.md
+    severity: warning
+    desc: "SECURITY.md must exist with vulnerability reporting instructions"
+
+  - id: SA-SP-02
+    type: contains
+    target: SECURITY.md
+    pattern: "Reporting"
+    severity: warning
+    desc: "SECURITY.md should contain reporting instructions"
+
 llm_reviews:
   # === HARDCODED CREDENTIALS REVIEW ===
   - id: SA-16
@@ -204,3 +403,68 @@ llm_reviews:
       - Verify Extbase actions use @TYPO3\CMS\Extbase\Annotation\IgnoreValidation carefully
     severity: warning
     desc: "Verify proper authentication and authorization controls"
+
+  # === DESERIALIZATION REVIEW ===
+  - id: SA-LLM-21
+    domain: security
+    prompt: |
+      Audit for insecure deserialization:
+      1. Search for unserialize() calls - check if allowed_classes parameter is used
+      2. Look for phar:// usage in file operations (triggers deserialization)
+      3. Check if user-controlled data reaches unserialize()
+      4. Verify JSON is used instead of serialize/unserialize for data exchange
+      5. Check for __wakeup() and __destruct() methods that could be gadget chains
+
+      Safe pattern: unserialize($data, ['allowed_classes' => false])
+      Best pattern: json_decode($data) instead
+    severity: error
+    desc: "Verify no insecure deserialization exists"
+
+  # === FILE UPLOAD REVIEW ===
+  - id: SA-LLM-22
+    domain: security
+    prompt: |
+      Audit file upload handling:
+      1. Check if MIME type is validated server-side (not just extension)
+      2. Verify uploaded files are renamed to random filenames
+      3. Check if uploads are stored outside the web root
+      4. Look for prevention of script execution in upload directories
+      5. Verify file size limits are enforced
+      6. Check for image reprocessing to strip metadata
+
+      For TYPO3: verify FAL (File Abstraction Layer) is used
+    severity: warning
+    desc: "Verify file uploads are handled securely"
+
+  # === CRYPTOGRAPHY REVIEW ===
+  - id: SA-LLM-23
+    domain: security
+    prompt: |
+      Audit cryptographic implementations:
+      1. Check for weak algorithms (MD5, SHA1 for integrity, DES, RC4, ECB mode)
+      2. Verify authenticated encryption is used (sodium_crypto_secretbox or AES-GCM)
+      3. Look for hardcoded encryption keys or IVs
+      4. Check for proper random generation (random_bytes, not rand/mt_rand)
+      5. Verify key derivation uses HKDF or similar (not plain hash)
+      6. Check for sodium_memzero() usage to clear sensitive data from memory
+
+      Recommended: Use sodium_crypto_secretbox for symmetric encryption
+    severity: error
+    desc: "Verify cryptographic practices are secure"
+
+  # === SECURITY HEADERS REVIEW ===
+  - id: SA-LLM-24
+    domain: security
+    prompt: |
+      Audit HTTP security headers configuration:
+      1. Check for HSTS (Strict-Transport-Security) with adequate max-age
+      2. Verify Content-Security-Policy is configured
+      3. Check X-Content-Type-Options: nosniff is set
+      4. Verify X-Frame-Options or CSP frame-ancestors is set
+      5. Check that X-XSS-Protection is set to 0 (deprecated, not 1; mode=block)
+      6. Look for Referrer-Policy and Permissions-Policy headers
+      7. Check middleware or TypoScript configuration for header settings
+
+      Note: X-XSS-Protection should be 0, not 1. The feature is deprecated.
+    severity: warning
+    desc: "Verify security headers are properly configured"
