@@ -331,6 +331,109 @@ if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
     fi
 fi
 
+# === Check for type juggling (CWE-843) ===
+echo ""
+echo "=== Checking for Type Juggling ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    # shellcheck disable=SC2016
+    TYPE_JUGGLE=$(scan_php '==\s*\$_(GET|POST|REQUEST|COOKIE)')
+    if [[ -n "$TYPE_JUGGLE" ]]; then
+        echo "🔴 Loose comparison (==) with user input (type juggling risk):"
+        echo "$TYPE_JUGGLE"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "✅ No obvious type juggling patterns detected"
+    fi
+fi
+
+# === Check for PHAR deserialization (CWE-502) ===
+echo ""
+echo "=== Checking for PHAR Deserialization ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    PHAR_PATTERNS=$(scan_php 'phar://')
+    if [[ -n "$PHAR_PATTERNS" ]]; then
+        echo "🔴 phar:// stream wrapper found (triggers deserialization):"
+        echo "$PHAR_PATTERNS"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "✅ No phar:// usage detected"
+    fi
+fi
+
+# === Check for email header injection (CWE-93) ===
+echo ""
+echo "=== Checking for Email Header Injection ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    # shellcheck disable=SC2016
+    EMAIL_INJECT=$(scan_php '\bmail\s*\([^)]*\$_(GET|POST|REQUEST)')
+    if [[ -n "$EMAIL_INJECT" ]]; then
+        echo "🔴 mail() with user input (header injection risk):"
+        echo "$EMAIL_INJECT"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "✅ No email header injection patterns detected"
+    fi
+fi
+
+# === Check for LDAP injection (CWE-90) ===
+echo ""
+echo "=== Checking for LDAP Injection ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    # shellcheck disable=SC2016
+    LDAP_INJECT=$(scan_php 'ldap_(search|bind)\s*\([^)]*\$_(GET|POST|REQUEST)')
+    if [[ -n "$LDAP_INJECT" ]]; then
+        echo "🔴 LDAP operation with user input (injection risk):"
+        echo "$LDAP_INJECT"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "✅ No LDAP injection patterns detected"
+    fi
+fi
+
+# === Check for insecure token generation (CWE-330) ===
+echo ""
+echo "=== Checking for Insecure Token Generation ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    INSECURE_TOKEN=$(scan_php '(md5|sha1)\s*\(\s*(time|microtime|uniqid|rand|mt_rand)\s*\(')
+    if [[ -n "$INSECURE_TOKEN" ]]; then
+        echo "🔴 Predictable token generation (use random_bytes instead):"
+        echo "$INSECURE_TOKEN"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "✅ No insecure token generation detected"
+    fi
+fi
+
+# === Check for session fixation (CWE-384) ===
+echo ""
+echo "=== Checking for Session Fixation ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    # shellcheck disable=SC2016
+    SESSION_FIX=$(scan_php 'session_id\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)')
+    if [[ -n "$SESSION_FIX" ]]; then
+        echo "🔴 Session ID set from user input (session fixation risk):"
+        echo "$SESSION_FIX"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "✅ No session fixation patterns detected"
+    fi
+fi
+
+# === Check for log injection (CWE-117) ===
+echo ""
+echo "=== Checking for Log Injection ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    # shellcheck disable=SC2016
+    LOG_INJECT=$(scan_php 'error_log\s*\([^)]*\$_(GET|POST|REQUEST|COOKIE)')
+    if [[ -n "$LOG_INJECT" ]]; then
+        echo "⚠️  Unsanitized user input in log calls (log injection risk):"
+        echo "$LOG_INJECT"
+        WARNINGS=$((WARNINGS + 1))
+    else
+        echo "✅ No log injection patterns detected"
+    fi
+fi
+
 # === Check for insecure cookie settings ===
 echo ""
 echo "=== Checking Cookie Security ==="

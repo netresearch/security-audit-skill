@@ -314,6 +314,100 @@ mechanical:
     severity: error
     desc: "Wildcard (*) version constraints in composer.json are insecure"
 
+  # === TYPE JUGGLING (CWE-843) ===
+  - id: SA-41
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "==\\s*\\$_(GET|POST|REQUEST|COOKIE)"
+    severity: error
+    desc: "Loose comparison (==) with superglobal enables type juggling attacks (CWE-843)"
+
+  - id: SA-42
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "in_array\\(\\$_.*(?!true\\s*\\))"
+    severity: warning
+    desc: "in_array() with superglobal without strict flag enables type juggling (CWE-843)"
+
+  # === PHAR DESERIALIZATION (CWE-502) ===
+  - id: SA-43
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "phar://"
+    severity: error
+    desc: "phar:// stream wrapper triggers deserialization and can lead to RCE (CWE-502)"
+
+  # === SSTI (CWE-1336) ===
+  - id: SA-44
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "createTemplate\\s*\\(.*\\$"
+    severity: error
+    desc: "Dynamic template creation with variables enables server-side template injection (CWE-1336)"
+
+  # === EMAIL HEADER INJECTION (CWE-93) ===
+  - id: SA-45
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "\\bmail\\s*\\([^)]*\\$_(GET|POST|REQUEST)"
+    severity: error
+    desc: "mail() with user input enables email header injection via CRLF (CWE-93)"
+
+  # === LDAP INJECTION (CWE-90) ===
+  - id: SA-46
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "ldap_(search|bind)\\s*\\([^)]*\\$_(GET|POST|REQUEST)"
+    severity: error
+    desc: "LDAP operations with user input without ldap_escape() enables LDAP injection (CWE-90)"
+
+  # === INSECURE TOKEN GENERATION (CWE-330) ===
+  - id: SA-47
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "(md5|sha1)\\s*\\(\\s*(time|microtime|uniqid|rand|mt_rand)\\s*\\("
+    severity: error
+    desc: "Predictable token generation using md5/sha1 of time/rand (CWE-330) - use random_bytes()"
+
+  # === LOG INJECTION / CRLF (CWE-117) ===
+  - id: SA-48
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "error_log\\s*\\([^)]*\\$_(GET|POST|REQUEST|COOKIE)"
+    severity: warning
+    desc: "Logging user input without sanitization enables log injection/forgery (CWE-117)"
+
+  # === SESSION FIXATION (CWE-384) ===
+  - id: SA-49
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "session_id\\s*\\(\\s*\\$_(GET|POST|REQUEST|COOKIE)"
+    severity: error
+    desc: "Setting session ID from user input enables session fixation attacks (CWE-384)"
+
+  # === HOST HEADER POISONING (CWE-644) ===
+  - id: SA-50
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "\\$_SERVER\\[.HTTP_HOST.\\].*(/reset|/confirm|/verify|/activate)"
+    severity: warning
+    desc: "HTTP_HOST used in security-critical URL construction enables host header poisoning (CWE-644)"
+
+  # === MASS ASSIGNMENT (CWE-915) ===
+  - id: SA-51
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "\\$guarded\\s*=\\s*\\[\\s*\\]"
+    severity: error
+    desc: "Empty $guarded array allows mass assignment of all model fields (CWE-915)"
+
+  - id: SA-52
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "->allowAllProperties()"
+    severity: error
+    desc: "allowAllProperties() disables TYPO3 Extbase mass assignment protection (CWE-915)"
+
   # === SAST TOOLING ===
   - id: SA-SAST-01
     type: regex
@@ -630,3 +724,166 @@ llm_reviews:
       - Verify frontend plugin access restrictions via TypoScript/Flexform
     severity: warning
     desc: "Verify access control is applied consistently at all layers (CWE-284)"
+
+  # === TYPE JUGGLING (CWE-843) ===
+  - id: SA-LLM-32
+    domain: security
+    prompt: |
+      Audit for PHP type juggling vulnerabilities in authentication and authorization:
+      1. Search for loose comparison (==) with user-supplied values, especially in auth code
+      2. Check password/token comparisons - must use hash_equals() not == or ===
+      3. Look for switch statements comparing user input (switch uses loose comparison)
+      4. Verify JWT/HMAC signature verification uses timing-safe comparison
+      5. Check for "0e" magic hash vulnerability in password comparisons
+      6. Look for in_array() without strict flag (third parameter true)
+
+      Vulnerable patterns:
+      - if ($token == $_POST['token'])  // "0" matches "0e12345"
+      - if ($role == 0)  // "admin" == 0 is true
+      - switch ($_GET['action']) { case 0: ... }  // "anything" == 0
+      - in_array($input, $whitelist)  // Without strict, "0" matches 0
+
+      Safe patterns:
+      - hash_equals($expected, $actual)
+      - in_array($input, $whitelist, true)
+      - === for all comparisons with user input
+    severity: error
+    desc: "Verify no loose comparison (==) with user input in auth/security code (CWE-843)"
+
+  # === JWT IMPLEMENTATION FLAWS (CWE-347) ===
+  - id: SA-LLM-33
+    domain: security
+    prompt: |
+      Audit JWT implementation for common vulnerabilities:
+      1. Check that JWT decode specifies allowed algorithms explicitly (algorithm confusion attack)
+      2. Verify "none" algorithm is not accepted
+      3. Check that RS256 tokens cannot be verified with HS256 using public key as secret
+      4. Verify JWT expiration (exp claim) is checked and enforced
+      5. Check that JWT secret/key is not hardcoded or too short
+      6. Verify audience (aud) and issuer (iss) claims are validated
+      7. Check for JWK/JWKS endpoint security (key injection via jku/x5u headers)
+
+      Vulnerable patterns:
+      - JWT::decode($token, $key) without algorithm allowlist
+      - Accepting tokens with alg: "none"
+      - Short/predictable JWT secrets (less than 256 bits)
+
+      Safe patterns:
+      - JWT::decode($token, new Key($publicKey, 'RS256'))
+      - Explicit algorithm allowlist in JWT configuration
+      - Key rotation with proper JWKS endpoint
+    severity: error
+    desc: "Verify JWT implementation prevents algorithm confusion and signature bypass (CWE-347)"
+
+  # === HTTP HOST HEADER ATTACKS (CWE-644) ===
+  - id: SA-LLM-34
+    domain: security
+    prompt: |
+      Audit for HTTP Host header poisoning vulnerabilities:
+      1. Check if $_SERVER['HTTP_HOST'] is used to construct URLs (password reset, email links)
+      2. Verify base URL comes from configuration, not from Host header
+      3. Look for cache poisoning via Host header in reverse proxy setups
+      4. Check if web cache includes Host header in cache key
+      5. Verify password reset links use configured base URL, not request host
+
+      Vulnerable patterns:
+      - $url = 'https://' . $_SERVER['HTTP_HOST'] . '/reset?token=' . $token
+      - $baseUrl = $request->getSchemeAndHttpHost() in security-critical code
+
+      Safe patterns:
+      - $baseUrl = $config->get('app.url') or env('APP_URL')
+      - Allowlist of valid Host header values in web server config
+    severity: warning
+    desc: "Verify HTTP Host header is not trusted for security-critical URL generation (CWE-644)"
+
+  # === TIMING ATTACKS IN AUTH (CWE-208) ===
+  - id: SA-LLM-35
+    domain: security
+    prompt: |
+      Audit for timing side-channel vulnerabilities in authentication:
+      1. Check that token/password comparisons use hash_equals() (constant-time)
+      2. Verify HMAC verification uses hash_equals(), not === or strcmp()
+      3. Look for early-return patterns in password verification (leaks valid usernames)
+      4. Check that login failure response time is consistent regardless of whether user exists
+      5. Verify API key comparison is timing-safe
+
+      Vulnerable patterns:
+      - if ($apiKey === $storedKey)  // Timing leak
+      - if (strcmp($hmac, $expected) !== 0)  // Not constant-time
+      - if (!$user) return error; if (!password_verify(...)) return error;  // Different timing for user exists vs wrong password
+
+      Safe patterns:
+      - hash_equals($stored, $provided)
+      - password_verify($password, $hash) // Already constant-time internally
+      - Consistent response time via sleep/delay for auth failures
+    severity: warning
+    desc: "Verify authentication comparisons are constant-time to prevent timing attacks (CWE-208)"
+
+  # === SECOND-ORDER SQL INJECTION ===
+  - id: SA-LLM-36
+    domain: security
+    prompt: |
+      Audit for second-order SQL injection:
+      1. Trace data stored from user input through the application
+      2. Check if stored data is later used in SQL queries without parameterization
+      3. Look for patterns where data is safely INSERT-ed but unsafely SELECT-ed later
+      4. Check admin panels, reports, and batch processing that read stored user data
+      5. Verify all queries use parameterized statements, even for "trusted" stored data
+
+      Vulnerable flow:
+      - Step 1: INSERT INTO users (name) VALUES (?)  -- safe insert with "admin'--"
+      - Step 2: "SELECT * FROM posts WHERE author = '" . $user->name . "'"  -- unsafe read
+
+      Key insight: No data from the database is "safe" - always use prepared statements.
+    severity: error
+    desc: "Verify stored data is not used unsafely in subsequent SQL queries (second-order SQLi)"
+
+  # === ReDoS PATTERNS (CWE-1333) ===
+  - id: SA-LLM-37
+    domain: security
+    prompt: |
+      Audit for Regular Expression Denial of Service (ReDoS):
+      1. Search for preg_match/preg_replace with user-controlled input
+      2. Check for nested quantifiers: (a+)+, (a*)+, (a+)*, ([^"]*)*
+      3. Look for alternation with overlapping matches: (a|a)+, (.*|.+)+
+      4. Check if pcre.backtrack_limit is set to a reasonable value
+      5. Verify regex patterns used on user input have bounded execution time
+      6. Check for possessive quantifiers or atomic groups as mitigations
+
+      Vulnerable patterns:
+      - preg_match('/^(a+)+$/', $userInput)
+      - preg_match('/^([a-zA-Z0-9]+)*@/', $email)
+      - preg_match('/(.*)+/', $input)
+
+      Safe patterns:
+      - Use atomic groups: (?>a+) or possessive: a++
+      - Set pcre.backtrack_limit in php.ini
+      - Use filter_var() instead of regex for email/URL validation
+      - Limit input length before applying regex
+    severity: warning
+    desc: "Verify regex patterns with user input are not vulnerable to catastrophic backtracking (CWE-1333)"
+
+  # === PRIVILEGE ESCALATION (CWE-269) ===
+  - id: SA-LLM-38
+    domain: security
+    prompt: |
+      Audit for privilege escalation via parameter manipulation:
+      1. Check if role/permission values can be set via user input (POST data, JSON body)
+      2. Verify that role changes require admin authorization, not just authentication
+      3. Look for hidden form fields containing role or permission data
+      4. Check API endpoints that modify user attributes for proper authorization
+      5. Verify that user profile updates cannot modify role or permission fields
+      6. Check for vertical privilege escalation (user -> admin)
+      7. Check for horizontal privilege escalation (user A -> user B's data)
+
+      Vulnerable patterns:
+      - User::create($request->all()) where request includes 'role' field
+      - $user->role = $_POST['role'] without authorization check
+      - PUT /api/users/me with {"role": "admin"} accepted
+
+      Safe patterns:
+      - Explicit allowlist of user-modifiable fields
+      - Server-side role assignment only by authorized admins
+      - Different endpoints for profile update vs admin user management
+    severity: error
+    desc: "Verify role/permission changes require proper authorization (CWE-269)"
