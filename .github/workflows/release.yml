@@ -28,29 +28,45 @@ jobs:
 
       - name: Create skill package
         run: |
-          mkdir -p dist
-          # Copy skill files from new structure
-          cp skills/security-audit/SKILL.md dist/
-          cp LICENSE dist/
-          [ -d "skills/security-audit/references" ] && cp -r skills/security-audit/references dist/
-          [ -d "skills/security-audit/scripts" ] && cp -r skills/security-audit/scripts dist/
-          [ -d "skills/security-audit/assets" ] && cp -r skills/security-audit/assets dist/
-          [ -d "skills/security-audit/templates" ] && cp -r skills/security-audit/templates dist/
-          # Include hooks and root-level scripts
-          [ -d "hooks" ] && cp -r hooks dist/
-          [ -d "scripts" ] && cp -r scripts dist/ && find dist/scripts -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-          # Include plugin manifest
-          [ -d ".claude-plugin" ] && cp -r .claude-plugin dist/
-          cd dist
-          zip -r ../security-audit-${{ steps.version.outputs.version }}.zip .
-          tar -czvf ../security-audit-${{ steps.version.outputs.version }}.tar.gz .
+          mkdir -p dist-skill
+          cp skills/security-audit/SKILL.md dist-skill/
+          cp LICENSE dist-skill/
+          [ -d "skills/security-audit/references" ] && cp -r skills/security-audit/references dist-skill/
+          [ -d "skills/security-audit/scripts" ] && cp -r skills/security-audit/scripts dist-skill/
+          [ -d "skills/security-audit/assets" ] && cp -r skills/security-audit/assets dist-skill/
+          [ -d "skills/security-audit/templates" ] && cp -r skills/security-audit/templates dist-skill/
+          [ -f "skills/security-audit/checkpoints.yaml" ] && cp skills/security-audit/checkpoints.yaml dist-skill/
+          cd dist-skill
+          zip -r ../security-audit-skill-${{ steps.version.outputs.version }}.zip .
+          tar -czvf ../security-audit-skill-${{ steps.version.outputs.version }}.tar.gz .
+
+      - name: Create plugin package
+        run: |
+          mkdir -p dist-plugin
+          # Include skill files
+          cp skills/security-audit/SKILL.md dist-plugin/
+          cp LICENSE dist-plugin/
+          [ -d "skills/security-audit/references" ] && cp -r skills/security-audit/references dist-plugin/
+          [ -d "skills/security-audit/scripts" ] && cp -r skills/security-audit/scripts dist-plugin/
+          [ -d "skills/security-audit/assets" ] && cp -r skills/security-audit/assets dist-plugin/
+          [ -d "skills/security-audit/templates" ] && cp -r skills/security-audit/templates dist-plugin/
+          [ -f "skills/security-audit/checkpoints.yaml" ] && cp skills/security-audit/checkpoints.yaml dist-plugin/
+          # Include plugin manifest, hooks, and root-level scripts
+          [ -d ".claude-plugin" ] && cp -r .claude-plugin dist-plugin/
+          [ -d "hooks" ] && cp -r hooks dist-plugin/
+          [ -d "scripts" ] && cp -r scripts dist-plugin/ && find dist-plugin/scripts -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+          cd dist-plugin
+          zip -r ../security-audit-plugin-${{ steps.version.outputs.version }}.zip .
+          tar -czvf ../security-audit-plugin-${{ steps.version.outputs.version }}.tar.gz .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
           files: |
-            security-audit-${{ steps.version.outputs.version }}.zip
-            security-audit-${{ steps.version.outputs.version }}.tar.gz
+            security-audit-skill-${{ steps.version.outputs.version }}.zip
+            security-audit-skill-${{ steps.version.outputs.version }}.tar.gz
+            security-audit-plugin-${{ steps.version.outputs.version }}.zip
+            security-audit-plugin-${{ steps.version.outputs.version }}.tar.gz
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
