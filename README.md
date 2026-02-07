@@ -1,6 +1,6 @@
 # Security Audit Skill
 
-Expert patterns for conducting security audits, vulnerability assessment, and implementing secure coding practices aligned with OWASP guidelines.
+Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for **any project**. Deep automated PHP/TYPO3 code scanning with 60+ checkpoints, 18 reference guides, and PreToolUse warnings.
 
 ## Compatibility
 
@@ -20,8 +20,8 @@ This is an **Agent Skill** following the [open standard](https://agentskills.io)
 - **Vulnerability Assessment**: XXE injection, SQL injection, XSS, CSRF, command injection, path traversal, file upload vulnerabilities, insecure deserialization, SSRF, authentication flaws
 - **Risk Scoring**: CVSS v3.1 and v4.0 scoring methodology, risk matrix assessment, impact and likelihood analysis, prioritization frameworks
 - **Secure Coding**: Input validation, output encoding, cryptographic best practices (sodium), session management, authentication patterns, security headers
-- **OWASP Compliance**: OWASP Top 10, CWE Top 25, OWASP ASVS v4.0, Proactive Controls
-- **PHP Security**: PHP 8.x security features, framework patterns (TYPO3, Symfony, Laravel)
+- **Standards Compliance**: OWASP Top 10, CWE Top 25 (2025), OWASP ASVS v4.0, Proactive Controls — applicable to any project
+- **PHP/TYPO3 Deep Scanning**: 60+ automated checkpoints, PHP 8.x security features, framework patterns (TYPO3, Symfony, Laravel)
 - **DevSecOps**: CI/CD security pipeline, SAST, dependency scanning, supply chain security, SLSA
 
 ## Installation
@@ -76,11 +76,12 @@ security-audit-skill/
 │   └── check_risky_command.py            # Risky command detection hook
 ├── skills/security-audit/
 │   ├── SKILL.md                          # Skill definition
-│   ├── checkpoints.yaml                  # 45+ automated security checkpoints
+│   ├── checkpoints.yaml                  # 60+ automated security checkpoints
 │   ├── scripts/
 │   │   ├── security-audit.sh             # PHP project security audit
 │   │   └── github-security-audit.sh      # GitHub repo security audit
 │   └── references/
+│       ├── cwe-top25.md                  # CWE Top 25 (2025) coverage map
 │       ├── owasp-top10.md                # OWASP Top 10 patterns
 │       ├── xxe-prevention.md             # XXE detection and prevention
 │       ├── cvss-scoring.md               # CVSS v3.1 & v4.0 scoring
