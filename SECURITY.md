@@ -20,11 +20,8 @@ fix is available.
 
 ### Security Contact
 
-For sensitive disclosures or if GitHub PVR is unavailable, contact us directly:
-
-**Email:** security@netresearch.de
-
-Encrypt sensitive reports using our PGP key if available on the Netresearch website.
+For sensitive disclosures or if GitHub PVR is unavailable, contact us via
+[our website](https://www.netresearch.de/).
 
 ## Response SLAs
 
@@ -128,5 +125,4 @@ If you report a valid vulnerability, we will:
 ## Questions
 
 For non-vulnerability security questions about this project, open a
-[GitHub Discussion](https://github.com/netresearch/security-audit-skill/discussions)
-or contact info@netresearch.de.
+[GitHub Discussion](https://github.com/netresearch/security-audit-skill/discussions).
