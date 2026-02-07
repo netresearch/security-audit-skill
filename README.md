@@ -1,6 +1,6 @@
 # Security Audit Skill
 
-Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for **any project**. Deep automated PHP/TYPO3 code scanning with 60+ checkpoints, 18 reference guides, and PreToolUse warnings.
+Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for **any project**. Deep automated PHP/TYPO3 code scanning with 80+ checkpoints, 19 reference guides, and PreToolUse warnings.
 
 ## Compatibility
 
@@ -17,11 +17,11 @@ This is an **Agent Skill** following the [open standard](https://agentskills.io)
 
 ## Features
 
-- **Vulnerability Assessment**: XXE injection, SQL injection, XSS, CSRF, command injection, path traversal, file upload vulnerabilities, insecure deserialization, SSRF, authentication flaws
+- **Vulnerability Assessment**: XXE injection, SQL injection, XSS, CSRF, command injection, path traversal, file upload vulnerabilities, insecure deserialization, SSRF, type juggling, SSTI, JWT flaws, LDAP injection, email header injection, session fixation
 - **Risk Scoring**: CVSS v3.1 and v4.0 scoring methodology, risk matrix assessment, impact and likelihood analysis, prioritization frameworks
 - **Secure Coding**: Input validation, output encoding, cryptographic best practices (sodium), session management, authentication patterns, security headers
 - **Standards Compliance**: OWASP Top 10, CWE Top 25 (2025), OWASP ASVS v4.0, Proactive Controls — applicable to any project
-- **PHP/TYPO3 Deep Scanning**: 60+ automated checkpoints, PHP 8.x security features, framework patterns (TYPO3, Symfony, Laravel)
+- **PHP/TYPO3 Deep Scanning**: 80+ automated checkpoints, PHP 8.x security features, framework patterns (TYPO3, Symfony, Laravel)
 - **DevSecOps**: CI/CD security pipeline, SAST, dependency scanning, supply chain security, SLSA
 
 ## Installation
@@ -76,7 +76,7 @@ security-audit-skill/
 │   └── check_risky_command.py            # Risky command detection hook
 ├── skills/security-audit/
 │   ├── SKILL.md                          # Skill definition
-│   ├── checkpoints.yaml                  # 60+ automated security checkpoints
+│   ├── checkpoints.yaml                  # 80+ automated security checkpoints
 │   ├── scripts/
 │   │   ├── security-audit.sh             # PHP project security audit
 │   │   └── github-security-audit.sh      # GitHub repo security audit
@@ -96,6 +96,7 @@ security-audit-skill/
 │       ├── cryptography-guide.md         # Cryptographic best practices
 │       ├── framework-security.md         # TYPO3/Symfony/Laravel security
 │       ├── modern-attacks.md             # SSRF, mass assignment, race conditions
+│       ├── cve-patterns.md              # CVE-derived patterns (15 vulnerability types)
 │       ├── php-security-features.md      # PHP 8.x security features
 │       ├── ci-security-pipeline.md       # CI/CD security tooling
 │       └── supply-chain-security.md      # SLSA, signing, OpenSSF

@@ -1,15 +1,15 @@
 ---
 name: security-audit
-description: "Agent Skill: Security audit patterns (OWASP, CWE, CVSS) for any project. Deep automated PHP/TYPO3 scanning. Use when conducting security assessments, identifying vulnerabilities, or CVSS scoring. By Netresearch."
+description: "Agent Skill: Security audit patterns (OWASP, CWE, CVSS) for any project. Deep automated PHP/TYPO3 scanning with 80+ checkpoints. Use when conducting security assessments, identifying vulnerabilities, or CVSS scoring. By Netresearch."
 ---
 
 # Security Audit Skill
 
-Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for any project. Deep automated PHP/TYPO3 code scanning with 60+ checkpoints and 18 reference guides.
+Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for any project. Deep automated PHP/TYPO3 code scanning with 80+ checkpoints and 19 reference guides.
 
 ## Expertise Areas
 
-- **Vulnerabilities**: XXE, SQL injection, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF
+- **Vulnerabilities**: XXE, SQL injection, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, type juggling, SSTI, JWT flaws
 - **Risk Scoring**: CVSS v3.1 and v4.0 methodology
 - **Secure Coding**: Input validation, output encoding, cryptography, session management, authentication
 - **Standards**: OWASP Top 10, CWE Top 25, OWASP ASVS, Proactive Controls
@@ -40,6 +40,7 @@ Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub pr
 
 ### Modern Threats
 - `references/modern-attacks.md` - SSRF, mass assignment, race conditions
+- `references/cve-patterns.md` - CVE-derived patterns (type juggling, PHAR, SSTI, JWT, LDAP injection)
 - `references/php-security-features.md` - PHP 8.x security features
 
 ### DevSecOps
