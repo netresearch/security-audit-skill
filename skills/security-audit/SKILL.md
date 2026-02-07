@@ -1,11 +1,11 @@
 ---
 name: security-audit
-description: "Agent Skill: Security audit patterns for PHP/OWASP. Use when conducting security assessments, identifying vulnerabilities (XXE, SQL injection, XSS), or CVSS scoring. By Netresearch."
+description: "Agent Skill: Security audit patterns (OWASP, CWE, CVSS) for any project. Deep automated PHP/TYPO3 scanning. Use when conducting security assessments, identifying vulnerabilities, or CVSS scoring. By Netresearch."
 ---
 
 # Security Audit Skill
 
-Security audits, vulnerability assessment, and secure coding patterns aligned with OWASP.
+Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for any project. Deep automated PHP/TYPO3 code scanning with 60+ checkpoints and 18 reference guides.
 
 ## Expertise Areas
 
@@ -18,6 +18,7 @@ Security audits, vulnerability assessment, and secure coding patterns aligned wi
 
 ### Core
 - `references/owasp-top10.md` - OWASP Top 10 patterns and mitigations
+- `references/cwe-top25.md` - CWE Top 25 (2025) coverage map with PHP examples
 - `references/xxe-prevention.md` - XXE detection and prevention
 - `references/cvss-scoring.md` - CVSS v3.1 and v4.0 scoring methodology
 - `references/api-key-encryption.md` - API key encryption at rest (sodium)

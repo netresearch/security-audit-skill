@@ -242,6 +242,36 @@ mechanical:
     severity: warning
     desc: "X-XSS-Protection is deprecated - use Content-Security-Policy instead"
 
+  # === CODE INJECTION (CWE-94) ===
+  - id: SA-37
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "eval($_"
+    severity: error
+    desc: "Code injection via eval() with user input (CWE-94)"
+
+  - id: SA-38
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "assert($_"
+    severity: error
+    desc: "Code injection via assert() with user input (CWE-94)"
+
+  - id: SA-39
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "preg_replace\\s*\\(.*'/e'"
+    severity: error
+    desc: "Deprecated /e modifier in preg_replace enables code execution (CWE-94)"
+
+  # === IDOR (CWE-639) ===
+  - id: SA-40
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "->find\\(\\$_(GET|POST|REQUEST)\\["
+    severity: warning
+    desc: "Direct use of user-supplied ID in database lookup without authorization check (CWE-639 IDOR)"
+
   # === SECRET SCANNING ===
   - id: SA-SEC-01
     type: not_contains
@@ -468,3 +498,135 @@ llm_reviews:
       Note: X-XSS-Protection should be 0, not 1. The feature is deprecated.
     severity: warning
     desc: "Verify security headers are properly configured"
+
+  # === CSRF REVIEW (CWE-352) ===
+  - id: SA-LLM-25
+    domain: security
+    prompt: |
+      Audit CSRF protection coverage:
+      1. Identify all state-changing endpoints (POST, PUT, DELETE, PATCH)
+      2. Verify each has CSRF token validation
+      3. Check that tokens are unique per session and per form
+      4. Verify SameSite cookie attribute is set (Lax or Strict)
+      5. Check for proper token regeneration after login
+
+      For TYPO3:
+      - Verify FormProtectionFactory is used in backend modules
+      - Check Extbase plugins use form ViewHelpers (auto-include CSRF)
+      - Look for AJAX endpoints missing CSRF validation
+    severity: error
+    desc: "Verify CSRF token coverage on all state-changing endpoints (CWE-352)"
+
+  # === SSRF REVIEW (CWE-918) ===
+  - id: SA-LLM-26
+    domain: security
+    prompt: |
+      Audit for Server-Side Request Forgery (SSRF):
+      1. Find all HTTP client usage (file_get_contents with URLs, curl, Guzzle, HttpClient)
+      2. Check if any URL parameter comes from user input
+      3. Verify URL allowlisting is applied (not just blocklisting)
+      4. Check for DNS rebinding protection (resolve hostname before request)
+      5. Verify internal network ranges are blocked (127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16)
+      6. Check for protocol restrictions (only allow http/https)
+
+      Common vulnerable patterns:
+      - file_get_contents($_GET['url'])
+      - curl_init($userProvidedUrl)
+      - $client->request('GET', $request->get('callback_url'))
+    severity: error
+    desc: "Verify SSRF protection in HTTP client calls (CWE-918)"
+
+  # === CODE INJECTION REVIEW (CWE-94) ===
+  - id: SA-LLM-27
+    domain: security
+    prompt: |
+      Audit for dynamic code execution and code injection:
+      1. Search for eval(), assert(), create_function() usage
+      2. Check for dynamic include/require with variable paths
+      3. Look for preg_replace with /e modifier (deprecated)
+      4. Check call_user_func/call_user_func_array with user-controlled callable
+      5. Verify no user input flows into code generation or template rendering
+      6. Check for reflection-based instantiation with user-controlled class names
+
+      Safe alternatives:
+      - Use allowlists for dynamic class/function references
+      - Use preg_replace_callback() instead of /e modifier
+      - Use match/switch instead of eval for conditional logic
+    severity: error
+    desc: "Verify no dynamic code execution with user input (CWE-94)"
+
+  # === IDOR REVIEW (CWE-639) ===
+  - id: SA-LLM-28
+    domain: security
+    prompt: |
+      Audit for Insecure Direct Object References (IDOR):
+      1. Find all endpoints that accept resource IDs from user input
+      2. Verify each performs ownership/authorization checks before access
+      3. Check for patterns like find($id) without verifying the resource belongs to the user
+      4. Look for sequential/predictable IDs that enable enumeration
+      5. Verify API endpoints use scoped queries (e.g., findByUserAndId)
+
+      Common vulnerable patterns:
+      - $repo->find($_GET['id']) without ownership check
+      - Direct database lookup by user-supplied ID
+      - Download/export endpoints with unvalidated file/record IDs
+    severity: error
+    desc: "Verify authorization checks prevent IDOR bypasses (CWE-639)"
+
+  # === RESOURCE EXHAUSTION REVIEW (CWE-770) ===
+  - id: SA-LLM-29
+    domain: security
+    prompt: |
+      Audit for resource exhaustion vulnerabilities:
+      1. Check for unbounded loops or recursive calls with user-controlled depth
+      2. Verify file upload size limits are enforced (upload_max_filesize, post_max_size)
+      3. Check database queries have LIMIT clauses (especially findAll/findBy)
+      4. Look for missing pagination on list endpoints
+      5. Verify rate limiting exists on authentication and API endpoints
+      6. Check for ReDoS (Regular Expression Denial of Service) patterns
+      7. Verify memory_limit and max_execution_time are set appropriately
+
+      Common vulnerable patterns:
+      - $repo->findAll() without limit
+      - file_get_contents('php://input') without size check
+      - while loops with user-controlled termination condition
+    severity: warning
+    desc: "Verify resource limits prevent denial of service (CWE-770)"
+
+  # === INFORMATION EXPOSURE REVIEW (CWE-200) ===
+  - id: SA-LLM-30
+    domain: security
+    prompt: |
+      Audit for sensitive information exposure:
+      1. Check exception handling - verify stack traces are not shown to users
+      2. Look for error messages that reveal internal structure (DB schema, file paths)
+      3. Verify display_errors is Off in production configuration
+      4. Check for debug endpoints or debug mode toggles left enabled
+      5. Look for verbose logging that includes sensitive data (passwords, tokens)
+      6. Verify API responses don't include internal IDs, timestamps, or metadata unnecessarily
+      7. Check for information leakage in HTTP headers (Server, X-Powered-By)
+
+      For TYPO3:
+      - Check $GLOBALS['TYPO3_CONF_VARS']['SYS']['displayErrors'] is 0 in production
+      - Verify devIPmask does not include wildcard or broad ranges
+    severity: warning
+    desc: "Verify no sensitive information exposure in errors and responses (CWE-200)"
+
+  # === ACCESS CONTROL REVIEW (CWE-284) ===
+  - id: SA-LLM-31
+    domain: security
+    prompt: |
+      Audit access control completeness:
+      1. Check that authentication middleware is applied consistently (not missing on routes)
+      2. Verify authorization is enforced at controller level, not just in UI/templates
+      3. Look for "security through obscurity" (hidden URLs without auth checks)
+      4. Check that API endpoints have the same access controls as web endpoints
+      5. Verify role/permission checks cannot be bypassed via parameter manipulation
+      6. Check for default-allow vs default-deny access control patterns
+
+      For TYPO3:
+      - Verify backend module access is configured in ext_tables.php
+      - Check that Extbase controllers verify BE_USER permissions
+      - Verify frontend plugin access restrictions via TypoScript/Flexform
+    severity: warning
+    desc: "Verify access control is applied consistently at all layers (CWE-284)"

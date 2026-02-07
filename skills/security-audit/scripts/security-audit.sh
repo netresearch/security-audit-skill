@@ -301,6 +301,36 @@ if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
     fi
 fi
 
+# === Check for SSRF patterns (CWE-918) ===
+echo ""
+echo "=== Checking for SSRF Patterns ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    # shellcheck disable=SC2016
+    SSRF_PATTERNS=$(scan_php '(file_get_contents|curl_init|curl_setopt.*CURLOPT_URL)\s*\(.*\$_(GET|POST|REQUEST)')
+    if [[ -n "$SSRF_PATTERNS" ]]; then
+        echo "🔴 Potential SSRF vulnerability (user-controlled URL in HTTP request):"
+        echo "$SSRF_PATTERNS"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "✅ No obvious SSRF patterns detected"
+    fi
+fi
+
+# === Check for IDOR patterns (CWE-639) ===
+echo ""
+echo "=== Checking for IDOR Patterns ==="
+if [[ ${#SCAN_DIRS[@]} -gt 0 ]]; then
+    # shellcheck disable=SC2016
+    IDOR_PATTERNS=$(scan_php '->find\(\s*\$_(GET|POST|REQUEST)\[')
+    if [[ -n "$IDOR_PATTERNS" ]]; then
+        echo "⚠️  Potential IDOR pattern (direct DB lookup with user-supplied ID without auth check):"
+        echo "$IDOR_PATTERNS"
+        WARNINGS=$((WARNINGS + 1))
+    else
+        echo "✅ No obvious IDOR patterns detected"
+    fi
+fi
+
 # === Check for insecure cookie settings ===
 echo ""
 echo "=== Checking Cookie Security ==="

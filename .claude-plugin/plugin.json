@@ -1,7 +1,7 @@
 {
   "name": "security-audit",
   "version": "2.0.0",
-  "description": "Comprehensive PHP security audit: OWASP Top 10, CWE Top 25, CVSS v4.0, 17 reference guides, 45+ checkpoints, CI/CD pipeline security, PreToolUse warnings",
+  "description": "Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for any project. Deep automated PHP/TYPO3 scanning with 60+ checkpoints, 18 reference guides, PreToolUse warnings. By Netresearch.",
   "repository": "https://github.com/netresearch/security-audit-skill",
   "license": "MIT",
   "author": {

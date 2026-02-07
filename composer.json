@@ -1,6 +1,6 @@
 {
   "name": "netresearch/agent-security-audit",
-  "description": "Netresearch AI skill for security audits following OWASP guidelines",
+  "description": "Netresearch AI skill for security audits (OWASP, CWE, CVSS). Universal patterns + deep PHP/TYPO3 scanning.",
   "type": "ai-agent-skill",
   "license": "MIT",
   "authors": [
