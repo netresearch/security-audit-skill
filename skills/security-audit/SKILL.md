@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Use when conducting security assessments, identifying vulnerabilities, CVSS scoring, or auditing PHP/TYPO3 projects against OWASP Top 10 and CWE Top 25."
+description: "Use when conducting security assessments, CVSS scoring, or auditing PHP/TYPO3 projects against OWASP Top 10 and CWE Top 25."
 ---
 
 # Security Audit Skill
