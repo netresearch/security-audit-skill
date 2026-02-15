@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Agent Skill: Security audit patterns (OWASP, CWE, CVSS) for any project. Deep automated PHP/TYPO3 scanning with 80+ checkpoints. Use when conducting security assessments, identifying vulnerabilities, or CVSS scoring. By Netresearch."
+description: "Use when conducting security assessments, CVSS scoring, or auditing PHP/TYPO3 projects against OWASP Top 10 and CWE Top 25."
 ---
 
 # Security Audit Skill
