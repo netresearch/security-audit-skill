@@ -46,6 +46,7 @@ Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub pr
 ### DevSecOps
 - `references/ci-security-pipeline.md` - SAST, dependency scanning, SBOM, container security
 - `references/supply-chain-security.md` - SLSA, Sigstore, OpenSSF Scorecard
+- `references/automated-scanning.md` - semgrep, trivy, gitleaks configuration and CI integration
 
 ## Quick Patterns
 
@@ -76,8 +77,80 @@ $encrypted = 'enc:' . base64_encode($nonce . sodium_crypto_secretbox($apiKey, $n
 $hash = password_hash($password, PASSWORD_ARGON2ID);
 ```
 
+## Automated Scanning Tools
+
+Complement manual review with automated scanners. Run these BEFORE manual code review.
+
+### semgrep - Static Analysis (SAST)
+
+Find security vulnerabilities with pre-built rulesets (OWASP, CWE).
+
+```bash
+# Auto-detect language, use community rulesets
+semgrep --config auto .
+
+# Specific rulesets
+semgrep --config p/owasp-top-ten .
+semgrep --config p/php-security .
+semgrep --config p/javascript .
+
+# CI-friendly output
+semgrep --config auto --json --output results.json .
+
+# Scan specific directory
+semgrep --config auto src/
+```
+
+**When to use:** Every security audit. Catches injection, XSS, hardcoded secrets, insecure crypto patterns automatically.
+
+### trivy - Vulnerability Scanner
+
+Scan dependencies, containers, and IaC for known CVEs.
+
+```bash
+# Scan project dependencies (composer.lock, package-lock.json, go.sum)
+trivy fs .
+
+# Scan only for HIGH and CRITICAL
+trivy fs --severity HIGH,CRITICAL .
+
+# Scan Docker image
+trivy image myapp:latest
+
+# Scan IaC (Terraform, Kubernetes)
+trivy config .
+
+# JSON output for CI
+trivy fs --format json --output trivy-results.json .
+```
+
+**When to use:** Before releases, when updating dependencies, when reviewing Dockerfiles or IaC.
+
+### gitleaks - Secret Detection
+
+Detect leaked secrets in git history and staged files.
+
+```bash
+# Scan current state
+gitleaks detect .
+
+# Scan git history
+gitleaks detect --source . --log-opts="--all"
+
+# Pre-commit check (staged files only)
+gitleaks protect --staged
+
+# JSON output
+gitleaks detect --report-format json --report-path gitleaks.json .
+```
+
+**When to use:** Before every commit. Catches API keys, passwords, tokens, private keys.
+
 ## Security Checklist
 
+- [ ] `semgrep --config auto` passes with no high-severity findings
+- [ ] `trivy fs --severity HIGH,CRITICAL` reports no unpatched CVEs
+- [ ] `gitleaks detect` finds no leaked secrets
 - [ ] bcrypt/Argon2 for passwords, CSRF tokens on state changes
 - [ ] All input validated server-side, parameterized SQL
 - [ ] XML external entities disabled (LIBXML_NONET only)
