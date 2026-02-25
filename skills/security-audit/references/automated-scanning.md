@@ -49,7 +49,9 @@ rules:
   - id: no-unserialize-user-input
     patterns:
       - pattern: unserialize($INPUT)
-      - pattern-where-python: "INPUT != 'static_value'"
+      - metavariable-regex:
+          metavariable: $INPUT
+          regex: "^(?!.*(static_value)).*$"
     message: "unserialize() with user input leads to object injection (CWE-502). Use json_decode() instead."
     languages: [php]
     severity: ERROR
@@ -169,7 +171,7 @@ trivy fs --scanners license .
 ```yaml
 # GitHub Actions
 - name: Trivy vulnerability scan
-  uses: aquasecurity/trivy-action@master
+  uses: aquasecurity/trivy-action@0.34.1
   with:
     scan-type: fs
     severity: HIGH,CRITICAL
@@ -178,7 +180,7 @@ trivy fs --scanners license .
     ignore-unfixed: true
 
 - name: Trivy Docker scan
-  uses: aquasecurity/trivy-action@master
+  uses: aquasecurity/trivy-action@0.34.1
   with:
     scan-type: image
     image-ref: ${{ env.IMAGE }}
@@ -203,6 +205,9 @@ useDefault = true
 # Allowlist specific paths or patterns
 [allowlist]
   description = "Allowed patterns"
+  commits = [
+    "abc123def456",  # Commit that added test fixtures with dummy keys
+  ]
   paths = [
     '''vendor/.*''',
     '''node_modules/.*''',
@@ -213,6 +218,7 @@ useDefault = true
     '''EXAMPLE_API_KEY''',
     '''test[_-]?key''',
     '''dummy[_-]?secret''',
+    '''AKIAIOSFODNN7EXAMPLE''',  # AWS example key from documentation
   ]
 
 # Custom rules
@@ -223,21 +229,6 @@ useDefault = true
   secretGroup = 0
   entropy = 3.5
   keywords = ["NR-"]
-```
-
-### Allowlisting Specific Findings
-
-For inline allowlisting (when a "secret" is actually safe):
-
-```toml
-# .gitleaks.toml
-[allowlist]
-  commits = [
-    "abc123def456",  # Commit that added test fixtures with dummy keys
-  ]
-  regexes = [
-    '''AKIAIOSFODNN7EXAMPLE''',  # AWS example key from documentation
-  ]
 ```
 
 ### Pre-commit Hook Setup
@@ -262,7 +253,7 @@ Or with the `pre-commit` framework:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.22.1
+    rev: v8.30.0
     hooks:
       - id: gitleaks
 ```
@@ -272,7 +263,7 @@ repos:
 ```yaml
 # GitHub Actions
 - name: Gitleaks secret scan
-  uses: gitleaks/gitleaks-action@v2
+  uses: gitleaks/gitleaks-action@v2.3.9
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -310,7 +301,7 @@ jobs:
           fetch-depth: 0  # Full history for git log scanning
 
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -321,7 +312,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           scan-type: fs
           severity: HIGH,CRITICAL
@@ -361,7 +352,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy config scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           scan-type: config
           severity: HIGH,CRITICAL
