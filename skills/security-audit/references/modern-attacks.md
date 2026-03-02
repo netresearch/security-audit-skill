@@ -1208,6 +1208,77 @@ $prototypePollutionPatterns = [
 ];
 ```
 
+## CodeQL `js/xss-through-dom` Remediation
+
+### Overview
+
+CodeQL's `js/xss-through-dom` query tracks taint from DOM sources (e.g., `element.getAttribute()`, `document.querySelector().dataset`) to DOM sinks (e.g., `script.src`, `element.innerHTML`). This is a common finding in frontend code that reads configuration from `data-*` attributes and uses the values to load scripts or set HTML content.
+
+### Why Boolean Validation Does Not Work
+
+CodeQL performs taint tracking through the entire data flow. A boolean validation function (returning `true`/`false`) does **not** break the taint chain because the original tainted value is still used at the sink:
+
+```javascript
+// BAD: Boolean check -- CodeQL still tracks taint through cfgPath
+function isSafeUrl(url) {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+const cfgPath = el.getAttribute('data-config');
+if (!isSafeUrl(cfgPath)) return;
+script.src = cfgPath;  // CodeQL alert: js/xss-through-dom
+```
+
+The variable `cfgPath` remains tainted regardless of the boolean check. CodeQL (correctly) identifies that an attacker who controls the DOM attribute value can still reach the sink.
+
+### Correct Pattern: Return a Sanitized Value
+
+To break CodeQL's taint chain, the sanitizer must return a **new constructed value** rather than the original input:
+
+```javascript
+// GOOD: Return sanitized value -- breaks taint chain
+function sanitizeScriptUrl(url) {
+  const parsed = new URL(url, window.location.origin);
+  if (parsed.origin !== window.location.origin) {
+    return null;
+  }
+  return parsed.href;  // New string from URL constructor
+}
+
+const safeUrl = sanitizeScriptUrl(el.getAttribute('data-config'));
+if (!safeUrl) return;
+script.src = safeUrl;  // No alert -- safeUrl is a new value
+```
+
+The key insight: `parsed.href` is a **new string** produced by the `URL` constructor, not the original tainted input. CodeQL recognizes that the `URL` constructor normalizes and reconstructs the value, breaking the taint chain.
+
+### Common Scenarios
+
+| DOM Source | DOM Sink | Fix Pattern |
+|-----------|----------|-------------|
+| `el.getAttribute('data-src')` | `script.src` | Return `new URL(...).href` |
+| `el.dataset.template` | `el.innerHTML` | Use `textContent` or a sanitizer library (DOMPurify) |
+| `el.getAttribute('data-url')` | `window.location` | Return `new URL(...).href` with origin check |
+| `el.getAttribute('data-path')` | `fetch(...)` | Return `new URL(...).pathname` with allowlist |
+
+### Detection Patterns
+
+```
+# Grep patterns for potential js/xss-through-dom vectors:
+getAttribute\(.*\).*\.src\s*=
+getAttribute\(.*\).*\.href\s*=
+getAttribute\(.*\).*innerHTML\s*=
+\.dataset\..*\.src\s*=
+\.dataset\..*innerHTML\s*=
+```
+
+---
+
 ## Remediation Priority
 
 | Vulnerability | Severity | CVSS Range | Action | Timeline |
@@ -1216,6 +1287,7 @@ $prototypePollutionPatterns = [
 | Mass assignment (admin fields) | High | 7.0-8.5 | Add fillable/allowlist, audit all form handlers | 24 hours |
 | Race condition (financial) | High | 7.0-8.0 | Add database locking, atomic operations | 24 hours |
 | SSRF to internal services | High | 7.0-8.5 | Block private IP ranges, use NoPrivateNetworkHttpClient | 48 hours |
+| DOM XSS via data attributes | Medium | 4.0-6.5 | Return new sanitized values, not booleans | 1 week |
 | Race condition (non-financial) | Medium | 4.0-6.5 | Add file locking, optimistic concurrency | 1 week |
 | JSON prototype pollution | Medium | 4.0-6.0 | Sanitize keys, use DTOs/validation | 1 week |
 | Mass assignment (non-critical fields) | Low | 2.0-4.0 | Add explicit allowlists | 2 weeks |

@@ -454,6 +454,40 @@ npm ci
 npm audit signatures
 ```
 
+### npm Overrides for Transitive Dependency Vulnerabilities
+
+When a transitive dependency has a known CVE but the direct parent package hasn't released a compatible fix, use npm `overrides` to force the patched version:
+
+```json
+{
+  "dependencies": {
+    "@rollup/plugin-terser": "^0.4.4"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.3"
+  }
+}
+```
+
+**When to use:**
+- Dependabot alert shows "fix available via `npm audit fix --force`" (breaking change)
+- `npm audit` shows the vulnerability is in a transitive dependency
+- The direct dependency's version range doesn't include the fix
+
+**Verification:**
+```bash
+# Verify override took effect
+npm ls <package-name> --all
+
+# Verify no audit findings remain
+npm audit
+
+# Verify build still works
+npm run build
+```
+
+**Caution:** Overrides force version resolution across the entire dependency tree. Always verify that the overridden version is API-compatible with consumers. Major version overrides (e.g., 6.x to 7.x) may cause runtime issues.
+
 ### Dependabot / Renovate for Automated Updates
 
 **Dependabot configuration:**
