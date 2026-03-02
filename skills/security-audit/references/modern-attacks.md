@@ -1243,11 +1243,15 @@ To break CodeQL's taint chain, the sanitizer must return a **new constructed val
 ```javascript
 // GOOD: Return sanitized value -- breaks taint chain
 function sanitizeScriptUrl(url) {
-  const parsed = new URL(url, window.location.origin);
-  if (parsed.origin !== window.location.origin) {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.origin !== window.location.origin) {
+      return null;
+    }
+    return parsed.href;  // New string from URL constructor
+  } catch {
     return null;
   }
-  return parsed.href;  // New string from URL constructor
 }
 
 const safeUrl = sanitizeScriptUrl(el.getAttribute('data-config'));
