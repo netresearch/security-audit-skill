@@ -56,24 +56,22 @@ mechanical:
     desc: "CI must run composer audit to detect vulnerable dependencies"
 
   # === XXE PREVENTION ===
+  # Use command type to avoid false positives from glob fallback to config files
   - id: SA-08
-    type: not_contains
-    target: "Classes/**/*.php"
-    pattern: "LIBXML_NOENT"
+    type: command
+    target: "! grep -rqF 'LIBXML_NOENT' --include='*.php' Classes/ 2>/dev/null"
     severity: error
     desc: "PHP files must not use LIBXML_NOENT flag that enables XXE"
 
   - id: SA-08b
-    type: not_contains
-    target: "Classes/**/*.php"
-    pattern: "LIBXML_DTDLOAD"
+    type: command
+    target: "! grep -rqF 'LIBXML_DTDLOAD' --include='*.php' Classes/ 2>/dev/null"
     severity: error
     desc: "PHP files must not use LIBXML_DTDLOAD flag that enables XXE"
 
   - id: SA-09
-    type: not_contains
-    target: "Classes/**/*.php"
-    pattern: "libxml_disable_entity_loader(false)"
+    type: command
+    target: "! grep -rqF 'libxml_disable_entity_loader(false)' --include='*.php' Classes/ 2>/dev/null"
     severity: error
     desc: "Must not explicitly enable XML entity loading (XXE vulnerability)"
 
@@ -100,10 +98,10 @@ mechanical:
     desc: "Direct use of $_REQUEST should be avoided (use framework request handling)"
 
   # === XSS PREVENTION ===
+  # Use command type to avoid false positives from glob fallback to config files
   - id: SA-13
-    type: not_contains
-    target: "Classes/**/*.php"
-    pattern: "echo $"
+    type: command
+    target: "! grep -rqF 'echo $' --include='*.php' Classes/ 2>/dev/null"
     severity: warning
     desc: "Direct echo of variables may be XSS vulnerable - use htmlspecialchars()"
 
