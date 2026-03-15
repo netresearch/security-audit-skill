@@ -428,6 +428,37 @@ mechanical:
     severity: warning
     desc: "CI should include dependency vulnerability scanning"
 
+  # === GITLEAKS IN CI ===
+  - id: SA-DEP-03
+    type: regex
+    target: .github/workflows/*.yml
+    pattern: "gitleaks"
+    severity: info
+    desc: "CI should include gitleaks for secret scanning"
+
+  # === PATH TRAVERSAL PREVENTION (CWE-22) ===
+  - id: SA-53
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "(file_get_contents|fopen|include|require)\\s*\\(.*\\$_(GET|POST|REQUEST)"
+    severity: error
+    desc: "File operations with user input without path validation enables path traversal (CWE-22)"
+
+  - id: SA-54
+    type: not_contains
+    target: "Classes/**/*.php"
+    pattern: "../"
+    severity: warning
+    desc: "Hardcoded relative path traversal patterns should be avoided in PHP source"
+
+  # === SEMGREP IN CI ===
+  - id: SA-SAST-02
+    type: regex
+    target: .github/workflows/*.yml
+    pattern: "semgrep"
+    severity: info
+    desc: "CI should include semgrep for SAST scanning"
+
   # === SECURITY POLICY ===
   - id: SA-SP-01
     type: file_exists
