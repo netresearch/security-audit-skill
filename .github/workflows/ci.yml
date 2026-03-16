@@ -6,24 +6,13 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  regex-tests:
-    name: Regex Pattern Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
-        with:
-          egress-policy: audit
-
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@e06108dd0aef18192324c70427afc47652e63a82 # v7.5.0
-
-      - name: Test risky command patterns
-        run: uv run scripts/test_risky_patterns.py
+  ci:
+    uses: netresearch/skill-repo-skill/.github/workflows/ci-python.yml@main
+    permissions:
+      contents: read
+    with:
+      python-versions: '["3.12", "3.13"]'
+      test-command: 'uv run --python "$PYTHON_VERSION" scripts/test_risky_patterns.py'
