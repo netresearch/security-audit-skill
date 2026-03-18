@@ -1,0 +1,32 @@
+[
+  {
+    "name": "php_security_audit",
+    "prompt": "Run a security audit on this PHP project and report findings",
+    "assertions": [
+      {
+        "type": "content",
+        "pattern": "(OWASP|CWE|CVE|vulnerability|injection|XSS)"
+      },
+      {
+        "type": "tool_use",
+        "tool": "Bash",
+        "pattern": "(security-audit|semgrep|trivy|gitleaks|composer audit)"
+      }
+    ]
+  },
+  {
+    "name": "check_xss_vulnerabilities",
+    "prompt": "Check for XSS vulnerabilities in this codebase",
+    "assertions": [
+      {
+        "type": "content",
+        "pattern": "(XSS|cross-site scripting|htmlspecialchars|output encoding)"
+      },
+      {
+        "type": "tool_use",
+        "tool": "Grep",
+        "pattern": "(echo|print|innerHTML|html\\()"
+      }
+    ]
+  }
+]
