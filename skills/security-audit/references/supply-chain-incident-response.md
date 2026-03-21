@@ -298,7 +298,7 @@ Repository Settings > Actions > General > Fork pull request workflows
 
 ## Real-World Incident: trivy-action (2026-03-19)
 
-On March 19, 2026, `aquasecurity/setup-trivy@v0.2.1` was compromised via a tag force-push attack. The attacker re-pointed the `v0.2.1` tag to a malicious commit.
+On March 19, 2026, `aquasecurity/trivy-action@v0.2.1` was compromised via a tag force-push attack. The attacker re-pointed the `v0.2.1` tag to a malicious commit.
 
 **Timeline:**
 - 2026-03-19: Compromised tag detected via StepSecurity Harden-Runner alerts showing unexpected outbound connections
