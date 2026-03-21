@@ -577,7 +577,7 @@ Ensure dependencies use compatible licenses. Some licenses have requirements tha
       - uses: actions/checkout@v4
 
       - name: Check licenses with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
           scan-type: 'fs'
           scanners: 'license'
