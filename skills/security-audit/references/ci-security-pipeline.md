@@ -77,7 +77,7 @@ Trivy scans dependencies, containers, IaC files, and checks licenses. It is a st
       - uses: actions/checkout@v4
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -487,7 +487,7 @@ For organizations requiring SPDX format instead of CycloneDX.
 
 ```yaml
       - name: Generate SPDX SBOM with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
           scan-type: 'fs'
           format: 'spdx-json'
@@ -535,7 +535,7 @@ Hadolint checks Dockerfiles for best practices and security issues.
         run: docker build -t myapp:scan .
 
       - name: Run Trivy container scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
           image-ref: 'myapp:scan'
           format: 'sarif'
@@ -637,7 +637,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
           scan-type: 'fs'
           format: 'sarif'

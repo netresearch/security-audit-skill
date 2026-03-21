@@ -171,7 +171,7 @@ trivy fs --scanners license .
 ```yaml
 # GitHub Actions
 - name: Trivy vulnerability scan
-  uses: aquasecurity/trivy-action@0.34.1
+  uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
   with:
     scan-type: fs
     severity: HIGH,CRITICAL
@@ -180,7 +180,7 @@ trivy fs --scanners license .
     ignore-unfixed: true
 
 - name: Trivy Docker scan
-  uses: aquasecurity/trivy-action@0.34.1
+  uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
   with:
     scan-type: image
     image-ref: ${{ env.IMAGE }}
@@ -312,7 +312,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
           scan-type: fs
           severity: HIGH,CRITICAL
@@ -352,7 +352,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy config scan
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
           scan-type: config
           severity: HIGH,CRITICAL

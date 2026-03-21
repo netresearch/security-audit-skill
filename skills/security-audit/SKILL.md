@@ -29,6 +29,7 @@ Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub pr
 - **Framework Security**: `framework-security.md` (TYPO3, Symfony, Laravel)
 - **Modern Threats**: `modern-attacks.md`, `cve-patterns.md`, `php-security-features.md`
 - **DevSecOps**: `ci-security-pipeline.md`, `supply-chain-security.md`, `automated-scanning.md`
+- **Incident Response**: `supply-chain-incident-response.md` (detection, triage, remediation playbooks for GitHub Actions supply chain compromises)
 
 All files located in `references/`.
 
