@@ -436,6 +436,18 @@ mechanical:
     severity: info
     desc: "CI should include gitleaks for secret scanning"
 
+  # === NPM DEPENDENCY MONITORING ===
+  - id: SA-DEP-04
+    type: file_exists_conditional
+    condition_file: package.json
+    severity: warning
+    desc: "npm dependencies monitored when package.json exists"
+    check: |
+      If package.json exists, verify that:
+      1. .github/dependabot.yml includes npm ecosystem
+      2. CI runs npm audit
+    tags: [dependencies, npm, supply-chain]
+
   # === PATH TRAVERSAL PREVENTION (CWE-22) ===
   - id: SA-53
     type: regex
@@ -974,3 +986,30 @@ llm_reviews:
       7. Flag any @ usage without clear TOCTOU justification or return check
     severity: warning
     desc: "Error suppression (@) is only acceptable for TOCTOU races (mkdir) or when return value is explicitly checked (file_get_contents, getimagesize)"
+
+  # === AUDIT LOGGING PRESENCE ===
+  - id: SA-LLM-39
+    domain: security
+    prompt: |
+      For each PHP service/class handling authentication, authorization,
+      credential storage, rate limiting, or token validation:
+      1. Verify LoggerInterface is injected (constructor DI)
+      2. Verify security events are logged (failed auth, lockout, replay, CSRF)
+      3. Verify log levels are appropriate (WARNING for failures, INFO for success)
+      4. Verify usernames are NEVER logged in plaintext (must be hashed)
+    severity: warning
+    tags: [owasp-a09, logging, audit-trail]
+    desc: "Security-sensitive services have audit logging"
+
+  # === TOCTOU RACE CONDITIONS ===
+  - id: SA-LLM-40
+    domain: security
+    prompt: |
+      Check for Time-of-Check/Time-of-Use race conditions in:
+      1. Rate limiters: Is check-then-increment atomic? (needs locking)
+      2. Nonce/token validators: Is check-then-consume atomic?
+      3. Last-resource guards: Is count-then-delete atomic?
+      Look for non-atomic read-check-write sequences in security-critical code.
+    severity: error
+    tags: [toctou, race-condition, concurrency]
+    desc: "No TOCTOU race conditions in security paths"
