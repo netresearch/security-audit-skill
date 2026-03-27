@@ -477,14 +477,14 @@ mechanical:
   - id: SA-CSP-01
     type: regex
     target: "Resources/Private/**/*.html"
-    pattern: '<script(?![^>]*\bsrc=)[^>]*>'
+    pattern: '<script(?![^>]*\bsrc\s*=)[^>]*>'
     severity: error
     desc: "Inline <script> tags violate Content Security Policy. Move JavaScript to external files loaded via f:be.pageRenderer includeJsFiles or AssetCollector API"
 
   - id: SA-CSP-02
     type: regex
     target: "Resources/Private/**/*.html"
-    pattern: '\son\w+='
+    pattern: '\son\w+\s*='
     severity: error
     desc: "Inline event handlers (onclick, onerror, onload, etc.) violate CSP. Use addEventListener() in external JavaScript files instead"
 
