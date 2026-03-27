@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Use when conducting security assessments, running OWASP Top 10 or CWE Top 25 audits, scoring vulnerabilities with CVSS v4.0, auditing PHP/TYPO3/Symfony/Laravel projects for XSS/SQLi/XXE/CSRF, checking for leaked secrets, scanning dependencies for CVEs, or reviewing code for any security concern."
+description: "Use when conducting security assessments, running OWASP Top 10 or CWE Top 25 audits, scoring vulnerabilities with CVSS v4.0, auditing PHP/TYPO3/Symfony/Laravel projects for XSS/SQLi/XXE/CSRF, checking for leaked secrets, scanning dependencies for CVEs, reviewing image processing security, CSP compliance, lock handling, error suppression, or reviewing code for any security concern."
 license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
 compatibility: "Requires grep, jq, gh CLI."
 metadata:
@@ -20,6 +20,10 @@ Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub pr
 - **Risk Scoring**: CVSS v3.1 and v4.0 methodology
 - **Secure Coding**: Input validation, output encoding, cryptography, session management, authentication
 - **Standards**: OWASP Top 10, CWE Top 25, OWASP ASVS, Proactive Controls
+- **Image Processing Security**: Path traversal in image paths, dimension/filesize limits, temporary file cleanup
+- **CSP Compliance**: Inline script detection, inline event handler detection, external JS migration
+- **Lock Handling**: try/finally cleanup, timeout configuration, deadlock prevention, exhaustion logging
+- **Error Suppression**: Context-aware @ operator validation, TOCTOU race conditions, return value checks
 
 ## Reference Files
 
