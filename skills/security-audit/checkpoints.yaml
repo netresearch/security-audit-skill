@@ -489,16 +489,16 @@ mechanical:
   - id: SA-CSP-01
     type: regex
     target: "Resources/Private/**/*.html"
-    pattern: '<script(?![^>]*\bsrc=)[^>]*>'
+    pattern: '<script[^>]*>'
     severity: error
     desc: "Inline <script> tags violate Content Security Policy. Move JavaScript to external files loaded via f:be.pageRenderer includeJsFiles or AssetCollector API"
 
   - id: SA-CSP-02
     type: regex
     target: "Resources/Private/**/*.html"
-    pattern: '\son\w+='
+    pattern: '\s(onclick|onerror|onload|onsubmit|onchange|onfocus|onblur|onmouseover)='
     severity: error
-    desc: "Inline event handlers (onclick, onerror, onload, etc.) violate CSP. Use addEventListener() in external JavaScript files instead"
+    desc: "Inline event handlers violate CSP. Use addEventListener() in external JavaScript files instead"
 
 llm_reviews:
   # === HARDCODED CREDENTIALS REVIEW ===
@@ -944,49 +944,6 @@ llm_reviews:
     severity: error
     desc: "Verify role/permission changes require proper authorization (CWE-269)"
 
-  # === IMAGE PROCESSING SECURITY ===
-  - id: SA-IMG-01
-    domain: security
-    prompt: |
-      Review image processing code for security:
-      1. Verify realpath() validation on ALL input image file paths before processing
-      2. Check that processed image output paths are validated against a whitelist directory
-      3. Verify getimagesize()/exif_read_data() results are checked before use
-      4. Check for path traversal in image URL/path parameters (../ sequences)
-      5. Verify image dimension/filesize limits are enforced before processing
-      6. Check that temporary files from image processing are cleaned up
-    severity: error
-    desc: "Image processing code must validate input paths with realpath(), enforce dimension/size limits, and clean up temporary files"
-
-  # === LOCK HANDLING SECURITY ===
-  - id: SA-LOCK-01
-    domain: security
-    prompt: |
-      Review lock handling for resource exhaustion and deadlock prevention:
-      1. Verify all lock acquisitions use try/finally to ensure lock release
-      2. Check that LockCreateException is handled in a way that ensures no resource is left locked — catching and retrying or logging is acceptable; silently propagating without cleanup is not
-      3. Verify lock timeout is configured (not infinite wait)
-      4. Check for exhaustion logging when lock cannot be acquired after retries
-      5. Verify no nested lock acquisitions that could cause deadlocks
-      6. Check that lock keys are deterministic and don't allow user-controlled lock names
-    severity: warning
-    desc: "Lock handling must use try/finally for cleanup, catch LockCreateException, configure timeouts, and log exhaustion"
-
-  # === CONTEXT-AWARE ERROR SUPPRESSION ===
-  - id: SA-SUPPRESS-01
-    domain: security
-    prompt: |
-      Review @ error suppression usage for safety:
-      1. ACCEPTABLE: @mkdir() for TOCTOU race conditions — must check return value or verify with is_dir() afterward
-      2. ACCEPTABLE: @file_get_contents() when return value is checked against false
-      3. ACCEPTABLE: @getimagesize() when return value is checked against false
-      4. UNACCEPTABLE: @ without subsequent return value validation
-      5. UNACCEPTABLE: @unlink() when deletion success is critical
-      6. For each @ usage: verify the return value IS checked before the result is used or the function returns
-      7. Flag any @ usage without clear TOCTOU justification or return check
-    severity: warning
-    desc: "Error suppression (@) is only acceptable for TOCTOU races (mkdir) or when return value is explicitly checked (file_get_contents, getimagesize)"
-
   # === AUDIT LOGGING PRESENCE ===
   - id: SA-LLM-39
     domain: security
@@ -1013,3 +970,46 @@ llm_reviews:
     severity: error
     tags: [toctou, race-condition, concurrency]
     desc: "No TOCTOU race conditions in security paths"
+
+  # === IMAGE PROCESSING SECURITY ===
+  - id: SA-IMG-01
+    domain: security
+    prompt: |
+      Review image processing code for security:
+      1. Verify realpath() validation on ALL input image file paths before processing
+      2. Check that processed image output paths are validated against a whitelist directory
+      3. Verify getimagesize()/exif_read_data() results are checked before use
+      4. Check for path traversal in image URL/path parameters (../ sequences)
+      5. Verify image dimension/filesize limits are enforced before processing
+      6. Check that temporary files from image processing are cleaned up
+    severity: error
+    desc: "Image processing code must validate input paths with realpath(), enforce dimension/size limits, and clean up temporary files"
+
+  # === LOCK HANDLING SECURITY ===
+  - id: SA-LOCK-01
+    domain: security
+    prompt: |
+      Review lock handling for resource exhaustion and deadlock prevention:
+      1. Verify all lock acquisitions use try/finally to ensure lock release
+      2. Check that LockCreateException is caught and handled (not just propagated)
+      3. Verify lock timeout is configured (not infinite wait)
+      4. Check for exhaustion logging when lock cannot be acquired after retries
+      5. Verify no nested lock acquisitions that could cause deadlocks
+      6. Check that lock keys are deterministic and don't allow user-controlled lock names
+    severity: warning
+    desc: "Lock handling must use try/finally for cleanup, catch LockCreateException, configure timeouts, and log exhaustion"
+
+  # === CONTEXT-AWARE ERROR SUPPRESSION ===
+  - id: SA-SUPPRESS-01
+    domain: security
+    prompt: |
+      Review @ error suppression usage for safety:
+      1. ACCEPTABLE: @mkdir() for TOCTOU race conditions when result is checked
+      2. ACCEPTABLE: @file_get_contents() when return value is checked against false
+      3. ACCEPTABLE: @getimagesize() when return value is checked against false
+      4. UNACCEPTABLE: @ without subsequent return value validation
+      5. UNACCEPTABLE: @unlink() when deletion success is critical
+      6. For each @ usage: verify the return value IS checked on the next line
+      7. Flag any @ usage without clear TOCTOU justification or return check
+    severity: warning
+    desc: "Error suppression (@) is only acceptable for TOCTOU races (mkdir) or when return value is explicitly checked (file_get_contents, getimagesize)"
