@@ -444,8 +444,9 @@ mechanical:
     desc: "npm dependencies monitored when package.json exists"
     check: |
       If package.json exists, verify that:
-      1. .github/dependabot.yml includes npm ecosystem
-      2. CI runs npm audit
+      1. .github/dependabot.yml is configured to monitor the "npm" package-ecosystem.
+      2. CI runs `npm audit` and is configured to fail the build on vulnerabilities (e.g., using `--audit-level=high`).
+      3. CI runs `npm audit signatures` to verify package integrity.
     tags: [dependencies, npm, supply-chain]
 
   # === PATH TRAVERSAL PREVENTION (CWE-22) ===
@@ -489,16 +490,16 @@ mechanical:
   - id: SA-CSP-01
     type: regex
     target: "Resources/Private/**/*.html"
-    pattern: '<script[^>]*>'
+    pattern: '<script(?![^>]*\bsrc=)[^>]*>'
     severity: error
     desc: "Inline <script> tags violate Content Security Policy. Move JavaScript to external files loaded via f:be.pageRenderer includeJsFiles or AssetCollector API"
 
   - id: SA-CSP-02
     type: regex
     target: "Resources/Private/**/*.html"
-    pattern: '\s(onclick|onerror|onload|onsubmit|onchange|onfocus|onblur|onmouseover)='
+    pattern: '\son\w+='
     severity: error
-    desc: "Inline event handlers violate CSP. Use addEventListener() in external JavaScript files instead"
+    desc: "Inline event handlers (on*= attributes) violate CSP. Use addEventListener() in external JavaScript files instead"
 
 llm_reviews:
   # === HARDCODED CREDENTIALS REVIEW ===
@@ -991,7 +992,7 @@ llm_reviews:
     prompt: |
       Review lock handling for resource exhaustion and deadlock prevention:
       1. Verify all lock acquisitions use try/finally to ensure lock release
-      2. Check that LockCreateException is caught and handled (not just propagated)
+      2. Check that LockCreateException is handled in a way that ensures no resource is left locked — catching and retrying or logging is acceptable; silently propagating without cleanup is not
       3. Verify lock timeout is configured (not infinite wait)
       4. Check for exhaustion logging when lock cannot be acquired after retries
       5. Verify no nested lock acquisitions that could cause deadlocks
@@ -1004,12 +1005,12 @@ llm_reviews:
     domain: security
     prompt: |
       Review @ error suppression usage for safety:
-      1. ACCEPTABLE: @mkdir() for TOCTOU race conditions when result is checked
+      1. ACCEPTABLE: @mkdir() for TOCTOU race conditions — must check return value or verify with is_dir() afterward
       2. ACCEPTABLE: @file_get_contents() when return value is checked against false
       3. ACCEPTABLE: @getimagesize() when return value is checked against false
       4. UNACCEPTABLE: @ without subsequent return value validation
       5. UNACCEPTABLE: @unlink() when deletion success is critical
-      6. For each @ usage: verify the return value IS checked on the next line
+      6. For each @ usage: verify the return value IS checked before the result is used or the function returns
       7. Flag any @ usage without clear TOCTOU justification or return check
     severity: warning
     desc: "Error suppression (@) is only acceptable for TOCTOU races (mkdir) or when return value is explicitly checked (file_get_contents, getimagesize)"
