@@ -1089,3 +1089,226 @@ llm_reviews:
     severity: warning
     tags: [exception-hierarchy, provider-abstraction, error-handling]
     desc: "Verify consistent exception hierarchy across provider abstraction layer"
+
+  # === CRYPTO KEY TRIM CORRUPTION ===
+  - id: SA-LLM-43
+    domain: security
+    prompt: |
+      Audit for trim() called on variables that may contain binary key material:
+      1. Search for trim(), ltrim(), rtrim() applied to variables holding encryption keys,
+         HMAC keys, nonces, IVs, or raw binary secrets
+      2. trim() strips bytes matching whitespace characters (0x09, 0x0A, 0x0D, 0x20, 0x00, 0x0B)
+         which corrupts binary keys — a 256-bit key can lose entropy silently
+      3. Check for trim() on values returned by random_bytes(), sodium_crypto_*keygen(),
+         hex2bin(), base64_decode() when result is used as key material
+      4. Verify key loading from files or environment does not trim binary content
+      5. Safe alternative: if whitespace stripping is needed for base64/hex encoded keys,
+         trim BEFORE decoding, never after
+
+      Vulnerable patterns:
+      - $key = trim(file_get_contents('secret.key'))  // binary key corrupted
+      - $key = trim(sodium_crypto_secretbox_keygen())  // random bytes corrupted
+      - $key = trim($env['ENCRYPTION_KEY'])  // if env holds raw binary
+
+      Safe patterns:
+      - $key = file_get_contents('secret.key')  // no trim on binary
+      - $encoded = trim(file_get_contents('secret.key.b64')); $key = base64_decode($encoded)
+    severity: error
+    tags: [cryptography, key-management, data-corruption]
+    desc: "trim() on binary key material silently corrupts keys by stripping bytes matching whitespace"
+
+  # === ERROR MESSAGE SANITIZATION IN AJAX ENDPOINTS ===
+  - id: SA-LLM-44
+    domain: security
+    prompt: |
+      Audit API and AJAX endpoints for raw exception message exposure:
+      1. Find all JSON-returning endpoints (JsonResponse, json_encode in controllers/actions)
+      2. Check each catch block — $e->getMessage() must NOT appear in the response body
+      3. Verify generic error strings are returned instead ('An error occurred', 'Request failed')
+      4. Check that the full exception IS logged server-side for debugging
+      5. Pay special attention to:
+         - AJAX action methods in Extbase controllers
+         - REST/API middleware error handlers
+         - JsonView error formatters
+      6. Exception messages from HTTP clients often contain full request URLs with API keys
+
+      Vulnerable patterns:
+      - return new JsonResponse(['error' => $e->getMessage()], 500)
+      - echo json_encode(['message' => $exception->getMessage()])
+      - $this->view->assign('error', $e->getMessage()) in AJAX context
+
+      Safe patterns:
+      - $this->logger->error('Operation failed', ['exception' => $e]);
+        return new JsonResponse(['error' => 'An internal error occurred'], 500)
+    severity: error
+    tags: [cwe-209, ajax, api, information-disclosure]
+    desc: "API/AJAX endpoints must not return raw exception messages — use generic error strings"
+
+  # === SSRF HOST VALIDATION FOR AUTH-INJECTING HTTP CLIENTS ===
+  - id: SA-LLM-45
+    domain: security
+    prompt: |
+      Audit HTTP client wrappers that inject authentication credentials:
+      1. Find all classes that create or configure HTTP clients (Guzzle, HttpClient, curl)
+         and inject Authorization headers, Bearer tokens, API keys, or basic auth
+      2. Verify the target host/URL is validated against an allowlist BEFORE credentials are sent
+      3. Check that redirect following does not leak credentials to third-party hosts
+      4. Flag any pattern where auth is injected based on configuration but the URL comes
+         from user input or external data without host validation
+
+      Vulnerable patterns:
+      - $client->request('GET', $url, ['headers' => ['Authorization' => 'Bearer ' . $token]])
+        where $url is not validated against allowed hosts
+      - Guzzle middleware that adds auth headers to ALL requests regardless of destination
+      - Base URI configured but request path allows host override (e.g., '//evil.com/path')
+
+      Safe patterns:
+      - Validate parse_url($url, PHP_URL_HOST) against allowlist before request
+      - Use base_uri in Guzzle with relative paths only (reject absolute URLs)
+      - Separate client instances per external service with fixed base URIs
+    severity: error
+    tags: [cwe-918, ssrf, credential-leakage, http-client]
+    desc: "HTTP clients injecting auth credentials must validate target host against allowlist before sending"
+
+  # === KEYED VS UNKEYED HASHING FOR TAMPER DETECTION ===
+  - id: SA-LLM-46
+    domain: security
+    prompt: |
+      Audit hash-based tamper detection for use of keyed vs unkeyed hashing:
+      1. Find all uses of hash('sha256', ...), hash('sha512', ...), sha256(), md5() for
+         integrity verification, audit trails, or tamper detection
+      2. Check if the hash is used to detect unauthorized modification of stored data
+         (database records, configuration, audit logs)
+      3. Unkeyed hashes (SHA-256) can be recomputed by anyone with database access —
+         an attacker who compromises the DB can alter records AND recompute valid hashes
+      4. Verify HMAC is used instead: hash_hmac('sha256', $data, $secret) where $secret
+         is stored separately from the data being protected
+      5. Check hash chains / audit trails — each entry should use HMAC, not plain hash
+
+      Vulnerable patterns:
+      - $hash = hash('sha256', $record['data'])  // anyone with DB access can recompute
+      - $chain = hash('sha256', $previousHash . $newData)  // unkeyed chain
+
+      Safe patterns:
+      - $hash = hash_hmac('sha256', $record['data'], $hmacKey)
+      - $chain = hash_hmac('sha256', $previousHash . $newData, $hmacKey)
+      - HMAC key stored in environment/config, NOT in the database
+    severity: error
+    tags: [cryptography, hmac, tamper-detection, integrity]
+    desc: "Tamper detection hashes must use HMAC (keyed), not plain SHA-256 — unkeyed hashes can be recomputed by anyone with DB access"
+
+  # === COPY-ON-WRITE SODIUM_MEMZERO ===
+  - id: SA-LLM-47
+    domain: security
+    prompt: |
+      Audit sodium_memzero() usage for PHP copy-on-write (COW) pitfalls:
+      1. In PHP, assigning a string variable creates a shared reference (COW).
+         Modifying one copy (via sodium_memzero) only zeros THAT copy, not the original.
+      2. Search for patterns where a secret is assigned to another variable, then
+         sodium_memzero is called on one but not the other:
+         - $key = $config->getKey(); sodium_memzero($key) — $config still holds secret
+         - $a = $b; sodium_memzero($b) — $a still holds the secret in memory
+         - $decrypted = sodium_crypto_secretbox_open(..., $key); sodium_memzero($key)
+           — if $key was assigned from another variable, that source still holds it
+      3. Check function parameters: passing a string by value creates a COW copy.
+         sodium_memzero on the parameter does not zero the caller's variable.
+      4. Verify that ALL references to the secret are zeroed, not just one alias.
+      5. Check array/object access: $key = $array['key']; sodium_memzero($key) does NOT
+         zero $array['key'].
+
+      Vulnerable patterns:
+      - $key = $this->key; sodium_memzero($key);  // $this->key still holds secret
+      - function encrypt($key, $data) { ... sodium_memzero($key); }  // caller's $key intact
+      - $keys = getKeys(); $enc = $keys['encryption']; sodium_memzero($enc);  // $keys unchanged
+
+      Safe patterns:
+      - sodium_memzero($this->key);  // zero the actual property
+      - Pass by reference: function encrypt(string &$key, ...) { ... sodium_memzero($key); }
+    severity: error
+    tags: [cryptography, memory-safety, sodium, secret-cleanup]
+    desc: "sodium_memzero() on a copy-on-write variable only zeros the copy — all references to the secret must be zeroed"
+
+  # === READONLY/FINAL VALUE OBJECTS WITH SECRETS ===
+  - id: SA-LLM-48
+    domain: security
+    prompt: |
+      Audit readonly classes and final/readonly properties that store secrets:
+      1. Find readonly classes (PHP 8.2+) or classes with readonly string properties
+      2. Check if any hold sensitive values: tokens, API keys, passwords, encryption keys,
+         secrets, credentials, connection strings
+      3. Readonly properties cannot be modified after initialization, which means
+         sodium_memzero() or any cleanup mechanism cannot zero them
+      4. Secrets in readonly properties persist in memory for the object's entire lifetime
+      5. Flag readonly class declarations where constructor parameters include
+         token, key, secret, password, credential, apiKey naming patterns
+
+      Vulnerable patterns:
+      - readonly class ApiCredentials { public function __construct(public string $apiKey, public string $secret) {} }
+      - class Config { public readonly string $encryptionKey; }
+      - final class Token { public function __construct(private readonly string $bearerToken) {} }
+
+      Safe patterns:
+      - Use a mutable property with explicit cleanup: $this->key = null in a destruct/cleanup method
+      - Store secrets in SensitiveParameterValue (PHP 8.2+) for debug protection
+      - Use a SecretBox wrapper that holds the value in a mutable property with a wipe() method
+    severity: warning
+    tags: [cryptography, memory-safety, readonly, secret-lifecycle]
+    desc: "readonly/final value objects storing secrets cannot be zeroed — use mutable properties with explicit cleanup"
+
+  # === REDIRECT CREDENTIAL LEAKAGE IN HTTP CLIENTS ===
+  - id: SA-LLM-49
+    domain: security
+    prompt: |
+      Audit HTTP clients for credential leakage via redirects:
+      1. Find all Guzzle/HttpClient instances that send Authorization headers,
+         Bearer tokens, or API keys
+      2. By default, Guzzle follows redirects AND forwards Authorization headers
+         to the redirect target — if the target is a different host, credentials leak
+      3. Check for explicit redirect configuration:
+         - 'allow_redirects' => false (disables redirects entirely)
+         - 'allow_redirects' => ['strict' => true] (preserves method but still leaks auth)
+         - Custom on_redirect callback that strips auth headers on host change
+      4. Check PSR-18 HttpClient implementations for similar redirect behavior
+      5. Verify that any HTTP client sending credentials has explicit redirect policy
+
+      Vulnerable patterns:
+      - $client = new Client(['headers' => ['Authorization' => 'Bearer ' . $token]])
+        // default: follows redirects, sends auth to redirect target
+      - $client->request('GET', $url, ['auth' => [$user, $pass]])
+        // if $url redirects to external host, credentials are sent
+
+      Safe patterns:
+      - $client = new Client(['allow_redirects' => false, 'headers' => ['Authorization' => ...]])
+      - Custom redirect middleware that strips Authorization on cross-origin redirect
+      - 'allow_redirects' => ['on_redirect' => function() { /* strip auth */ }]
+    severity: error
+    tags: [cwe-522, http-client, credential-leakage, redirect]
+    desc: "HTTP clients following redirects send Authorization headers to redirect targets — configure allow_redirects explicitly"
+
+  # === SODIUM_MEMZERO IN FINALLY BLOCKS ===
+  - id: SA-LLM-50
+    domain: security
+    prompt: |
+      Audit sodium_memzero() placement in encryption/decryption operations:
+      1. Find all encryption/decryption operations using sodium_crypto_secretbox,
+         sodium_crypto_secretbox_open, sodium_crypto_aead_*, or similar
+      2. Check that sodium_memzero() for key material is in a finally{} block,
+         NOT placed after the try/catch block or only after success
+      3. If an exception is thrown during encryption/decryption, keys left in memory
+         without finally{} cleanup persist until garbage collection
+      4. Verify the pattern: try { encrypt/decrypt } finally { sodium_memzero($key) }
+      5. Check for early returns inside try blocks that skip sodium_memzero()
+
+      Vulnerable patterns:
+      - $result = sodium_crypto_secretbox($msg, $nonce, $key);
+        sodium_memzero($key);  // skipped if exception thrown above
+      - try { $result = encrypt($data, $key); } catch (...) { throw ...; }
+        sodium_memzero($key);  // never reached if catch re-throws
+
+      Safe patterns:
+      - try { $result = sodium_crypto_secretbox($msg, $nonce, $key); }
+        finally { sodium_memzero($key); sodium_memzero($nonce); }
+      - Using a wrapper that handles cleanup in __destruct or finally internally
+    severity: error
+    tags: [cryptography, memory-safety, sodium, exception-handling]
+    desc: "sodium_memzero() must be in finally{} blocks — exceptions during crypto operations leave keys in memory"
