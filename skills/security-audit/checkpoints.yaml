@@ -1251,7 +1251,7 @@ llm_reviews:
       - Use a mutable property with explicit cleanup: $this->key = null in a destruct/cleanup method
       - Store secrets in SensitiveParameterValue (PHP 8.2+) for debug protection
       - Use a SecretBox wrapper that holds the value in a mutable property with a wipe() method
-    severity: warning
+    severity: error
     tags: [cryptography, memory-safety, readonly, secret-lifecycle]
     desc: "readonly/final value objects storing secrets cannot be zeroed — use mutable properties with explicit cleanup"
 
