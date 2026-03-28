@@ -1175,7 +1175,7 @@ llm_reviews:
     domain: security
     prompt: |
       Audit hash-based tamper detection for use of keyed vs unkeyed hashing:
-      1. Find all uses of hash('sha256', ...), hash('sha512', ...), sha256(), md5() for
+      1. Find all uses of hash('sha256', ...), hash('sha512', ...), md5() for
          integrity verification, audit trails, or tamper detection
       2. Check if the hash is used to detect unauthorized modification of stored data
          (database records, configuration, audit logs)
@@ -1248,9 +1248,12 @@ llm_reviews:
       - final class Token { public function __construct(private readonly string $bearerToken) {} }
 
       Safe patterns:
-      - Use a mutable property with explicit cleanup: $this->key = null in a destruct/cleanup method
+      - Use a mutable property with explicit cleanup in __destruct():
+        sodium_memzero($this->accessToken); $this->accessToken = '';
+        (Note: simply setting to null does NOT wipe the underlying string from memory)
       - Store secrets in SensitiveParameterValue (PHP 8.2+) for debug protection
       - Use a SecretBox wrapper that holds the value in a mutable property with a wipe() method
+        that calls sodium_memzero() before nulling
     severity: error
     tags: [cryptography, memory-safety, readonly, secret-lifecycle]
     desc: "readonly/final value objects storing secrets cannot be zeroed — use mutable properties with explicit cleanup"
