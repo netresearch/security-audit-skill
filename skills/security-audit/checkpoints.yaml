@@ -1000,6 +1000,35 @@ llm_reviews:
     severity: warning
     desc: "Lock handling must use try/finally for cleanup, catch LockCreateException, configure timeouts, and log exhaustion"
 
+  # === ERROR MESSAGE SANITIZATION (CWE-209) ===
+  - id: SA-55
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "throw\\s+new\\s+\\w*Exception\\([^)]*\\$\\w+->getMessage\\(\\)"
+    severity: warning
+    desc: "Exception re-thrown with raw getMessage() may leak sensitive data (API keys, paths) - sanitize first (CWE-209)"
+
+  - id: SA-56
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "new\\s+JsonResponse\\([^)]*getMessage\\(\\)"
+    severity: error
+    desc: "Raw exception message in JsonResponse exposes internals to frontend (CWE-209)"
+
+  - id: SA-57
+    type: regex
+    target: "Classes/**/*.php"
+    pattern: "new\\s+HtmlResponse\\([^)]*getMessage\\(\\)"
+    severity: error
+    desc: "Raw exception message in HtmlResponse exposes internals to frontend (CWE-209)"
+
+  # === EXCEPTION TYPE CONSISTENCY ===
+  - id: SA-58
+    type: command
+    target: "! grep -rqP 'throw\\s+new\\s+\\\\?(RuntimeException|BadMethodCallException|\\\\Exception)\\s*\\(' --include='*Provider*.php' --include='*Client*.php' --include='*Connector*.php' --include='*Adapter*.php' Classes/ 2>/dev/null"
+    severity: warning
+    desc: "Provider/Client/Connector classes should use domain-specific exceptions, not generic RuntimeException or \\Exception"
+
   # === CONTEXT-AWARE ERROR SUPPRESSION ===
   - id: SA-SUPPRESS-01
     domain: security
@@ -1014,3 +1043,49 @@ llm_reviews:
       7. Flag any @ usage without clear TOCTOU justification or return check
     severity: warning
     desc: "Error suppression (@) is only acceptable for TOCTOU races (mkdir) or when return value is explicitly checked (file_get_contents, getimagesize)"
+
+  # === ERROR MESSAGE SANITIZATION REVIEW (CWE-209) ===
+  - id: SA-LLM-41
+    domain: security
+    prompt: |
+      Audit error message handling for information leakage:
+      1. Check all catch blocks in controllers/actions - verify $e->getMessage() is NOT passed to HTTP responses
+      2. Look for exception messages that include HTTP request URLs (may contain API keys as query parameters)
+      3. Verify exception re-throws sanitize the inner message before wrapping
+      4. Check that server-side logging captures the full exception while client responses use generic messages
+      5. Look for patterns like: ?key=, ?api_key=, ?token=, ?secret= in URL construction passed to HTTP clients
+
+      Vulnerable patterns:
+      - throw new Exception('Failed: ' . $e->getMessage())  where $e contains URL with API key
+      - return new JsonResponse(['error' => $e->getMessage()], 500)
+      - echo $e->getMessage() in any response context
+
+      Safe patterns:
+      - Sanitize URLs in exception messages: preg_replace('/([?&](key|api_key|token|secret)=)[^&\s]*/i', '$1[REDACTED]', $msg)
+      - Log full exception server-side, return generic message to client
+      - Use domain-specific exception types with controlled messages
+    severity: error
+    tags: [cwe-209, error-handling, information-disclosure]
+    desc: "Verify error messages do not leak API keys, internal paths, or sensitive details (CWE-209)"
+
+  # === EXCEPTION HIERARCHY CONSISTENCY REVIEW ===
+  - id: SA-LLM-42
+    domain: security
+    prompt: |
+      Audit exception usage consistency across provider/client abstraction layers:
+      1. Identify all provider/client/connector/adapter classes in the codebase
+      2. Verify they all use the same domain-specific exception hierarchy (not generic exceptions)
+      3. Check that HTTP status codes map to consistent exception types across providers:
+         - 401/402/403 → ProviderConfigurationException (or equivalent auth exception)
+         - 429/503/timeout → ProviderConnectionException (or equivalent connectivity exception)
+         - 4xx/5xx → ProviderResponseException (or equivalent response exception)
+      4. Verify no provider throws RuntimeException, BadMethodCallException, LogicException, or bare \Exception
+      5. Check that consumers can rely on catching a common base exception type
+
+      Benefits of consistent exceptions:
+      - Centralized error handling in consumers
+      - Sanitization middleware can target specific exception types
+      - Prevents sensitive details from bypassing error filters via unexpected types
+    severity: warning
+    tags: [exception-hierarchy, provider-abstraction, error-handling]
+    desc: "Verify consistent exception hierarchy across provider abstraction layer"

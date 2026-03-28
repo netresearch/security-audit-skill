@@ -5,7 +5,7 @@ license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
 compatibility: "Requires grep, jq, gh CLI."
 metadata:
   author: Netresearch DTT GmbH
-  version: "2.3.0"
+  version: "2.4.0"
   repository: https://github.com/netresearch/security-audit-skill
 allowed-tools: Bash(grep:*) Bash(jq:*) Bash(gh:*) Read Glob Grep
 ---
@@ -20,12 +20,13 @@ Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub pr
 - **Risk Scoring**: CVSS v3.1 and v4.0 methodology
 - **Secure Coding**: Input validation, output encoding, cryptography, session management, authentication
 - **Standards**: OWASP Top 10, CWE Top 25, OWASP ASVS, Proactive Controls
-- **Infrastructure**: CSP compliance, lock handling, image processing security, error suppression
+- **Infrastructure**: CSP compliance, lock handling, image processing security, error suppression, error message sanitization
 
 ## Reference Files
 
 - **Core**: `owasp-top10.md`, `cwe-top25.md`, `xxe-prevention.md`, `cvss-scoring.md`, `api-key-encryption.md`
 - **Vulnerability Prevention**: `deserialization-prevention.md`, `path-traversal-prevention.md`, `file-upload-security.md`, `input-validation.md`
+- **Error Handling**: `error-message-sanitization.md` (API key redaction, exception hierarchy, frontend exposure)
 - **Secure Architecture**: `authentication-patterns.md`, `security-headers.md`, `security-logging.md`, `cryptography-guide.md`
 - **Framework Security**: `framework-security.md` (TYPO3, Symfony, Laravel)
 - **Modern Threats**: `modern-attacks.md`, `cve-patterns.md`, `php-security-features.md`
@@ -75,6 +76,8 @@ For automated scanning tools (semgrep, trivy, gitleaks), see `references/automat
 - [ ] XML external entities disabled (LIBXML_NONET only)
 - [ ] Context-appropriate output encoding, CSP configured
 - [ ] API keys encrypted at rest (sodium_crypto_secretbox)
+- [ ] Exception messages sanitized (no API keys, paths, or SQL in responses)
+- [ ] Consistent exception hierarchy across provider abstraction layers
 - [ ] TLS 1.2+, secrets not in VCS, audit logging
 - [ ] No unserialize() with user input, use json_decode()
 - [ ] File uploads validated, renamed, stored outside web root
