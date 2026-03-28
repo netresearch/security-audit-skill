@@ -68,13 +68,13 @@ private function sanitizeErrorMessage(string $message): string
 
 ### Detection Patterns
 
-```
+```bash
 # Find exception messages that include raw exception messages from HTTP clients
-throw\s+new\s+\w*Exception\([^)]*\$\w+->getMessage\(\)
-catch\s*\([^)]*Exception[^)]*\$e\)\s*\{[^}]*throw[^;]*\$e->getMessage\(\)
+grep -rP 'throw\s+new\s+[\w\\\\]*Exception\(.*\$\w+->getMessage\s*\(\)' Classes/
+grep -rP 'catch\s*\(.*Exception.*\$e\)\s*\{[^}]*throw[^;]*\$e->getMessage\s*\(\)' Classes/
 
 # Find HTTP URLs constructed with API keys as query parameters
-\?\s*(key|api_key|apikey|token|secret|access_token)\s*=\s*\$
+grep -rP '\?\s*(key|api_key|apikey|token|secret|access_token)\s*=\s*\$' Classes/
 ```
 
 ---
@@ -270,16 +270,16 @@ final class ItemController extends ActionController
 
 ### Detection Patterns
 
-```
+```bash
 # Find catch blocks that pass exception message to responses
-catch\s*\([^)]*\$e\)\s*\{[^}]*JsonResponse[^;]*\$e->getMessage\(\)
-catch\s*\([^)]*\$e\)\s*\{[^}]*->write\([^)]*\$e->getMessage\(\)
-catch\s*\([^)]*\$e\)\s*\{[^}]*echo\s+\$e->getMessage\(\)
-catch\s*\([^)]*\$e\)\s*\{[^}]*return.*\$e->getMessage\(\)
+grep -rPzo 'catch\s*\([^)]*\$e\)\s*\{[^}]*JsonResponse[^;]*\$e->getMessage\s*\(\)' Classes/
+grep -rPzo 'catch\s*\([^)]*\$e\)\s*\{[^}]*->write\([^)]*\$e->getMessage\s*\(\)' Classes/
+grep -rPzo 'catch\s*\([^)]*\$e\)\s*\{[^}]*echo\s+\$e->getMessage\s*\(\)' Classes/
+grep -rPzo 'catch\s*\([^)]*\$e\)\s*\{[^}]*return.*\$e->getMessage\s*\(\)' Classes/
 
 # Find raw exception in Symfony/TYPO3 response patterns
-new\s+JsonResponse\([^)]*getMessage\(\)
-new\s+HtmlResponse\([^)]*getMessage\(\)
+grep -rP 'new\s+JsonResponse\(.*getMessage\s*\(\)' Classes/
+grep -rP 'new\s+HtmlResponse\(.*getMessage\s*\(\)' Classes/
 ```
 
 ---

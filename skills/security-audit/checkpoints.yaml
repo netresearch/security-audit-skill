@@ -1004,7 +1004,7 @@ llm_reviews:
   - id: SA-55
     type: regex
     target: "Classes/**/*.php"
-    pattern: "throw\\s+new\\s+\\w*Exception\\([^)]*\\$\\w+->getMessage\\(\\)"
+    pattern: "throw\\s+new\\s+[\\w\\\\]*Exception\\([^)]*\\$\\w+->getMessage\\(\\)"
     severity: warning
     desc: "Exception re-thrown with raw getMessage() may leak sensitive data (API keys, paths) - sanitize first (CWE-209)"
 
