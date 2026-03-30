@@ -449,6 +449,21 @@ mechanical:
       3. CI runs `npm audit signatures` to verify package integrity.
     tags: [dependencies, npm, supply-chain]
 
+  # === GITHUB ACTIONS INJECTION ===
+  - id: SA-GHA-01
+    type: regex
+    target: .github/workflows/*.yml
+    pattern: 'run:.*\$\{\{\s*inputs\.'
+    severity: error
+    desc: "Workflow run: blocks must not interpolate ${{ inputs.* }} directly (code injection via reusable workflow inputs). Use env: block instead"
+
+  - id: SA-GHA-02
+    type: regex
+    target: .github/workflows/*.yml
+    pattern: 'run:.*\$\{\{\s*github\.event\.'
+    severity: error
+    desc: "Workflow run: blocks must not interpolate ${{ github.event.* }} directly (code injection). Use env: block instead"
+
   # === PATH TRAVERSAL PREVENTION (CWE-22) ===
   - id: SA-53
     type: regex
@@ -1315,3 +1330,55 @@ llm_reviews:
     severity: error
     tags: [cryptography, memory-safety, sodium, exception-handling]
     desc: "sodium_memzero() must be in finally{} blocks — exceptions during crypto operations leave keys in memory"
+
+  # === DEPENDENCY VULNERABILITY MANAGEMENT ===
+  - id: SA-DEP-05
+    domain: supply-chain
+    prompt: |
+      Check the project's dependency vulnerability posture:
+      1. Run gh api repos/OWNER/REPO/dependabot/alerts (if accessible) or
+         check for open Dependabot PRs indicating known vulnerabilities
+      2. For npm projects: check if pnpm-lock.yaml/package-lock.json contains
+         known-vulnerable transitive dependency versions. Cross-reference with
+         the project's pnpm.overrides or npm.overrides — overrides should be
+         a LAST RESORT when upstream hasn't patched
+      3. For Go projects: check go.sum for github.com/docker/docker or other
+         packages with known unfixable module path issues (v29.x not available
+         on github.com/docker/docker Go module path)
+      4. Verify the project has a strategy for each alert: fixed, dismissed
+         with rationale, or tracked for upstream fix
+      Report unaddressed vulnerabilities and recommend the appropriate fix
+      strategy (upgrade > override > dismiss with rationale).
+    severity: warning
+    desc: "Verify all Dependabot alerts are addressed: prefer upgrades over overrides, dismiss unfixable with rationale"
+
+  - id: SA-DEP-06
+    domain: supply-chain
+    prompt: |
+      For npm/pnpm projects, verify transitive dependency health:
+      1. Check if pnpm.overrides or npm.overrides exist in package.json
+      2. For each override, verify it's still necessary — run pnpm update
+         or npm update and check if the patched version resolves naturally
+      3. Stale overrides that are no longer needed add maintenance burden
+         and may mask version conflicts
+      4. Check that direct dependencies are up to date — upgrading direct
+         deps often pulls in patched transitive deps naturally
+      Report unnecessary overrides and outdated direct dependencies.
+    severity: info
+    desc: "Verify pnpm/npm overrides are still necessary and direct deps are current"
+
+  # === GITHUB ACTIONS SECURITY PATTERNS ===
+  - id: SA-GHA-03
+    domain: ci-security
+    prompt: |
+      Review GitHub Actions workflows for security anti-patterns:
+      1. Any ${{ inputs.* }} or ${{ github.event.* }} used directly in run:
+         blocks is a code injection vector — must use env: block instead
+      2. Check that pull_request_target workflows don't check out PR head
+         code and execute it (combined with write permissions = RCE)
+      3. Verify GITHUB_TOKEN permissions follow least-privilege principle
+      4. Check for secrets passed to steps that don't need them
+      5. Ensure third-party actions are SHA-pinned (not tag-only)
+      Report specific injection vectors and their remediation.
+    severity: error
+    desc: "Review GitHub Actions for injection vectors, permission scope, and secret exposure"

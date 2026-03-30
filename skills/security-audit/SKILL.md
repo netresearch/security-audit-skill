@@ -84,6 +84,39 @@ For automated scanning tools (semgrep, trivy, gitleaks), see `references/automat
 - [ ] Security headers: HSTS, CSP, X-Content-Type-Options
 - [ ] Dependencies scanned (composer audit), Dependabot enabled
 
+## GitHub Actions Security
+
+### Code Injection Prevention
+
+**NEVER** interpolate untrusted data in `run:` blocks:
+
+```yaml
+# VULNERABLE — direct interpolation
+- run: echo "${{ inputs.scripts-path }}"
+- run: echo "${{ github.event.pull_request.title }}"
+
+# SAFE — use env: block
+- env:
+    SCRIPTS_PATH: ${{ inputs.scripts-path }}
+  run: echo "$SCRIPTS_PATH"
+```
+
+Sources of untrusted data in workflows:
+- `github.event.*` (PR titles, branch names, commit messages)
+- `inputs.*` (reusable workflow inputs from callers)
+- `github.head_ref` (branch name from fork PRs)
+
+### Dependency Vulnerability Triage
+
+When Dependabot/Renovate flags vulnerabilities:
+
+1. **Try upgrade first**: `pnpm update --latest` or `go get pkg@latest` — often resolves transitive deps naturally
+2. **Override as last resort**: `pnpm.overrides` / `npm.overrides` only when upstream hasn't patched
+3. **Dismiss with rationale**: When no fix exists (e.g., Go module path issues like docker/docker v29.x)
+4. **Track for upstream**: Create an issue linking to the upstream fix timeline
+
+Never leave alerts unaddressed — each must have a documented resolution strategy.
+
 ## Verification
 
 ```bash
