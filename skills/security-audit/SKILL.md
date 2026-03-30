@@ -16,22 +16,22 @@ Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub pr
 
 ## Expertise Areas
 
-- **Vulnerabilities**: XXE, SQL injection, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, type juggling, SSTI, JWT flaws
-- **Risk Scoring**: CVSS v3.1 and v4.0 methodology
+- **Vulnerabilities**: XXE, SQLi, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, type juggling, SSTI, JWT flaws
+- **Risk Scoring**: CVSS v3.1 and v4.0
 - **Secure Coding**: Input validation, output encoding, cryptography, session management, authentication
 - **Standards**: OWASP Top 10, CWE Top 25, OWASP ASVS, Proactive Controls
-- **Infrastructure**: CSP compliance, lock handling, image processing security, error suppression, error message sanitization
+- **Infrastructure**: CSP, lock handling, image processing security, error suppression and sanitization
 
 ## Reference Files
 
 - **Core**: `owasp-top10.md`, `cwe-top25.md`, `xxe-prevention.md`, `cvss-scoring.md`, `api-key-encryption.md`
 - **Vulnerability Prevention**: `deserialization-prevention.md`, `path-traversal-prevention.md`, `file-upload-security.md`, `input-validation.md`
-- **Error Handling**: `error-message-sanitization.md` (API key redaction, exception hierarchy, frontend exposure)
+- **Error Handling**: `error-message-sanitization.md` (API key redaction, exception hierarchy)
 - **Secure Architecture**: `authentication-patterns.md`, `security-headers.md`, `security-logging.md`, `cryptography-guide.md`
 - **Framework Security**: `framework-security.md` (TYPO3, Symfony, Laravel)
 - **Modern Threats**: `modern-attacks.md`, `cve-patterns.md`, `php-security-features.md`
-- **DevSecOps**: `ci-security-pipeline.md`, `supply-chain-security.md`, `automated-scanning.md`
-- **Incident Response**: `supply-chain-incident-response.md` (detection, triage, remediation playbooks for GitHub Actions supply chain compromises)
+- **DevSecOps**: `ci-security-pipeline.md`, `supply-chain-security.md`, `automated-scanning.md`, `gha-security.md`
+- **Incident Response**: `supply-chain-incident-response.md` (detection, triage, remediation for supply chain compromises)
 
 All files located in `references/`.
 
@@ -64,58 +64,30 @@ $encrypted = 'enc:' . base64_encode($nonce . sodium_crypto_secretbox($apiKey, $n
 $hash = password_hash($password, PASSWORD_ARGON2ID);
 ```
 
-For automated scanning tools (semgrep, trivy, gitleaks), see `references/automated-scanning.md`.
+For scanning tools (semgrep, trivy, gitleaks), see `references/automated-scanning.md`.
 
 ## Security Checklist
 
-- [ ] `semgrep --config auto` passes with no high-severity findings
-- [ ] `trivy fs --severity HIGH,CRITICAL` reports no unpatched CVEs
-- [ ] `gitleaks detect` finds no leaked secrets
+- [ ] `semgrep --config auto` — no high-severity findings
+- [ ] `trivy fs --severity HIGH,CRITICAL` — no unpatched CVEs
+- [ ] `gitleaks detect` — no leaked secrets
 - [ ] bcrypt/Argon2 for passwords, CSRF tokens on state changes
 - [ ] All input validated server-side, parameterized SQL
 - [ ] XML external entities disabled (LIBXML_NONET only)
 - [ ] Context-appropriate output encoding, CSP configured
 - [ ] API keys encrypted at rest (sodium_crypto_secretbox)
 - [ ] Exception messages sanitized (no API keys, paths, or SQL in responses)
-- [ ] Consistent exception hierarchy across provider abstraction layers
 - [ ] TLS 1.2+, secrets not in VCS, audit logging
 - [ ] No unserialize() with user input, use json_decode()
 - [ ] File uploads validated, renamed, stored outside web root
-- [ ] Security headers: HSTS, CSP, X-Content-Type-Options
+- [ ] Security headers: HSTS, X-Content-Type-Options set
 - [ ] Dependencies scanned (composer audit), Dependabot enabled
 
 ## GitHub Actions Security
 
-### Code Injection Prevention
-
-**NEVER** interpolate untrusted data in `run:` blocks:
-
-```yaml
-# VULNERABLE — direct interpolation
-- run: echo "${{ inputs.scripts-path }}"
-- run: echo "${{ github.event.pull_request.title }}"
-
-# SAFE — use env: block
-- env:
-    SCRIPTS_PATH: ${{ inputs.scripts-path }}
-  run: echo "$SCRIPTS_PATH"
-```
-
-Sources of untrusted data in workflows:
-- `github.event.*` (PR titles, branch names, commit messages)
-- `inputs.*` (reusable workflow inputs from callers)
-- `github.head_ref` (branch name from fork PRs)
-
-### Dependency Vulnerability Triage
-
-When Dependabot/Renovate flags vulnerabilities:
-
-1. **Try upgrade first**: `pnpm update --latest` or `go get pkg@latest` — often resolves transitive deps naturally
-2. **Override as last resort**: `pnpm.overrides` / `npm.overrides` only when upstream hasn't patched
-3. **Dismiss with rationale**: When no fix exists (e.g., Go module path issues like docker/docker v29.x)
-4. **Track for upstream**: Create an issue linking to the upstream fix timeline
-
-Never leave alerts unaddressed — each must have a documented resolution strategy.
+- **NEVER** interpolate `${{ inputs.* }}` or `${{ github.event.* }}` in `run:` blocks — use `env:` instead
+- Dependency triage: upgrade > override > dismiss with rationale
+- See `references/gha-security.md` for patterns and examples
 
 ## Verification
 
