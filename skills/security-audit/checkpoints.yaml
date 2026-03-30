@@ -455,14 +455,14 @@ mechanical:
     target: .github/workflows/*.yml
     pattern: 'run:.*\$\{\{\s*inputs\.'
     severity: error
-    desc: "Workflow run: blocks must not interpolate ${{ inputs.* }} directly (code injection via reusable workflow inputs). Use env: block instead"
+    desc: "Workflow run: blocks must not interpolate ${{ inputs.* }} directly (code injection). Use env: block instead. Note: only catches single-line run: — SA-GHA-03 LLM review covers multi-line blocks"
 
   - id: SA-GHA-02
     type: regex
     target: .github/workflows/*.yml
     pattern: 'run:.*\$\{\{\s*github\.event\.'
     severity: error
-    desc: "Workflow run: blocks must not interpolate ${{ github.event.* }} directly (code injection). Use env: block instead"
+    desc: "Workflow run: blocks must not interpolate ${{ github.event.* }} directly (code injection). Use env: block instead. Note: only catches single-line run: — SA-GHA-03 LLM review covers multi-line blocks"
 
   # === PATH TRAVERSAL PREVENTION (CWE-22) ===
   - id: SA-53
@@ -1336,7 +1336,7 @@ llm_reviews:
     domain: supply-chain
     prompt: |
       Check the project's dependency vulnerability posture:
-      1. Run gh api repos/OWNER/REPO/dependabot/alerts (if accessible) or
+      1. Check Dependabot alerts for the repository (if accessible) or
          check for open Dependabot PRs indicating known vulnerabilities
       2. For npm projects: check if pnpm-lock.yaml/package-lock.json contains
          known-vulnerable transitive dependency versions. Cross-reference with
@@ -1364,7 +1364,7 @@ llm_reviews:
       4. Check that direct dependencies are up to date — upgrading direct
          deps often pulls in patched transitive deps naturally
       Report unnecessary overrides and outdated direct dependencies.
-    severity: info
+    severity: warning
     desc: "Verify pnpm/npm overrides are still necessary and direct deps are current"
 
   # === GITHUB ACTIONS SECURITY PATTERNS ===
