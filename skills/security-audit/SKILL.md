@@ -12,26 +12,26 @@ allowed-tools: Bash(grep:*) Bash(jq:*) Bash(gh:*) Read Glob Grep
 
 # Security Audit Skill
 
-Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for any project. Deep automated PHP/TYPO3 code scanning with 80+ checkpoints and 19 reference guides.
+Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks. Deep PHP/TYPO3 code scanning with 80+ checkpoints and 19 reference guides.
 
 ## Expertise Areas
 
-- **Vulnerabilities**: XXE, SQLi, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, type juggling, SSTI, JWT flaws
+- **Vulnerabilities**: XXE, SQLi, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, type juggling, SSTI, JWT flaws, insecure randomness
 - **Risk Scoring**: CVSS v3.1 and v4.0
-- **Secure Coding**: Input validation, output encoding, cryptography, session management, authentication
+- **Secure Coding**: Input validation, output encoding, cryptography, session management, authentication, error sanitization
 - **Standards**: OWASP Top 10, CWE Top 25, OWASP ASVS, Proactive Controls
-- **Infrastructure**: CSP, lock handling, image processing security, error suppression and sanitization
+- **Container/Docker**: Root user detection, file permissions, image pinning, non-root users
 
 ## Reference Files
 
 - **Core**: `owasp-top10.md`, `cwe-top25.md`, `xxe-prevention.md`, `cvss-scoring.md`, `api-key-encryption.md`
 - **Vulnerability Prevention**: `deserialization-prevention.md`, `path-traversal-prevention.md`, `file-upload-security.md`, `input-validation.md`
 - **Error Handling**: `error-message-sanitization.md` (API key redaction, exception hierarchy)
-- **Secure Architecture**: `authentication-patterns.md`, `security-headers.md`, `security-logging.md`, `cryptography-guide.md`
+- **Architecture**: `authentication-patterns.md`, `security-headers.md`, `security-logging.md`, `cryptography-guide.md`
 - **Framework Security**: `framework-security.md` (TYPO3, Symfony, Laravel)
 - **Modern Threats**: `modern-attacks.md`, `cve-patterns.md`, `php-security-features.md`
 - **DevSecOps**: `ci-security-pipeline.md`, `supply-chain-security.md`, `automated-scanning.md`, `gha-security.md`
-- **Incident Response**: `supply-chain-incident-response.md` (detection, triage, remediation for supply chain compromises)
+- **Incident Response**: `supply-chain-incident-response.md`
 
 All files located in `references/`.
 
@@ -62,6 +62,11 @@ $encrypted = 'enc:' . base64_encode($nonce . sodium_crypto_secretbox($apiKey, $n
 **Password hashing:**
 ```php
 $hash = password_hash($password, PASSWORD_ARGON2ID);
+```
+
+**Secure randomness (NOT mt_rand/rand):**
+```php
+$token = bin2hex(random_bytes(32));
 ```
 
 For scanning tools (semgrep, trivy, gitleaks), see `references/automated-scanning.md`.

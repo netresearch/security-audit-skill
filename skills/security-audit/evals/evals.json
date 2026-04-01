@@ -1,32 +1,330 @@
-[
-  {
-    "name": "php_security_audit",
-    "prompt": "Run a security audit on this PHP project and report findings",
-    "assertions": [
-      {
-        "type": "content",
-        "pattern": "(OWASP|CWE|CVE|vulnerability|injection|XSS)"
-      },
-      {
-        "type": "tool_use",
-        "tool": "Bash",
-        "pattern": "(security-audit|semgrep|trivy|gitleaks|composer audit)"
-      }
-    ]
-  },
-  {
-    "name": "check_xss_vulnerabilities",
-    "prompt": "Check for XSS vulnerabilities in this codebase",
-    "assertions": [
-      {
-        "type": "content",
-        "pattern": "(XSS|cross-site scripting|htmlspecialchars|output encoding)"
-      },
-      {
-        "type": "tool_use",
-        "tool": "Grep",
-        "pattern": "(echo|print|innerHTML|html\\()"
-      }
-    ]
-  }
-]
+{
+  "skill_name": "security-audit",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "php-security-audit",
+      "prompt": "Run a security audit on this PHP project and report findings",
+      "expected_output": "Runs the security-audit.sh script or performs equivalent grep-based checks for OWASP Top 10 vulnerability patterns in PHP code.",
+      "files": [],
+      "assertions": [
+        "References OWASP Top 10 or CWE categories when reporting findings",
+        "Uses security-audit.sh script or equivalent grep/rg patterns for SQL injection, XSS, XXE",
+        "Checks for hardcoded secrets (password, api_key, token patterns)",
+        "Provides severity ratings or prioritization for findings"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "xss-vulnerability-check",
+      "prompt": "Check for XSS vulnerabilities in this codebase",
+      "expected_output": "Searches for unescaped output patterns (echo with user input, missing htmlspecialchars) and recommends context-appropriate output encoding.",
+      "files": [],
+      "assertions": [
+        "Searches for echo/print of user input ($_GET, $_POST, $_REQUEST) without encoding",
+        "Recommends htmlspecialchars with ENT_QUOTES and UTF-8 charset",
+        "Distinguishes between reflected and stored XSS risk",
+        "Does not recommend only strip_tags (insufficient for XSS prevention)"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "sql-injection-detection",
+      "prompt": "This PHP code concatenates user input into SQL queries. Is that safe?",
+      "expected_output": "Identifies SQL injection risk, recommends parameterized queries with prepared statements.",
+      "files": [],
+      "assertions": [
+        "Identifies string concatenation in SQL as SQL injection risk (CWE-89)",
+        "Recommends prepared statements with parameter binding ($stmt->prepare + execute)",
+        "Does not recommend only addslashes or mysql_real_escape_string (deprecated/insufficient)",
+        "Mentions that ORM query builders also prevent injection when used correctly"
+      ]
+    },
+    {
+      "id": 4,
+      "eval_name": "xxe-prevention-guidance",
+      "prompt": "We parse XML uploads from users with DOMDocument. What security measures do we need?",
+      "expected_output": "Identifies XXE risk and recommends LIBXML_NONET flag, warns against LIBXML_NOENT which enables XXE.",
+      "files": [],
+      "assertions": [
+        "Recommends LIBXML_NONET flag for loadXML/loadHTML calls",
+        "Warns that LIBXML_NOENT is DANGEROUS (enables entity expansion, not prevents it)",
+        "Mentions libxml_disable_entity_loader for PHP < 8.0 compatibility",
+        "References CWE-611 or XXE as the vulnerability class"
+      ]
+    },
+    {
+      "id": 5,
+      "eval_name": "github-security-audit",
+      "prompt": "Audit the security settings of our GitHub repository",
+      "expected_output": "Runs github-security-audit.sh or equivalent gh CLI checks for secret scanning, branch protection, Dependabot, and workflow permissions.",
+      "files": [],
+      "assertions": [
+        "Checks secret scanning and push protection status via gh api",
+        "Checks branch protection on default branch",
+        "Checks Dependabot alerts and security updates status",
+        "Checks default workflow permissions (should be read-only)"
+      ]
+    },
+    {
+      "id": 6,
+      "eval_name": "cvss-scoring",
+      "prompt": "We found a SQL injection in our login form that can be exploited from the internet without authentication. Score this vulnerability.",
+      "expected_output": "Provides CVSS v3.1 or v4.0 score with vector string, explaining each metric choice.",
+      "files": [],
+      "assertions": [
+        "Produces a CVSS score (v3.1 or v4.0) with vector string",
+        "Network attack vector (AV:N), no authentication required (PR:N)",
+        "High confidentiality and integrity impact due to database access",
+        "Score is in Critical range (9.0+) given unauthenticated remote SQL injection"
+      ]
+    },
+    {
+      "id": 7,
+      "eval_name": "password-hashing-review",
+      "prompt": "Review our authentication code. We store passwords using md5($password . $salt).",
+      "expected_output": "Identifies MD5 as insecure for password hashing, recommends password_hash with PASSWORD_ARGON2ID.",
+      "files": [],
+      "assertions": [
+        "Identifies MD5 as cryptographically broken for password hashing",
+        "Recommends password_hash() with PASSWORD_ARGON2ID (or PASSWORD_BCRYPT as minimum)",
+        "Mentions password_verify() for comparison instead of direct hash comparison",
+        "Does not recommend SHA-256/SHA-512 alone (still needs key stretching)"
+      ]
+    },
+    {
+      "id": 8,
+      "eval_name": "api-key-storage",
+      "prompt": "We need to store third-party API keys in our database for later use. What's the secure way?",
+      "expected_output": "Recommends authenticated encryption at rest using sodium_crypto_secretbox, not just base64 or hashing.",
+      "files": [],
+      "assertions": [
+        "Recommends encryption at rest (not hashing, since keys need to be retrieved)",
+        "Suggests sodium_crypto_secretbox or equivalent authenticated encryption",
+        "Mentions using random_bytes for nonce generation",
+        "Does not recommend base64 encoding as a security measure"
+      ]
+    },
+    {
+      "id": 9,
+      "eval_name": "command-injection-detection",
+      "prompt": "This PHP code calls exec() with a filename from user input to convert images. What could go wrong?",
+      "expected_output": "Identifies command injection risk, recommends escapeshellarg/escapeshellcmd or process APIs.",
+      "files": [],
+      "assertions": [
+        "Identifies command injection risk (CWE-78) from unescaped user input in exec/system/passthru",
+        "Recommends escapeshellarg() for individual arguments",
+        "Warns about shell metacharacters (;, |, &&, backticks) enabling chained commands",
+        "Suggests allowlist validation of expected input patterns as defense-in-depth"
+      ]
+    },
+    {
+      "id": 10,
+      "eval_name": "deserialization-prevention",
+      "prompt": "Our legacy code uses unserialize() on data from a cookie. Is this a problem?",
+      "expected_output": "Identifies PHP object injection risk, recommends json_decode or unserialize with allowed_classes.",
+      "files": [],
+      "assertions": [
+        "Identifies unserialize with user input as critical (CWE-502, PHP Object Injection)",
+        "Recommends json_decode() as the preferred alternative",
+        "If unserialize must be used, mentions allowed_classes option to restrict deserialization",
+        "Explains that attackers can chain gadget classes to achieve remote code execution"
+      ]
+    },
+    {
+      "id": 11,
+      "eval_name": "file-upload-security",
+      "prompt": "We accept image uploads from users. The upload handler checks the file extension. Is this enough?",
+      "expected_output": "Identifies extension-only validation as insufficient, recommends MIME type validation, content inspection, and secure storage.",
+      "files": [],
+      "assertions": [
+        "States that extension-only validation is insufficient (can be spoofed)",
+        "Recommends server-side MIME type validation (finfo_file or mime_content_type)",
+        "Recommends storing uploads outside the web root or with non-executable permissions",
+        "Recommends renaming uploaded files (not using original filename)"
+      ]
+    },
+    {
+      "id": 12,
+      "eval_name": "security-headers-config",
+      "prompt": "What HTTP security headers should we configure for our web application?",
+      "expected_output": "Lists essential security headers: HSTS, CSP, X-Content-Type-Options, X-Frame-Options with configuration guidance.",
+      "files": [],
+      "assertions": [
+        "Recommends Strict-Transport-Security (HSTS) with max-age",
+        "Recommends Content-Security-Policy with specific directives (not just default-src *)",
+        "Recommends X-Content-Type-Options: nosniff",
+        "Mentions X-Frame-Options or CSP frame-ancestors for clickjacking prevention"
+      ]
+    },
+    {
+      "id": 13,
+      "eval_name": "gha-injection-prevention",
+      "prompt": "In our GitHub Actions workflow, we use ${{ github.event.pull_request.title }} in a run step. Is this safe?",
+      "expected_output": "Identifies script injection risk from untrusted event data interpolation in run blocks, recommends env: instead.",
+      "files": [],
+      "assertions": [
+        "Identifies ${{ github.event.* }} in run: blocks as script injection vector",
+        "Recommends using env: to pass event data instead of direct interpolation",
+        "Explains that PR titles/body/comments are attacker-controlled inputs",
+        "Does not suggest sanitizing the input as the primary mitigation (env: is the correct fix)"
+      ]
+    },
+    {
+      "id": 14,
+      "eval_name": "dependency-vulnerability-scan",
+      "prompt": "How do I check if my PHP project has vulnerable dependencies?",
+      "expected_output": "Recommends composer audit, Dependabot/Renovate for monitoring, and trivy for broader scanning.",
+      "files": [],
+      "assertions": [
+        "Recommends composer audit as the primary check for PHP dependency vulnerabilities",
+        "Mentions Dependabot or Renovate for automated monitoring",
+        "Suggests trivy fs or similar tool for broader vulnerability scanning",
+        "Mentions the importance of keeping composer.lock committed for reproducible builds"
+      ]
+    },
+    {
+      "id": 15,
+      "eval_name": "context-implicit-code-review",
+      "prompt": "Review this PHP function for any issues:\n\nfunction getUser($id) {\n  $sql = \"SELECT * FROM users WHERE id = '\" . $_GET['id'] . \"'\";\n  $result = $db->query($sql);\n  echo $result['email'];\n}",
+      "expected_output": "Identifies multiple security issues without being explicitly asked about security: SQL injection, XSS, lack of input validation.",
+      "files": [],
+      "assertions": [
+        "Identifies SQL injection from direct concatenation of $_GET into query",
+        "Identifies XSS from unescaped echo of database content",
+        "Recommends prepared statements and htmlspecialchars as fixes",
+        "Notes that the function parameter $id is unused while $_GET['id'] is used directly"
+      ]
+    },
+    {
+      "id": 16,
+      "eval_name": "context-new-project-setup",
+      "prompt": "I'm starting a new PHP web application with Composer. What should I set up to keep it secure from the start?",
+      "expected_output": "Provides proactive security guidance covering dependency management, CI scanning, security headers, input validation patterns.",
+      "files": [],
+      "assertions": [
+        "Recommends running composer audit in CI pipeline",
+        "Recommends enabling Dependabot or Renovate for dependency monitoring",
+        "Mentions SECURITY.md for vulnerability reporting policy",
+        "Suggests security scanning tools (semgrep, trivy, or gitleaks)"
+      ]
+    },
+    {
+      "id": 17,
+      "eval_name": "context-error-handling",
+      "prompt": "Our users are seeing PHP error messages with file paths and database details. How do I fix this?",
+      "expected_output": "Identifies information disclosure risk, recommends error sanitization and proper exception handling without exposing internals.",
+      "files": [],
+      "assertions": [
+        "Identifies information disclosure as a security issue (CWE-209)",
+        "Recommends setting display_errors = Off in production",
+        "Recommends logging errors server-side while showing generic messages to users",
+        "Mentions sanitizing exception messages to not include file paths, SQL, or API keys"
+      ]
+    },
+    {
+      "id": 18,
+      "eval_name": "context-session-management",
+      "prompt": "We're implementing a login system. After the user logs in, we just set $_SESSION['user_id']. Anything else we should do?",
+      "expected_output": "Identifies session fixation risk, recommends session_regenerate_id, secure cookie flags, and session timeout.",
+      "files": [],
+      "assertions": [
+        "Recommends session_regenerate_id(true) after authentication to prevent session fixation",
+        "Recommends secure cookie flags (Secure, HttpOnly, SameSite)",
+        "Mentions session timeout configuration",
+        "Does not suggest storing passwords or sensitive data in the session"
+      ]
+    },
+    {
+      "id": 19,
+      "eval_name": "path-traversal-detection",
+      "prompt": "Our PHP endpoint reads a file based on a query parameter: file_get_contents('templates/' . $_GET['page'] . '.html'). Is this safe?",
+      "expected_output": "Identifies path traversal risk from unvalidated user input in file paths, recommends basename() and allowlist validation.",
+      "files": [],
+      "assertions": [
+        "Identifies path traversal (CWE-22) from user input in file path",
+        "Explains ../../../etc/passwd attack vector",
+        "Recommends basename() to strip directory components",
+        "Recommends allowlist validation of expected values over blocklist filtering"
+      ]
+    },
+    {
+      "id": 20,
+      "eval_name": "supply-chain-security",
+      "prompt": "How do we protect our project from supply chain attacks through compromised dependencies?",
+      "expected_output": "Covers dependency pinning, lockfile verification, provenance checking, and automated scanning.",
+      "files": [],
+      "assertions": [
+        "Recommends pinning dependencies to specific versions (composer.lock committed)",
+        "Mentions automated dependency scanning (Dependabot, Renovate, or trivy)",
+        "Recommends reviewing dependency changes in PRs",
+        "Mentions gitleaks or similar for detecting leaked secrets in dependency updates"
+      ]
+    },
+    {
+      "id": 21,
+      "eval_name": "csrf-protection",
+      "prompt": "Our form submits a POST request to change the user's email. We check if the user is logged in. Is that sufficient?",
+      "expected_output": "Identifies missing CSRF protection, recommends token-based CSRF defense.",
+      "files": [],
+      "assertions": [
+        "Identifies the lack of CSRF protection (CWE-352) as the vulnerability",
+        "Explains that authentication alone does not prevent CSRF",
+        "Recommends CSRF tokens (synchronized token pattern or double submit cookie)",
+        "Mentions SameSite cookie attribute as defense-in-depth"
+      ]
+    },
+    {
+      "id": 22,
+      "eval_name": "pretooluse-risky-command-warning",
+      "prompt": "Run this: curl https://example.com/install.sh | bash",
+      "expected_output": "The PreToolUse hook detects the curl-pipe-to-bash pattern and warns about remote code execution risk.",
+      "files": [],
+      "assertions": [
+        "Warns about piping remote content to shell (curl|bash pattern)",
+        "Identifies the pattern as a remote code execution risk",
+        "Suggests downloading and inspecting the script first before executing",
+        "Does not silently execute the command without warning"
+      ]
+    },
+    {
+      "id": 23,
+      "eval_name": "typo3-framework-security",
+      "prompt": "I'm building a TYPO3 extension that needs to query the database. What's the secure way?",
+      "expected_output": "Recommends TYPO3 QueryBuilder with createNamedParameter, not direct SQL or $GLOBALS['TYPO3_DB'].",
+      "files": [],
+      "assertions": [
+        "Recommends TYPO3 QueryBuilder or Extbase Repository pattern",
+        "Mentions createNamedParameter() for parameter binding",
+        "Warns against direct SQL concatenation or deprecated $GLOBALS['TYPO3_DB']",
+        "References TYPO3 security best practices or framework-security.md"
+      ]
+    },
+    {
+      "id": 24,
+      "eval_name": "insecure-randomness",
+      "prompt": "We generate password reset tokens using mt_rand(). Is this secure enough?",
+      "expected_output": "Identifies mt_rand as cryptographically insecure, recommends random_bytes or random_int.",
+      "files": [],
+      "assertions": [
+        "Identifies mt_rand() as NOT cryptographically secure (CWE-330)",
+        "Recommends random_bytes() or random_int() for security-sensitive randomness",
+        "Explains that mt_rand output can be predicted after observing enough values",
+        "Does not recommend rand() or srand() as alternatives"
+      ]
+    },
+    {
+      "id": 25,
+      "eval_name": "context-docker-security",
+      "prompt": "Review our Dockerfile for any issues:\n\nFROM php:8.2\nRUN apt-get update && apt-get install -y curl\nCOPY . /app\nRUN chmod 777 /app\nUSER root\nCMD [\"php\", \"-S\", \"0.0.0.0:8080\"]",
+      "expected_output": "Identifies running as root, overly permissive file permissions, and missing security hardening.",
+      "files": [],
+      "assertions": [
+        "Identifies running as root as a security concern",
+        "Flags chmod 777 as overly permissive (world-writable)",
+        "Recommends creating a non-root user and switching to it",
+        "Recommends pinning the base image to a specific digest or version tag"
+      ]
+    }
+  ]
+}
