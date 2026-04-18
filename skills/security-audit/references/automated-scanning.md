@@ -122,19 +122,26 @@ make install-opengrep   # downloads statically-linked binary to ~/.local/bin
 Usage — identical to semgrep:
 
 ```bash
-opengrep scan --config auto --error .                 # community rules
-opengrep scan --config p/owasp-top-ten --sarif -o out.sarif .
-opengrep scan --config .semgrep.yml .                 # custom rules (same format)
+opengrep scan --config auto --error .                           # community rules
+opengrep scan --config p/owasp-top-ten --sarif --output out.sarif .
+opengrep scan --config .semgrep.yml .                           # custom rules (same format)
 ```
 
-CI integration (no official action yet — invoke the binary directly):
+CI integration (no official action yet — invoke the binary directly). Pin the version and verify the SHA256 to keep the pipeline reproducible and supply-chain safe:
 
 ```yaml
 - name: Opengrep SAST
+  env:
+    OPENGREP_VERSION: v1.19.0
+    # SHA256 of opengrep_manylinux_x86 at OPENGREP_VERSION
+    OPENGREP_SHA256: 1d69a41beb88e8e7917f26cc6a16c1edf298f31402807e6d1afbb5d8684c3590
   run: |
-    curl -fsSL -o /usr/local/bin/opengrep \
-      https://github.com/opengrep/opengrep/releases/latest/download/opengrep_manylinux_x86
-    chmod +x /usr/local/bin/opengrep
+    mkdir -p "$HOME/.local/bin"
+    curl -fsSL -o "$HOME/.local/bin/opengrep" \
+      "https://github.com/opengrep/opengrep/releases/download/${OPENGREP_VERSION}/opengrep_manylinux_x86"
+    echo "${OPENGREP_SHA256}  $HOME/.local/bin/opengrep" | sha256sum -c -
+    chmod +x "$HOME/.local/bin/opengrep"
+    echo "$HOME/.local/bin" >> "$GITHUB_PATH"
     opengrep scan --config auto --sarif --output opengrep.sarif --error .
 - name: Upload SARIF
   uses: github/codeql-action/upload-sarif@v3
