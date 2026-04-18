@@ -479,13 +479,13 @@ mechanical:
     severity: warning
     desc: "Hardcoded relative path traversal patterns should be avoided in PHP source"
 
-  # === SEMGREP IN CI ===
+  # === SEMGREP / OPENGREP IN CI ===
   - id: SA-SAST-02
     type: regex
     target: .github/workflows/*.yml
-    pattern: "semgrep"
+    pattern: "semgrep|opengrep"
     severity: info
-    desc: "CI should include semgrep for SAST scanning"
+    desc: "CI should include semgrep or opengrep for SAST scanning"
 
   # === SECURITY POLICY ===
   - id: SA-SP-01

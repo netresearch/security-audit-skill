@@ -69,7 +69,7 @@ $hash = password_hash($password, PASSWORD_ARGON2ID);
 $token = bin2hex(random_bytes(32));
 ```
 
-For scanning tools (semgrep, trivy, gitleaks), see `references/automated-scanning.md`.
+For scanning tools (semgrep/opengrep, trivy, gitleaks), see `references/automated-scanning.md`.
 
 ## Security Checklist
 

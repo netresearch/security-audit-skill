@@ -1,12 +1,12 @@
 # Automated Scanning Tools Reference
 
-Configuration, custom rules, CI integration, and best practices for semgrep, trivy, and gitleaks.
+Configuration, custom rules, CI integration, and best practices for semgrep / opengrep, trivy, and gitleaks.
 
 ## Tool Comparison
 
 | Tool | Purpose | Scans | Best For |
 |------|---------|-------|----------|
-| **semgrep** | SAST (Static Application Security Testing) | Source code patterns | Injection, XSS, insecure crypto, code quality |
+| **semgrep** / **opengrep** | SAST (Static Application Security Testing) | Source code patterns | Injection, XSS, insecure crypto, code quality |
 | **trivy** | Vulnerability scanner | Dependencies, containers, IaC | Known CVEs, outdated packages, misconfigurations |
 | **gitleaks** | Secret detection | Git history, staged files | API keys, passwords, tokens, private keys |
 
@@ -14,7 +14,9 @@ Configuration, custom rules, CI integration, and best practices for semgrep, tri
 
 1. **gitleaks** -- fast, catches critical secrets immediately
 2. **trivy** -- scans dependencies and infrastructure
-3. **semgrep** -- deep code analysis, takes longest
+3. **semgrep** / **opengrep** -- deep code analysis, takes longest
+
+> **semgrep vs opengrep:** [Opengrep](https://github.com/opengrep/opengrep) is a fully open-source (LGPL-2.1) fork of Semgrep, created after Semgrep relicensed the community rule registry to CC-BY-NC-SA. The CLI is a drop-in replacement — rule syntax, `.semgrepignore`, `nosemgrep:` comments, and config files all work identically. See the [opengrep subsection](#opengrep-fully-oss-drop-in-replacement) below for when to prefer it.
 
 ---
 
@@ -102,6 +104,52 @@ node_modules/
   env:
     SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 ```
+
+### opengrep: fully-OSS drop-in replacement
+
+[Opengrep](https://github.com/opengrep/opengrep) is an LGPL-2.1 fork of Semgrep maintained by a coalition of security vendors. Reasons to prefer it:
+
+- **No license friction.** Semgrep's Community rule registry is CC-BY-NC-SA (non-commercial). Opengrep rules are freely usable in any setting, including commercial audits and derived rulesets.
+- **Fully open engine.** Semgrep's Pro engine (interfile / taint tracking beyond the OSS baseline) is proprietary. Opengrep keeps the complete analysis engine open.
+- **CLI-compatible.** Same rule syntax, same config files (`.semgrep.yml`, `.semgrepignore`), same `nosemgrep:` ignore comments. Existing rules and CI pipelines port over by swapping the binary.
+
+Install via `coding_agent_cli_toolset`:
+
+```bash
+make install-opengrep   # downloads statically-linked binary to ~/.local/bin
+```
+
+Usage — identical to semgrep:
+
+```bash
+opengrep scan --config auto --error .                           # community rules
+opengrep scan --config p/owasp-top-ten --sarif --output out.sarif .
+opengrep scan --config .semgrep.yml .                           # custom rules (same format)
+```
+
+CI integration (no official action yet — invoke the binary directly). Pin the version and verify the SHA256 to keep the pipeline reproducible and supply-chain safe:
+
+```yaml
+- name: Opengrep SAST
+  env:
+    OPENGREP_VERSION: v1.19.0
+    # SHA256 of opengrep_manylinux_x86 at OPENGREP_VERSION
+    OPENGREP_SHA256: 1d69a41beb88e8e7917f26cc6a16c1edf298f31402807e6d1afbb5d8684c3590
+  run: |
+    mkdir -p "$HOME/.local/bin"
+    curl -fsSL -o "$HOME/.local/bin/opengrep" \
+      "https://github.com/opengrep/opengrep/releases/download/${OPENGREP_VERSION}/opengrep_manylinux_x86"
+    echo "${OPENGREP_SHA256}  $HOME/.local/bin/opengrep" | sha256sum -c -
+    chmod +x "$HOME/.local/bin/opengrep"
+    echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+    opengrep scan --config auto --sarif --output opengrep.sarif --error .
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: opengrep.sarif
+```
+
+**When to stay on semgrep:** Semgrep Pro/AppSec Platform features (interfile taint tracking, managed registry, SCM integrations). **When to switch:** rule-authoring freedom, offline/air-gapped scanning, avoiding the Semgrep account requirement for `--config auto` against the Pro registry.
 
 ---
 
