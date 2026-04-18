@@ -16,7 +16,7 @@ Configuration, custom rules, CI integration, and best practices for semgrep / op
 2. **trivy** -- scans dependencies and infrastructure
 3. **semgrep** / **opengrep** -- deep code analysis, takes longest
 
-> **semgrep vs opengrep:** [Opengrep](https://github.com/opengrep/opengrep) is a fully open-source (LGPL-2.1) fork of Semgrep, created after Semgrep relicensed the community rule registry to CC-BY-NC-SA. The CLI is a drop-in replacement — rule syntax, `.semgrepignore`, `nosemgrep:` comments, and config files all work identically. See the [opengrep subsection](#opengrep--fully-oss-drop-in-replacement) below for when to prefer it.
+> **semgrep vs opengrep:** [Opengrep](https://github.com/opengrep/opengrep) is a fully open-source (LGPL-2.1) fork of Semgrep, created after Semgrep relicensed the community rule registry to CC-BY-NC-SA. The CLI is a drop-in replacement — rule syntax, `.semgrepignore`, `nosemgrep:` comments, and config files all work identically. See the [opengrep subsection](#opengrep-fully-oss-drop-in-replacement) below for when to prefer it.
 
 ---
 
@@ -105,7 +105,7 @@ node_modules/
     SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 ```
 
-### opengrep — fully-OSS drop-in replacement
+### opengrep: fully-OSS drop-in replacement
 
 [Opengrep](https://github.com/opengrep/opengrep) is an LGPL-2.1 fork of Semgrep maintained by a coalition of security vendors. Reasons to prefer it:
 
