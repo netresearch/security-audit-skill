@@ -129,7 +129,7 @@ def login_safe():
 SQLAlchemy provides an ORM that generates parameterized queries by default. However, using `text()`, `execute()`, or string concatenation to build queries introduces SQL injection vulnerabilities.
 
 ```python
-from flask import Flask, request
+from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 
@@ -295,9 +295,12 @@ if __name__ == "__main__":
 Flask's default session implementation uses signed cookies. The session data is encoded (not encrypted) and visible to clients. If the `SECRET_KEY` is weak or leaked, attackers can forge session cookies.
 
 ```python
-from flask import Flask, session
+from flask import Flask, request, session
 
 app = Flask(__name__)
+
+def authenticate(username: str, password: str):
+    ...  # look up + verify user; return user object or None
 
 # VULNERABLE: Weak SECRET_KEY
 app.secret_key = "dev"
@@ -363,19 +366,23 @@ def login():
         login_user(user)  # Session ID not regenerated
         return redirect("/dashboard")
 
-# SECURE: Regenerate session on login
+# SECURE: Rotate the session on login. Flask's built-in session has no
+# first-class "regenerate ID" API (it's a signed-cookie implementation, so
+# every session payload is already bound to the current signing key).
+# Portable approach: clear() the old session before populating it with the
+# authenticated identity, which invalidates the previous cookie value.
+# If you use server-side sessions (Flask-Session, Flask-Login), rotate the
+# backend session ID with the backend's documented call — the exact name
+# varies (flask_session.SessionInterface backends expose their own rotate
+# hook; consult your backend's docs).
 @app.route("/login", methods=["POST"])
 def login_safe():
     user = User.query.filter_by(
         username=request.form["username"]
     ).first()
     if user and user.check_password(request.form["password"]):
-        # Clear and regenerate session
-        old_data = dict(session)
-        session.clear()
-        session.regenerate()  # Flask-Session >=0.6
-        # Restore non-sensitive session data if needed
-        login_user(user)
+        session.clear()            # drop any pre-login session state
+        login_user(user)           # Flask-Login writes a fresh session
         return redirect("/dashboard")
 
 # SECURE: Configure session cookie security

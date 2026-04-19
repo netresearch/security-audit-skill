@@ -66,6 +66,7 @@ def raw_query_safe(request):
 When user-supplied input is used as field names in `filter()`, `exclude()`, `values()`, `order_by()`, or `annotate()`, attackers can traverse relationships or extract data from related models.
 
 ```python
+from django.http import HttpResponseBadRequest, JsonResponse
 from myapp.models import User
 
 # VULNERABLE: User-controlled field in filter()
@@ -226,6 +227,7 @@ def transfer_funds_safe(request):
 # SECURE: For APIs, use token authentication instead
 from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.response import Response
 
 @api_view(["POST"])
 @authentication_classes([TokenAuthentication])

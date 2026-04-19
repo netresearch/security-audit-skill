@@ -40,14 +40,19 @@ from typing import Any
 def load_user_session(session_data: str) -> dict[str, Any]:
     return json.loads(session_data)
 
-# SECURE: If pickle is necessary, use hmac to verify integrity
+# SECURE: Sign a JSON payload if you must round-trip server-to-server data.
+# Signing a pickle does NOT make it safe — the signature only stops third-
+# party tampering; the server still deserializes attacker-crafted data the
+# moment its own signature verifies. Use JSON and read the HMAC key from the
+# environment (not from source).
 import hmac
 import hashlib
+import os
 
-SECRET_KEY = b"server-side-secret"
+SIGNING_KEY = os.environb[b"APP_SIGNING_KEY"]  # fail hard if unset
 
-def load_verified_data(signed_data: bytes, signature: bytes) -> Any:
-    expected = hmac.new(SECRET_KEY, signed_data, hashlib.sha256).digest()
+def load_verified_json(signed_data: bytes, signature: bytes) -> Any:
+    expected = hmac.new(SIGNING_KEY, signed_data, hashlib.sha256).digest()
     if not hmac.compare_digest(signature, expected):
         raise ValueError("Data integrity check failed")
     return json.loads(signed_data)
@@ -882,26 +887,26 @@ def check_rate_limit_safe(ip: str) -> bool:
 
 ## Detection Patterns for Auditing Python Security Features
 
-| Pattern | Regex | Severity | Checkpoint ID |
-|---------|-------|----------|---------------|
-| Insecure deserialization via pickle | `pickle\.(loads\|load)\(` | error | SA-PY-01 |
-| Code injection via eval() | `eval\(` | error | SA-PY-02 |
-| Code injection via exec() | `exec\(` | error | SA-PY-03 |
-| Command injection via subprocess shell=True | `subprocess\.\w+\(.*shell\s*=\s*True` | error | SA-PY-04 |
-| Command injection via os.system | `os\.system\(` | error | SA-PY-05 |
-| Unsafe YAML loading | `yaml\.load\(` | error | SA-PY-06 |
-| SQL injection via f-string in query | `execute\(f"` | error | SA-PY-07 |
-| SQL injection via .format() in query | `execute\(.*\.format\(` | error | SA-PY-08 |
-| Weak hash: MD5 for security | `hashlib\.md5\(` | warning | SA-PY-09 |
-| Weak hash: SHA1 for security | `hashlib\.sha1\(` | warning | SA-PY-10 |
-| Deprecated tempfile.mktemp | `tempfile\.mktemp\(` | error | SA-PY-11 |
-| Dynamic import with __import__ | `__import__\(` | warning | SA-PY-12 |
-| XML parsing without defusedxml | `xml\.etree\.ElementTree` | warning | SA-PY-13 |
-| Jinja2 Template with variable | `Template\s*\(.*\w+.*\)` | warning | SA-PY-14 |
-| Command injection via os.popen | `os\.popen\(` | error | SA-PY-15 |
-| Code injection via compile() | `compile\(.*,.*,` | warning | SA-PY-16 |
-| Insecure deserialization via shelve | `shelve\.open\(` | warning | SA-PY-17 |
-| Insecure deserialization via marshal | `marshal\.loads\(` | warning | SA-PY-18 |
+| Pattern | Regex | Severity |
+|---------|-------|----------|
+| Insecure deserialization via pickle | `pickle\.(loads\|load)\(` | error |
+| Code injection via eval() | `eval\(` | error |
+| Code injection via exec() | `exec\(` | error |
+| Command injection via subprocess shell=True | `subprocess\.\w+\(.*shell\s*=\s*True` | error |
+| Command injection via os.system | `os\.system\(` | error |
+| Unsafe YAML loading | `yaml\.load\(` | error |
+| SQL injection via f-string in query | `execute\(f"` | error |
+| SQL injection via .format() in query | `execute\(.*\.format\(` | error |
+| Weak hash: MD5 for security | `hashlib\.md5\(` | warning |
+| Weak hash: SHA1 for security | `hashlib\.sha1\(` | warning |
+| Deprecated tempfile.mktemp | `tempfile\.mktemp\(` | error |
+| Dynamic import with __import__ | `__import__\(` | warning |
+| XML parsing without defusedxml | `xml\.etree\.ElementTree` | warning |
+| Jinja2 Template with variable | `Template\s*\(.*\w+.*\)` | warning |
+| Command injection via os.popen | `os\.popen\(` | error |
+| Code injection via compile() | `compile\(.*,.*,` | warning |
+| Insecure deserialization via shelve | `shelve\.open\(` | warning |
+| Insecure deserialization via marshal | `marshal\.loads\(` | warning |
 
 ## Version Adoption Security Checklist
 
@@ -928,7 +933,7 @@ def check_rate_limit_safe(ip: str) -> bool:
 - `cwe-top25.md` — CWE Top 25 mapping
 - `input-validation.md` — Input validation patterns
 - `php-security-features.md` — PHP security features reference
-- `node-security-features.md` — Node.js security features reference
+- `nodejs-security-features.md` — Node.js security features reference
 
 ## Changelog
 

@@ -9,11 +9,16 @@ Security patterns, common misconfigurations, and detection regexes for FastAPI a
 FastAPI uses dependency injection for authentication and authorization via `Depends()`. Endpoints that lack auth dependencies are publicly accessible. Unlike Django, FastAPI has no global auth middleware by default -- each endpoint must explicitly declare its dependencies.
 
 ```python
+import os
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError  # python-jose
+from myapp.models import User   # your ORM / data access layer
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+SECRET_KEY = os.environ["APP_JWT_KEY"]  # fail fast if unset; never hardcode
 
 # VULNERABLE: No auth dependency -- endpoint is public
 @app.get("/users/{user_id}")
@@ -88,7 +93,20 @@ async def update_settings_router(settings: dict):
     return {"status": "updated"}
 ```
 
-**Detection regex:** `@app\.(get|post|put|patch|delete)\s*\(\s*["\'][^"\']*["\']\s*\)\s*\n\s*(async\s+)?def\s+\w+\s*\([^)]*\)\s*(?!.*Depends)`
+**Detection (two-pass, since line-oriented grep can't match across `\n`):**
+First flag all route decorators, then separately check that the function signature on the next line mentions `Depends(`.
+```bash
+# Pass 1: list files with route decorators (PCRE, supports \s):
+files=$(grep -rlP '@app\.(get|post|put|patch|delete)\s*\(' --include='*.py' .)
+# Pass 2: for each file, find decorators whose next signature lacks Depends(:
+for f in $files; do
+  awk '/^@app\.(get|post|put|patch|delete)\s*\(/ { deco=NR; next }
+       /^(async[[:space:]]+)?def[[:space:]]/ && deco {
+         if ($0 !~ /Depends/) print FILENAME":"deco": route without Depends(...) auth"
+         deco=0
+       }' "$f"
+done
+```
 **Severity:** warning
 
 ### SA-FASTAPI-02: Pydantic Validation Bypass
@@ -146,11 +164,22 @@ class Comment(BaseModel):
     body: str = Field(max_length=10000)
     title: str = Field(max_length=200)
 
-# SECURE: Use specific types, not Any
+# SECURE: Use specific types, not Any. Pydantic's `max_length` constraint
+# only applies to string/bytes/sequence types — not to `dict`. To cap the
+# number of entries in a metadata dict, add a validator.
+from pydantic import field_validator
+
 class UserUpdate(BaseModel):
     model_config = {"extra": "forbid"}
     role: str = Field(pattern=r"^(user|editor|admin)$")
-    metadata: dict[str, str] = Field(default_factory=dict, max_length=20)
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("metadata")
+    @classmethod
+    def _cap_metadata_size(cls, v: dict[str, str]) -> dict[str, str]:
+        if len(v) > 20:
+            raise ValueError("metadata may contain at most 20 keys")
+        return v
 ```
 
 **Detection regex:** `def\s+\w+\s*\([^)]*:\s*dict\s*[,\)]|:\s*Any\s*[,\)=]|extra\s*=\s*["\']allow["\']`
@@ -610,7 +639,7 @@ async def websocket_cookie_auth(websocket: WebSocket):
     # ... handle messages
 ```
 
-**Detection regex:** `@app\.websocket\s*\(\s*["\'][^"\']*["\']\s*\)\s*\n\s*async\s+def\s+\w+\s*\(\s*websocket\s*:\s*WebSocket\s*\)\s*:`
+**Detection regex:** `@app\.websocket\s*\(\s*["\'][^"\']*["\']\s*\)` — flag every WebSocket route, then manually verify each `async def` accepts an auth token / Depends parameter. A single-line regex cannot span the decorator and the signature; use the two-pass approach shown earlier for Depends() verification.
 **Severity:** warning
 
 ## Remediation Priority
