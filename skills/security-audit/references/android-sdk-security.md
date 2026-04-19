@@ -33,8 +33,13 @@ Activities declared with `android:exported="true"` are accessible to any applica
 </activity>
 ```
 
-**Detection regex:** `android:exported\s*=\s*"true"`
-**Severity:** error
+**Detection guidance:** a plain `android:exported="true"` regex flags both the vulnerable AND the secure example above (the secure one is exported but protected by `android:permission`). Narrow it to "exported without `android:permission` or `intent-filter`", which requires a structural check. XML-aware tooling like `xmlstarlet sel` is the right answer:
+
+```bash
+xmlstarlet sel -t -m '//activity[@android:exported="true"][not(@android:permission)][not(intent-filter)]' \
+  -v '@android:name' -n AndroidManifest.xml 2>/dev/null
+```
+**Severity:** error (for exported-without-protection); info (for bare regex matches — review required)
 
 ### Implicit Intent Data Leakage
 
@@ -52,7 +57,7 @@ intent.putExtra("auth_token", token)
 startActivity(intent)
 ```
 
-**Detection regex:** `new\s+Intent\s*\(\s*"[^"]+"\s*\)[\s\S]{0,120}putExtra\s*\(\s*"(auth|token|session|password|secret|key|credential)`
+**Detection regex (Java + Kotlin — `new` is optional):** `(new\s+)?Intent\s*\(\s*"[^"]+"\s*\)[\s\S]{0,120}putExtra\s*\(\s*"(auth|token|session|password|secret|key|credential)` — run with `grep -rP` across `.java` and `.kt` files.
 **Severity:** warning
 
 ### Exported Broadcast Receivers Without Permissions
@@ -68,7 +73,7 @@ registerReceiver(receiver, IntentFilter("com.example.PAYMENT_COMPLETE"),
     "com.example.PAYMENT_PERMISSION", null)
 ```
 
-**Detection regex:** `registerReceiver\s*\(\s*\w+\s*,\s*\w+\s*\)\s*$`
+**Detection regex (two-argument form only — permission-protected calls take 3+ args):** `registerReceiver\s*\(\s*[^,]+,\s*[^,)]+\)` — run with `grep -rP` across `.java` and `.kt`. The permission-protected overload has a third `String broadcastPermission` argument, so this pattern skips it.
 **Severity:** warning
 
 ## ContentProvider Vulnerabilities
@@ -223,7 +228,19 @@ class WebViewActivity : AppCompatActivity() {
 }
 ```
 
-**Detection regex:** `addJavascriptInterface\s*\(`
+**Detection guidance:** `addJavascriptInterface(…)` itself is not a vulnerability on modern `minSdk`. Flag two specific shapes instead: (1) `addJavascriptInterface(` in a project whose `minSdk` is below 17, and (2) an interface class whose public methods are missing the `@JavascriptInterface` annotation:
+
+```bash
+# (1) Find addJavascriptInterface usage and require the caller to verify minSdk.
+grep -rnE 'addJavascriptInterface\s*\(' --include='*.java' --include='*.kt' . \
+  | while read -r line; do echo "review minSdk: $line"; done
+
+# (2) Detect interface classes where any public method lacks the annotation.
+# Heuristic: a class passed to addJavascriptInterface whose next 20 lines
+# show a public/fun member without a preceding @JavascriptInterface line.
+# Best run through an AST-aware tool (ktlint custom rule, PSI in Android Studio).
+```
+**Severity:** info (regex match only — requires manual minSdk + annotation review)
 **Severity:** error
 
 ### WebView File Access

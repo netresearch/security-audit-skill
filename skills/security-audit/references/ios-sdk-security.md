@@ -37,7 +37,7 @@ let query: [String: Any] = [
 SecItemAdd(query as CFDictionary, nil)
 ```
 
-**Detection regex:** `kSecAttrAccessibleAlways[^T]|kSecAttrAccessibleAlways\b(?!ThisDeviceOnly)`
+**Detection regex (PCRE):** `kSecAttrAccessibleAlways(ThisDeviceOnly)?\b` — run with `grep -rnP`. Both `kSecAttrAccessibleAlways` and `kSecAttrAccessibleAlwaysThisDeviceOnly` are insecure because both keep the Keychain item accessible while the device is locked; the earlier pattern excluded the `…ThisDeviceOnly` variant that the VULNERABLE examples above show is also vulnerable.
 **Severity:** error
 
 ### Missing Keychain Access Control
@@ -175,8 +175,18 @@ func copyTemporarySensitiveData(_ data: String) {
     )
 }
 
-// SECURE: For iOS 15+, mark as sensitive
-func copyWithSensitiveFlag(_ data: String) {
+// SECURE: Narrow the blast radius. There is no single "mark as
+// sensitive" API on UIPasteboard — instead combine:
+//   .localOnly        — don't propagate to other devices via Universal Clipboard
+//   .expirationDate   — clear after N seconds
+//   …and declare the type explicitly via UIPasteboard.typeListString /
+//   UIPasteboard.typeAutomatic so the system Pasteboard suggestions
+//   (iOS 14+) can drop the item from the "recent items" UI when
+//   appropriate.
+// For a password-field-like flow, use a UITextField with
+// `isSecureTextEntry = true` and avoid writing to the pasteboard at
+// all; the keyboard's native "Strong Password" integration is safer.
+func copyWithShortLifetime(_ data: String) {
     let item = [UIPasteboard.typeAutomatic: data]
     UIPasteboard.general.setItems(
         [item],
@@ -378,16 +388,10 @@ class JailbreakDetector {
 
 ### Insecure Random Number Generation
 
-`arc4random` and `arc4random_uniform` use a non-cryptographic PRNG. For security tokens, nonces, and key material, use `SecRandomCopyBytes`.
+The classically-insecure libc `random()`, `rand()`, and `srand()` are predictable and must not be used for security tokens. On Apple platforms `arc4random` and `arc4random_uniform` are actually backed by a CSPRNG (since they were rewritten in the 2010s to call into the kernel), so in practice they are cryptographically suitable — the failure mode to audit for here is `random()` / `rand()` / `srand()` with security-sensitive values. `SecRandomCopyBytes` remains the documented, API-stable way to request CSPRNG bytes.
 
 ```swift
-// VULNERABLE: arc4random for security token
-func generateToken() -> String {
-    let bytes = (0..<32).map { _ in UInt8(arc4random_uniform(256)) }
-    return Data(bytes).base64EncodedString()
-}
-
-// VULNERABLE: Using random() for session ID
+// VULNERABLE: libc random() / rand() for session ID — predictable PRNG.
 func generateSessionId() -> String {
     return String(format: "%08x%08x", random(), random())
 }
@@ -403,7 +407,7 @@ func generateToken() -> String {
 }
 ```
 
-**Detection regex:** `arc4random\s*\(|arc4random_uniform\s*\([\s\S]{0,80}(token|key|secret|session|nonce|salt|iv)`
+**Detection regex (PCRE — target the classically-insecure libc PRNG, not arc4random which is CSPRNG on Apple):** `\b(random|rand|srand)\s*\([\s\S]{0,80}(token|key|secret|session|nonce|salt|iv)` — run with `grep -rnP` across `.swift`, `.m`, `.mm`. Match on `arc4random_uniform(…secret…)` is informational only: the function is suitable for cryptographic use on Apple platforms.
 **Severity:** error
 
 ### Weak Hashing Algorithms
