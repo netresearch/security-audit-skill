@@ -242,7 +242,16 @@ app.MapRazorComponents<App>()
     }
 }
 
-// VULNERABLE: Sensitive data in ProtectedBrowserStorage without encryption
+// VULNERABLE: Storing long-lived or high-value secrets in browser-side
+// Protected*Storage. ProtectedSessionStorage / ProtectedLocalStorage DO
+// encrypt the stored ciphertext using the server-side Data Protection
+// API (keys live on the server, not in the page), so the stored value
+// is opaque to the user and to browser extensions.
+// BUT: the ciphertext is still round-tripped through the browser, so
+// persistence lifetime, cross-tab visibility, and the user's ability
+// to capture the encrypted blob all become part of the threat model.
+// Treat it like a signed cookie — fine for short-lived UI state, not
+// a substitute for a server-side session store for API tokens.
 @inject ProtectedSessionStorage SessionStorage
 
 @code {
@@ -250,7 +259,6 @@ app.MapRazorComponents<App>()
     {
         if (firstRender)
         {
-            // Data is encrypted but key is in the page — not truly secret
             await SessionStorage.SetAsync("apiToken", apiToken);
         }
     }

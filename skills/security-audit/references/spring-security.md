@@ -4,7 +4,7 @@ Security patterns, common misconfigurations, and detection regexes for Spring Bo
 
 ## Authentication & Authorization
 
-### Spring Security Misconfiguration — permitAll Overreach
+### Spring Security Misconfiguration - permitAll Overreach
 
 ```java
 // VULNERABLE: Over-permissive security configuration
@@ -181,7 +181,7 @@ public class PageController {
 **Detection regex:** `return\s+(?:request|param|input|query|\w+)\s*;[\s\S]{0,5}$|return\s+"[^"]*"\s*\+\s*(?:request|param|input|\w+)`
 **Severity:** error
 
-### Jackson Deserialization — Polymorphic Typing
+### Jackson Deserialization - Polymorphic Typing
 
 ```java
 // VULNERABLE: Default typing enabled globally
@@ -232,7 +232,7 @@ public abstract class Notification {
 ### Actuator Endpoint Exposure
 
 ```yaml
-# VULNERABLE: application.yml — all actuator endpoints exposed without auth
+# VULNERABLE: application.yml - all actuator endpoints exposed without auth
 management:
   endpoints:
     web:
@@ -284,7 +284,7 @@ public class SecurityConfig {
 **Detection regex:** `include\s*:\s*["']?\*["']?|exposure\.include\s*=\s*\*`
 **Severity:** error
 
-### CSRF Configuration — Unsafe Disabling
+### CSRF Configuration - Unsafe Disabling
 
 ```java
 // VULNERABLE: CSRF protection disabled entirely
@@ -369,11 +369,14 @@ public record UserUpdateDto(
     @Email String email
 ) {}
 
+// Form-binding variant (replaces the @ModelAttribute example above).
+// Keeps the Controller-returns-view-name shape so it is a drop-in
+// mitigation for the mass-assignment bug, not a different feature.
 @Controller
 public class UserController {
 
     @PostMapping("/users/update")
-    public String updateProfile(@Valid @RequestBody UserUpdateDto dto,
+    public String updateProfile(@Valid @ModelAttribute UserUpdateDto dto,
                                 Authentication auth) {
         User user = userRepository.findByUsername(auth.getName())
             .orElseThrow();
@@ -382,6 +385,22 @@ public class UserController {
         // role and enabled are never exposed to user input
         userRepository.save(user);
         return "redirect:/profile";
+    }
+}
+
+// REST variant — same allowlist DTO, different response style.
+@RestController
+public class UserApiController {
+
+    @PostMapping("/api/users/update")
+    public ResponseEntity<Void> updateProfile(@Valid @RequestBody UserUpdateDto dto,
+                                              Authentication auth) {
+        User user = userRepository.findByUsername(auth.getName())
+            .orElseThrow();
+        user.setName(dto.name());
+        user.setEmail(dto.email());
+        userRepository.save(user);
+        return ResponseEntity.noContent().build();
     }
 }
 
@@ -545,7 +564,7 @@ String[] springPatterns = {
 ## Related References
 
 - `owasp-top10.md` — OWASP Top 10 mapping
-- `java-security.md` — Java language-level patterns (deserialization, JNDI)
+- `java-security-features.md` — Java language-level patterns (deserialization, JNDI)
 - `dotnet-security.md` — Comparison with ASP.NET Core patterns
 
 ## Changelog

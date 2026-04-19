@@ -240,8 +240,13 @@ Constructing file paths from user input without validation allows directory trav
 string filename = request.Query["file"];
 string path = Path.Combine("/uploads", filename);
 byte[] content = File.ReadAllBytes(path);
-// Path.Combine("/uploads", "../etc/passwd") = "../etc/passwd" (!!)
-// When the second argument is a rooted path, Combine ignores the first!
+// Two distinct path-traversal failure modes to know about:
+//  (1) Relative traversal:  "../etc/passwd"  → Combine returns
+//      "/uploads/../etc/passwd", which File.ReadAllBytes happily
+//      resolves outside /uploads unless the caller re-anchors it.
+//  (2) Rooted-override:     "/etc/passwd"    → Path.Combine drops
+//      the first argument when the second is absolute, so the result
+//      is literally "/etc/passwd". This is documented behaviour.
 ```
 
 ```csharp

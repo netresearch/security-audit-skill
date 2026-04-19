@@ -4,23 +4,19 @@ Security patterns, common misconfigurations, and detection regexes for ASP.NET C
 
 ## Security Misconfiguration
 
-### Middleware Ordering — Auth Before Routing
+### Middleware Ordering - Auth Before Routing
+
+`MapControllers()` only registers endpoints — it does not execute per-request. The order that actually matters is of the **middleware** calls: `UseRouting` → `UseAuthentication` → `UseAuthorization` → endpoint execution. Getting that sequence wrong (e.g., authorization before authentication) is what causes auth to be skipped.
 
 ```csharp
-// VULNERABLE: Authentication middleware registered after routing/endpoints
+// VULNERABLE: Authorization registered before authentication —
+// requests reach UseAuthorization with no identity established, so
+// [Authorize] attributes evaluate against an anonymous principal.
 var app = builder.Build();
 
 app.UseRouting();
-app.MapControllers();         // Endpoints are mapped BEFORE auth runs
-app.UseAuthentication();      // Too late — requests already routed
-app.UseAuthorization();
-
-// VULNERABLE: Authorization before authentication
-var app = builder.Build();
-
-app.UseRouting();
-app.UseAuthorization();       // Cannot authorize without identity
-app.UseAuthentication();      // Wrong order
+app.UseAuthorization();       // Runs before identity is set
+app.UseAuthentication();
 app.MapControllers();
 
 // SECURE: Correct middleware ordering
@@ -29,10 +25,13 @@ var app = builder.Build();
 app.UseRouting();
 app.UseAuthentication();      // 1. Establish identity
 app.UseAuthorization();       // 2. Check permissions
-app.MapControllers();         // 3. Route to endpoints
+app.MapControllers();         // 3. Register endpoints (order of the
+                              //    call relative to the auth middleware
+                              //    does not matter — MapControllers()
+                              //    only registers routes).
 ```
 
-**Detection regex:** `UseAuthentication\s*\(\s*\)[\s\S]{0,200}UseRouting\s*\(\s*\)|MapControllers\s*\(\s*\)[\s\S]{0,200}UseAuthentication\s*\(\s*\)|UseAuthorization\s*\(\s*\)[\s\S]{0,200}UseAuthentication\s*\(\s*\)`
+**Detection guidance:** flag files where `UseAuthorization()` appears before `UseAuthentication()` on the middleware pipeline, or where `UseAuthentication()` is missing entirely from a pipeline that calls `UseAuthorization()`. A line-oriented regex like `UseAuthorization\s*\([\s\S]{0,200}UseAuthentication\s*\(` catches the first case; the second needs a per-file check. Do not match on `MapControllers()`-vs-`UseAuthentication()` ordering — that is not the bug.
 **Severity:** error
 
 ### CORS Policy Misconfiguration

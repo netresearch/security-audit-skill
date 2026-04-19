@@ -22,12 +22,13 @@ ois.setObjectInputFilter(ObjectInputFilter.Config.createFilter(
 ));
 Object obj = ois.readObject();
 
-// SECURE: Avoid Java serialization entirely — use JSON with explicit types
+// SECURE: Avoid Java serialization entirely — use JSON and bind to a
+// concrete type. Do NOT enable Jackson default typing; it reintroduces
+// polymorphic deserialization, which is the exact same gadget-chain
+// attack surface we are trying to remove. If polymorphism is genuinely
+// required, supply a strict PolymorphicTypeValidator that allowlists
+// specific base types and reject everything else.
 ObjectMapper mapper = new ObjectMapper();
-mapper.activateDefaultTyping(
-    mapper.getPolymorphicTypeValidator(),
-    ObjectMapper.DefaultTyping.NON_FINAL
-);
 UserDto user = mapper.readValue(input, UserDto.class);
 ```
 
@@ -647,23 +648,31 @@ String handleRequest(AuthResult auth, Resource resource) {
 
 ## Detection Patterns for Auditing Java Security Features
 
-| Pattern | Regex | Severity | Checkpoint ID |
-|---------|-------|----------|---------------|
-| ObjectInputStream deserialization | `new\s+ObjectInputStream\s*\(` | error | SA-JAVA-01 |
-| XMLDecoder deserialization | `new\s+XMLDecoder\s*\(` | error | SA-JAVA-02 |
-| JNDI injection via InitialContext.lookup | `InitialContext\s*\(\s*\)[\s\S]{0,100}\.lookup\s*\(` | error | SA-JAVA-03 |
-| Reflection with Class.forName | `Class\.forName\s*\(` | warning | SA-JAVA-04 |
-| JDBC string concatenation | `(createStatement\|executeQuery\|executeUpdate)\s*\([^)]*\+` | error | SA-JAVA-05 |
-| XXE via DocumentBuilderFactory | `DocumentBuilderFactory\.newInstance\s*\(` | warning | SA-JAVA-06 |
-| Command injection via Runtime.exec | `Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(` | error | SA-JAVA-07 |
-| Path traversal via new File with input | `new\s+File\s*\(\s*[^)]*\+\s*(request\|req\|param\|input\|args)` | warning | SA-JAVA-08 |
-| Weak hash MD5 or SHA-1 | `getInstance\s*\(\s*"(MD5\|SHA-1)"\s*\)` | warning | SA-JAVA-09 |
-| Weak cipher DES or ECB mode | `Cipher\.getInstance\s*\(\s*"(DES\|.*ECB)` | error | SA-JAVA-10 |
-| Insecure random java.util.Random | `new\s+Random\s*\(` | warning | SA-JAVA-11 |
-| SSRF via openConnection | `(openConnection\|openStream)\s*\(\s*\)` | warning | SA-JAVA-12 |
-| SSRF via HttpClient | `HttpClient\.new(HttpClient\|Builder)\s*\(` | warning | SA-JAVA-13 |
-| Method.invoke reflection | `Method\.invoke\s*\(` | warning | SA-JAVA-14 |
-| Unsafe ProcessBuilder with user input | `new\s+ProcessBuilder\s*\(.*\+` | error | SA-JAVA-15 |
+The `Regex` column is Markdown table syntax, so pipe characters in regex alternations are escaped as `\|` inside the cell. When you copy a pattern out of the table to run it standalone, unescape the `\|` back to `|`:
+
+```bash
+# As written in the table: getInstance\s*\(\s*"(MD5\|SHA-1)"\s*\)
+# As run:                   getInstance\s*\(\s*"(MD5|SHA-1)"\s*\)
+grep -rnP 'getInstance\s*\(\s*"(MD5|SHA-1)"\s*\)' --include='*.java' .
+```
+
+| Pattern | Regex | Severity |
+|---------|-------|----------|
+| ObjectInputStream deserialization | `new\s+ObjectInputStream\s*\(` | error |
+| XMLDecoder deserialization | `new\s+XMLDecoder\s*\(` | error |
+| JNDI injection via InitialContext.lookup | `InitialContext\s*\(\s*\)[\s\S]{0,100}\.lookup\s*\(` | error |
+| Reflection with Class.forName | `Class\.forName\s*\(` | warning |
+| JDBC string concatenation | `(createStatement\|executeQuery\|executeUpdate)\s*\([^)]*\+` | error |
+| XXE via DocumentBuilderFactory | `DocumentBuilderFactory\.newInstance\s*\(` | warning |
+| Command injection via Runtime.exec | `Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(` | error |
+| Path traversal via new File with input | `new\s+File\s*\(\s*[^)]*\+\s*(request\|req\|param\|input\|args)` | warning |
+| Weak hash MD5 or SHA-1 | `getInstance\s*\(\s*"(MD5\|SHA-1)"\s*\)` | warning |
+| Weak cipher DES or ECB mode | `Cipher\.getInstance\s*\(\s*"(DES\|.*ECB)` | error |
+| Insecure random java.util.Random | `new\s+Random\s*\(` | warning |
+| SSRF via openConnection | `(openConnection\|openStream)\s*\(\s*\)` | warning |
+| SSRF via HttpClient | `HttpClient\.new(HttpClient\|Builder)\s*\(` | warning |
+| Method.invoke reflection | `Method\.invoke\s*\(` | warning |
+| Unsafe ProcessBuilder with user input | `new\s+ProcessBuilder\s*\(.*\+` | error |
 
 ## Version Adoption Security Checklist
 
