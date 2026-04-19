@@ -1,6 +1,6 @@
 # Framework Security Patterns (Cross-framework)
 
-Patterns that recur across multiple backend frameworks — middleware architecture, input validation, output encoding, and a comparison matrix. For framework-specific detail see the dedicated references:
+Patterns that recur across web frameworks (backend + frontend) — middleware / pipeline architecture, input validation, output encoding, and a comparison matrix. For framework-specific detail see the dedicated references:
 
 - **PHP**: `typo3-security.md`, `typo3-fluid-security.md`, `typo3-typoscript-security.md`, `symfony-security.md`, `laravel-security.md`
 - **Python**: `django-security.md`, `flask-security.md`, `fastapi-security.md`

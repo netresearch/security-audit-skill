@@ -8,7 +8,6 @@ Security patterns specific to Laravel — Gates/Policies, mass assignment, CSRF,
 <?php
 declare(strict_types=1);
 
-use Illuminate\Auth\Access\Gate;
 use Illuminate\Support\Facades\Gate as GateFacade;
 
 // Define gates in AuthServiceProvider

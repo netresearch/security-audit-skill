@@ -230,8 +230,11 @@ final class SecureService
         }
 
         // Check voter-based permission — $resource comes from the caller
-        // (controller route argument, repository lookup, etc.)
-        if (!$this->authChecker->isGranted('EDIT', $resource)) {
+        // (controller route argument, repository lookup, etc.). The attribute
+        // string below matches the DocumentVoter::EDIT constant defined in
+        // the earlier example; use the constant rather than the literal
+        // string in real code so a voter rename refactors cleanly.
+        if (!$this->authChecker->isGranted(DocumentVoter::EDIT, $resource)) {
             throw new AccessDeniedException('Cannot edit this resource');
         }
     }

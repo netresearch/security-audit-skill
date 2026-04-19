@@ -268,7 +268,7 @@ Not a direct vulnerability, but flag during audit: does disabling advanced UI hi
 ## Prevention checklist
 
 - [ ] All `userFunc` / `preUserFunc` / `postUserFunc` point at hardcoded, version-controlled callables — not at values influenced by sitepackage upload, forms, or pipeline inputs
-- [ ] `stdWrap.insertData = 1` is never applied to values that came from `GP:`, `POST:`, or untrusted database rows
+- [ ] `stdWrap.insertData = 1` is never applied to values that came from `GP:` (the merged GET+POST accessor) or untrusted database rows
 - [ ] Every `data = GP:…` (merged GET+POST) and `data = TSFE:fe_user|…` is followed by `htmlSpecialChars = 1` (or is wrapped in a cObject that escapes)
 - [ ] `typolink.parameter.data = GP:…` is validated against an allowlist in a controller before reaching TypoScript
 - [ ] `typolink.ATagParams.data` is not sourced from request data
