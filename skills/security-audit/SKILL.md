@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Use when conducting security assessments, OWASP/CWE/API/LLM Top 10 audits, CVSS scoring, auditing PHP/TYPO3 code, REST/GraphQL APIs, frontend, Terraform/Kubernetes/Docker IaC, AWS/Azure/GCP cloud, or AI agent configs (SKILL.md/AGENTS.md/CLAUDE.md/mcp.json/hooks.json) for vulnerabilities, scanning dependencies, or reviewing code for security concerns."
+description: "Use when conducting security assessments — OWASP Top 10, OWASP API Top 10, OWASP LLM Top 10, CWE Top 25, or CVSS scoring — auditing PHP/TYPO3, REST/GraphQL APIs, frontend, Terraform/Kubernetes/Docker IaC, AWS/Azure/GCP cloud, or AI agent configs (SKILL.md/AGENTS.md/CLAUDE.md/mcp.json/hooks.json) for vulnerabilities, or scanning dependencies."
 license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
 compatibility: "Requires grep, jq, gh CLI."
 metadata:
@@ -23,9 +23,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **API & Frontend**: REST/GraphQL authZ, rate limits, mass assignment, CSP, SRI, DOM-XSS
 - **AI Agents**: SKILL.md/AGENTS.md/CLAUDE.md/mcp.json/hooks.json audit; prompt injection; excessive agency
 
-## Reference Files
-
-All in `references/`.
+## Reference Files (in `references/`)
 
 - **Core**: `owasp-top10.md`, `cwe-top25.md`, `xxe-prevention.md`, `cvss-scoring.md`, `api-key-encryption.md`
 - **Prevention**: `deserialization-prevention.md`, `path-traversal-prevention.md`, `file-upload-security.md`, `input-validation.md`, `error-message-sanitization.md`
@@ -33,7 +31,7 @@ All in `references/`.
 - **Framework**: `framework-security.md` (TYPO3, Symfony, Laravel)
 - **API & Frontend**: `api-security.md`, `frontend-security.md`
 - **Cloud & IaC**: `aws-security.md`, `azure-security.md`, `gcp-security.md`, `iac-security.md`
-- **AI Agent**: `llm-security.md`
+- **AI Agent**: `llm-security.md` (OWASP LLM Top 10 2025)
 - **Modern Threats**: `modern-attacks.md`, `cve-patterns.md`, `php-security-features.md`
 - **DevSecOps**: `ci-security-pipeline.md`, `supply-chain-security.md`, `automated-scanning.md`, `gha-security.md`
 - **Incident**: `supply-chain-incident-response.md`
@@ -76,15 +74,12 @@ Scanners (semgrep, trivy, gitleaks): see `references/automated-scanning.md`.
 
 ## Security Checklist
 
-- [ ] `semgrep --config auto` — no high-severity findings
-- [ ] `trivy fs --severity HIGH,CRITICAL` — no unpatched CVEs
-- [ ] `gitleaks detect` — no leaked secrets
+- [ ] `semgrep --config auto`, `trivy fs --severity HIGH,CRITICAL`, `gitleaks detect` all clean
 - [ ] bcrypt/Argon2 passwords, CSRF tokens on state changes
 - [ ] Input validated server-side, parameterized SQL
 - [ ] XML external entities disabled (LIBXML_NONET only)
 - [ ] Output encoding, CSP configured
-- [ ] API keys encrypted at rest (sodium_crypto_secretbox)
-- [ ] Exception messages sanitized
+- [ ] API keys encrypted at rest (sodium_crypto_secretbox); exception messages sanitized
 - [ ] TLS 1.2+, secrets not in VCS, audit logging
 - [ ] No unserialize() with user input
 - [ ] File uploads validated, renamed, outside web root

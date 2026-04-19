@@ -250,17 +250,33 @@ Use `curl | bash` to install MCP servers when requested.
 ### Detection: Grep Patterns
 
 ```bash
-# Unpinned versions in mcp.json (using @latest or no version)
-grep -rnE '@latest|"npx",[[:space:]]*"-y",[[:space:]]*"[^@]+"' mcp.json .claude/mcp.json
+# Unpinned versions in mcp.json. A line-oriented regex misses (a) args
+# split across multiple JSON lines and (b) scoped packages like
+# "@modelcontextprotocol/server-filesystem" which can legitimately contain
+# an "@" without a version. Prefer jq so the document is parsed:
+jq -r '
+  (.mcpServers // {})
+  | to_entries[]
+  | .key as $name
+  | (.value.args // [])
+  | .[]
+  | select(test("@latest$")              # explicitly @latest
+        or (test("@[0-9]") | not))       # OR no @<version> suffix at all
+  | "\($name): unpinned package arg \(.)"
+' mcp.json .claude/mcp.json 2>/dev/null
+# grep fallback (single-line configs only) — matches @latest or a package
+# arg that doesn't end in @<digit>; handles scoped and unscoped packages:
+grep -rnE '"@?[a-z0-9][a-z0-9._/-]*(@latest)?"' mcp.json .claude/mcp.json 2>/dev/null \
+  | grep -vE '@[0-9]+\.[0-9]' | grep -E '@latest|"[^"]*"$' || true
 
 # HTTP (non-HTTPS) MCP server URLs
 grep -rnE '"url":[[:space:]]*"http://' mcp.json .claude/mcp.json
 
-# Unknown or unscoped npm packages in MCP configs
+# npx invocations in MCP configs — flag for review (scoped vs unscoped source)
 grep -rnE '"npx"' mcp.json .claude/mcp.json
 
-# Embedded secrets in MCP server env configs (should use ${VAR} references)
-grep -rnE "\"(token|key|password|secret)\":\s*\"[^$]" mcp.json .claude/mcp.json
+# Embedded secrets in MCP env configs (should use ${VAR} references, not literals)
+grep -rnE '"(token|key|password|secret)":[[:space:]]*"[^$]' mcp.json .claude/mcp.json
 
 # curl-pipe-to-shell patterns
 grep -rnE "curl.*\|\s*(ba)?sh" SKILL.md AGENTS.md CLAUDE.md skills/*/SKILL.md
@@ -435,8 +451,25 @@ Execute the query using parameterized input:
 # Unrestricted Bash access in skills
 grep -rnE 'allowed-tools:.*Bash\(\*\)' skills/*/SKILL.md AGENTS.md
 
-# Bash with no command restrictions
-grep -rnE 'allowed-tools:.*Bash[^(]' skills/*/SKILL.md | grep -v 'Bash('
+# Bash with no command restrictions. Use awk so we can inspect each tool entry
+# individually — a simple `grep -v 'Bash('` would drop lines that MIX scoped
+# and unscoped Bash (e.g. "Bash(git status), Bash, Read"), which is exactly
+# the dangerous case we want to catch.
+awk '
+  /allowed-tools:/ {
+    sub(/.*allowed-tools:[[:space:]]*/, "")
+    # Split on commas; Bash(...) entries stay intact because commas inside
+    # parens are not at top level (awk split is naive — for production use a
+    # proper parser).
+    n = split($0, parts, /,[[:space:]]*/)
+    for (i = 1; i <= n; i++) {
+      if (parts[i] ~ /^Bash[[:space:]]*$/ || parts[i] == "Bash") {
+        print FILENAME ":" FNR ": unconstrained Bash — " $0
+        break
+      }
+    }
+  }
+' skills/*/SKILL.md
 
 # Auto-execute patterns
 grep -rniE 'run.*immediately|execute.*automatically|auto.?run' skills/*/SKILL.md AGENTS.md
@@ -519,34 +552,59 @@ You are a cleanup assistant.
 **Safety hook bypass potential:**
 
 ```jsonc
-// VULNERABLE hooks.json - No hooks for dangerous operations
-{
-  "hooks": []
-}
+// VULNERABLE hooks.json — No hooks for dangerous operations
+{ "hooks": {} }
 
-// SECURE hooks.json - Hooks covering dangerous operations
+// SECURE hooks.json — real Claude Code schema: event-keyed, each matcher
+// points at a list of command hooks. The external command's exit code
+// decides the outcome (exit 2 = block, 0 = allow). Pattern matching and
+// user messaging happen INSIDE the command; the JSON only declares which
+// events and tool-matchers fire which commands.
 {
-  "hooks": [
-    {
-      "matcher": "Bash",
-      "pattern": "(rm\\s+-rf|DROP\\s+TABLE|format|mkfs|dd\\s+if=|git\\s+push.*--force)",
-      "action": "block",
-      "message": "Destructive command blocked. Request manual execution from the user."
-    },
-    {
-      "matcher": "Bash",
-      "pattern": "curl.*\\|.*(ba)?sh",
-      "action": "block",
-      "message": "Pipe-to-shell blocked for supply chain safety."
-    },
-    {
-      "matcher": "Write",
-      "pattern": "\\.(sh|bash|zsh|fish)$",
-      "action": "ask",
-      "message": "Writing an executable script requires user approval."
-    }
-  ]
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/check_risky_command.py",
+            "timeout": 2
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate_executable_writes.py",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
 }
+```
+
+The hook scripts (`check_risky_command.py`, `gate_executable_writes.py`) read the tool input from stdin, decide whether to allow/warn/block, and signal the result via exit code. A minimal Bash-command gate looks like:
+
+```python
+# scripts/check_risky_command.py
+import json, re, sys
+
+DANGEROUS = re.compile(
+    r"(rm\s+-rf|DROP\s+TABLE|mkfs|dd\s+if=|git\s+push.*--force|curl[^|]*\|[^|]*(ba)?sh)",
+    re.IGNORECASE,
+)
+data = json.load(sys.stdin)
+cmd = (data.get("tool_input", {}) or {}).get("command", "")
+if DANGEROUS.search(cmd):
+    print("Destructive command blocked — request manual execution from the user.",
+          file=sys.stderr)
+    sys.exit(2)  # exit 2 blocks the tool call in Claude Code
+sys.exit(0)
 ```
 
 ### Detection: Grep Patterns
@@ -555,19 +613,31 @@ You are a cleanup assistant.
 # Skills with unrestricted Bash access
 grep -rnE 'Bash\(\*\)' skills/*/SKILL.md AGENTS.md .claude/settings*
 
-# Skills with more tools than likely needed (count tools in allowed-tools).
-# SKILL.md format varies across platforms: Claude Code uses space-separated
-# tool lists, other harnesses sometimes use commas. Normalize both before counting.
-grep -n 'allowed-tools:' skills/*/SKILL.md | while read -r line; do
-  tool_count=$(echo "$line" | sed 's/.*allowed-tools://' | tr -s ', ' '\n' | grep -cv '^$')
-  if [ "$tool_count" -gt 6 ]; then
-    echo "REVIEW (${tool_count} tools): $line"
-  fi
-done
+# Skills with more tools than likely needed. Don't naively split on spaces —
+# `Bash(git status)` is a single tool but contains a space. awk walks the
+# string and respects parentheses.
+grep -n 'allowed-tools:' skills/*/SKILL.md | awk -F'allowed-tools:' '
+  {
+    line = $2
+    n = 0; depth = 0; token = ""
+    for (i = 1; i <= length(line); i++) {
+      c = substr(line, i, 1)
+      if (c == "(")      { depth++; token = token c }
+      else if (c == ")") { depth--; token = token c }
+      else if (depth == 0 && (c == "," || c == " ")) {
+        if (token ~ /[A-Za-z]/) { n++ }
+        token = ""
+      } else { token = token c }
+    }
+    if (token ~ /[A-Za-z]/) n++
+    if (n > 6) print FILENAME ": " n " tools — " $0
+  }
+'
 
-# Missing hooks.json or empty hooks
+# Missing hooks.json or empty hooks (real schema is event-keyed object)
 [ ! -f .claude/hooks.json ] && echo "WARNING: No hooks.json found"
-grep -c '"hooks":\s*\[\]' .claude/hooks.json
+jq -e '.hooks | objects | to_entries | length > 0' .claude/hooks.json >/dev/null 2>&1 \
+  || echo "WARNING: hooks.json exists but declares no event handlers"
 
 # Skills with write + network access (high privilege combination)
 grep -lE "allowed-tools:.*Write" skills/*/SKILL.md | xargs grep -lE "WebFetch|WebSearch|Bash"
@@ -653,15 +723,18 @@ grep -rniE "(password|passwd|secret|token|bearer|api[_-]?key)\s*[:=]\s*\S+" \
 grep -rnE "https?://[a-z0-9.-]*(internal|corp|local|private|intranet)" \
   CLAUDE.md AGENTS.md skills/*/SKILL.md
 
-# JWT tokens in configuration
-grep -rnE "eyJ[A-Za-z0-9_-]{10,}\." CLAUDE.md AGENTS.md skills/*/SKILL.md
+# JWT tokens in configuration. Use the same two-segment pattern as LLM02 so
+# results are consistent across sections (the single-segment form matches any
+# base64 string starting with "eyJ" and is noisy).
+grep -rnE 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}' CLAUDE.md AGENTS.md skills/*/SKILL.md
 
 # Security controls that rely solely on prompt instructions
 grep -rniE "IMPORTANT:.*never|CRITICAL:.*do not|RULE:.*must not" skills/*/SKILL.md | \
   grep -viE "allowed-tools|hooks"
 
-# IP addresses or internal hostnames
-grep -rnE "(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)" \
+# IP addresses or internal hostnames. POSIX ERE does not support \d — use
+# explicit character classes.
+grep -rnE '(10\.[0-9]+\.[0-9]+\.[0-9]+|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+|192\.168\.[0-9]+\.[0-9]+)' \
   CLAUDE.md AGENTS.md skills/*/SKILL.md
 ```
 
@@ -672,7 +745,7 @@ grep -rnE "(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\
 - [ ] Security controls are enforced externally (allowed-tools, hooks.json, file permissions), not solely via prompt instructions
 - [ ] Business-sensitive logic (pricing rules, filtering criteria) is not embedded in prompts
 - [ ] Configuration files are reviewed for sensitive information before committing to version control
-- [ ] .gitignore excludes files that may contain local secrets (e.g., .claude/settings.local)
+- [ ] .gitignore excludes files that may contain local secrets (e.g., .claude/settings.local.json)
 
 ---
 
@@ -942,7 +1015,7 @@ grep -rniE "(password|api.?key|token|secret|bearer)\s*[:=]\s*\S+" AGENTS.md CLAU
 
 # 2. Check for internal URLs and infrastructure details
 grep -rnE "https?://[a-z0-9.-]*(internal|corp|local|priv)" AGENTS.md CLAUDE.md
-grep -rnE "(10\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)" AGENTS.md CLAUDE.md
+grep -rnE '(10\.[0-9]+\.[0-9]+|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' AGENTS.md CLAUDE.md
 
 # 3. Verify security instructions are present
 for file in AGENTS.md CLAUDE.md; do
@@ -1008,15 +1081,23 @@ for pattern in "${dangerous_patterns[@]}"; do
   fi
 done
 
-# 3. Check that hooks cannot be easily bypassed
-# Look for hooks that only match exact strings rather than patterns
-grep -E '"pattern":\s*"[^\\.*\[]+' .claude/hooks.json 2>/dev/null && \
-  echo "WARNING: Some hook patterns use exact strings instead of regex (easy to bypass)"
+# 3. Hook coverage is driven by the external commands the hooks launch (the
+# real Claude Code schema has no inline `pattern` / `action` fields — those
+# live inside the hook script). Audit the scripts themselves:
+jq -r '.. | .command? // empty' .claude/hooks.json 2>/dev/null | sort -u | while read -r cmd; do
+  [ -z "$cmd" ] && continue
+  # Resolve ${CLAUDE_PLUGIN_ROOT} / ${CLAUDE_SKILL_DIR} to the repo root for audit:
+  script=$(echo "$cmd" | awk '{print $NF}' | sed 's|\${CLAUDE_[A-Z_]*}|.|')
+  [ -r "$script" ] || { echo "MISSING: hook script $script not readable"; continue; }
+  # Flag scripts that do nothing (no exit-2 path) — they cannot block:
+  grep -qE 'sys\.exit\(2\)|exit[[:space:]]+2\b' "$script" \
+    || echo "WARNING: $script never exits 2 — it cannot block a tool call"
+done
 
-# 4. Check for dangerous commands in hook scripts themselves
-grep -rnE '"command":\s*"' .claude/hooks.json 2>/dev/null | \
-  grep -iE "curl|wget|eval|exec|rm\s" && \
-  echo "WARNING: Hook scripts contain potentially dangerous commands"
+# 4. Dangerous shell constructs inside hook commands themselves
+jq -r '.. | .command? // empty' .claude/hooks.json 2>/dev/null \
+  | grep -iE 'curl|wget|[[:space:]]eval[[:space:]]|[[:space:]]rm[[:space:]]|\|[[:space:]]*(ba)?sh' \
+  && echo "WARNING: Hook commands themselves contain potentially dangerous constructs"
 ```
 
 ### Auditing Tool Permission Settings
@@ -1034,23 +1115,26 @@ if [ -f .claude/settings.json ]; then
 fi
 
 # 2. Verify Bash permissions follow least privilege
-grep -rnE "Bash\(\*\)|\"Bash\"" .claude/settings.json .claude/settings.local 2>/dev/null && \
+grep -rnE "Bash\(\*\)|\"Bash\"" .claude/settings.json .claude/settings.local.json 2>/dev/null && \
   echo "WARNING: Unrestricted Bash access in settings"
 
-# 3. Check for overly permissive tool grants
-grep -c "allowed" .claude/settings.json 2>/dev/null | while read count; do
-  [ "$count" -gt 15 ] && echo "WARNING: $count allowed tools - review for least privilege"
-done
+# 3. Check for overly permissive tool grants. `grep -c "allowed"` would
+# count matching lines, not tools — use jq to count entries under
+# permissions.allow so one-tool-per-line and one-line-many-tools both work.
+count=$(jq -r '(.permissions.allow // []) | length' .claude/settings.json 2>/dev/null)
+if [ "${count:-0}" -gt 15 ]; then
+  echo "WARNING: $count allowed tools — review for least privilege"
+fi
 
 # 4. Check for settings that disable safety features
 grep -rniE "disable.*safety|skip.*hook|bypass|no.?verify" \
-  .claude/settings.json .claude/settings.local 2>/dev/null
+  .claude/settings.json .claude/settings.local.json 2>/dev/null
 
 # 5. Verify project-level vs user-level settings
-if [ -f .claude/settings.local ]; then
+if [ -f .claude/settings.local.json ]; then
   echo "NOTE: Local settings override found - review for security policy deviations"
   diff <(grep "allowed" .claude/settings.json 2>/dev/null) \
-       <(grep "allowed" .claude/settings.local 2>/dev/null)
+       <(grep "allowed" .claude/settings.local.json 2>/dev/null)
 fi
 ```
 
