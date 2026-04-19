@@ -105,12 +105,16 @@ const { query, validationResult } = require('express-validator');
 
 app.get('/api/users',
   query('role').isIn(['user', 'editor', 'admin']).optional(),
-  (req, res) => {
+  async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const users = await User.find({ role: req.query.role });
-    res.json(users);
+    try {
+      const users = await User.find({ role: req.query.role });
+      res.json(users);
+    } catch (err) {
+      next(err);
+    }
   }
 );
 
@@ -353,7 +357,9 @@ app.put('/api/users/:id',
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
-    const allowed = pick(req.body, ['name', 'email']); // Only safe fields
+    // Inline allowlist — keeps the example dependency-free.
+    // Equivalent to lodash/Ramda `pick`.
+    const allowed = { name: req.body.name, email: req.body.email };
     await User.findByIdAndUpdate(req.params.id, allowed);
     res.json({ success: true });
   }

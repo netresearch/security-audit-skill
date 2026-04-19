@@ -330,7 +330,7 @@ function generateToken() {
 // VULNERABLE: Math.random for CSRF tokens
 const csrfToken = Math.random().toString(16).slice(2);
 
-// SECURE: Use crypto.randomUUID() (Node.js 19+ / modern browsers)
+// SECURE: Use crypto.randomUUID() (Node.js 14.17+ / 16+ / modern browsers)
 const token = crypto.randomUUID();
 
 // SECURE: Use crypto.getRandomValues for byte arrays

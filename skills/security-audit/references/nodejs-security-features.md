@@ -243,10 +243,21 @@ app.post('/login', async (req, res) => {
 // SECURE: Limit input size and use streaming JSON parsers
 app.use(express.json({ limit: '1mb' }));
 
-// SECURE: Avoid constructing RegExp from user input, or use safe-regex
-const safeRegex = require('safe-regex');
-if (!safeRegex(req.query.pattern)) {
-  return res.status(400).send('Invalid pattern');
+// SECURE: Prefer a linear-time engine (google/re2 via the `re2` npm package)
+// over feeding user input to the V8 backtracking RegExp engine. safe-regex
+// is a useful smell-test but known to be bypassable with crafted inputs —
+// it stops the obvious cases, not a determined attacker.
+const RE2 = require('re2');
+try {
+  const compiled = new RE2(req.query.pattern);      // throws if input uses
+  const matches = compiled.match(req.query.subject); // unsupported features
+  res.json({ matches });
+} catch {
+  return res.status(400).send('Invalid or unsupported pattern');
+}
+// Also always enforce a maximum input length before any regex work:
+if (req.query.subject && req.query.subject.length > 10_000) {
+  return res.status(413).send('Input too large');
 }
 ```
 
@@ -705,7 +716,7 @@ if (process.permission.has('child.process')) {
 
 ### 16. `require(esm)` and Dynamic Import Security
 
-Node.js 22 stabilized `require()` support for ES modules, and dynamic `import()` expressions have been available since Node.js 13.2. Both can be vectors for loading untrusted code when the specifier comes from user input.
+`require()` of ES modules is an experimental / flagged feature in Node.js 22 (`--experimental-require-module`), not a stable default — treat it as unreleased for security-critical code. Dynamic `import()` expressions, on the other hand, have been stable since Node.js 13.2. Both can be vectors for loading untrusted code when the specifier comes from user input.
 
 ```javascript
 // VULNERABLE: Dynamic import with user-controlled specifier
@@ -783,7 +794,7 @@ const config = await import('./config.json', { with: { type: 'json' } });
 - `owasp-top10.md` — OWASP Top 10 mapping
 - `cwe-top25.md` — CWE Top 25 mapping
 - `input-validation.md` — Input validation patterns
-- `javascript-security-features.md` — Browser/client-side JavaScript patterns
+- `javascript-typescript-security-features.md` — Browser/client-side JavaScript/TypeScript patterns
 
 ## Changelog
 

@@ -205,7 +205,7 @@ export class UsersController {
 
 ```typescript
 // SECURE: Use @Exclude() and ClassSerializerInterceptor
-import { Exclude } from 'class-transformer';
+import { Exclude, plainToInstance } from 'class-transformer';
 
 @Entity()
 export class User {

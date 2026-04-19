@@ -150,7 +150,7 @@ export default {
 </script>
 ```
 
-**Detection regex:** `:(href|src)\s*=\s*"[^"]*(?!https?://|mailto:)[a-zA-Z]`
+**Detection regex:** `:(href|src)\s*=\s*"(?!https?://|mailto:|/|#)[^"]*"` (PCRE — use `grep -rP`). The negative lookahead is anchored to the start of the attribute value so the protocol check runs before arbitrary characters can consume it.
 **Severity:** warning
 
 **Why it matters:** Vue does not sanitize URL protocols in `v-bind:href` or `v-bind:src`. Starting in Vue 3.x there are warnings for `javascript:` URLs, but they are not blocked by default. Explicit allowlisting of safe protocols is required.
