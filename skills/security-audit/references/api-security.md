@@ -232,19 +232,23 @@ if (str_starts_with($authHeader, 'Bearer ')) {
 
 declare(strict_types=1);
 
-// VULNERABLE: JWT with no expiration, weak secret, algorithm not enforced
+// VULNERABLE: JWT with no expiration, weak secret, and (on older firebase/php-jwt <6.0)
+// no algorithm enforcement. On modern firebase/php-jwt (>=6.0) the Key object
+// pins the algorithm, so the primary issues here are the missing `exp` claim
+// and the guessable secret.
 use Firebase\JWT\JWT;
 
 $payload = [
     'sub' => $user->getId(),
     'name' => $user->getName(),
-    // No 'exp' claim - token never expires!
+    // No 'exp' claim — token never expires.
 ];
-$token = JWT::encode($payload, 'secret123', 'HS256'); // Weak secret
+$token = JWT::encode($payload, 'secret123', 'HS256'); // Short, guessable secret
 
-// VULNERABLE: Decoding without specifying allowed algorithms
-$decoded = JWT::decode($token, new Key('secret123', 'HS256'));
-// If the library accepts "none" algorithm, attacker can forge tokens
+// Decoding. On firebase/php-jwt >=6.0 the Key object pins the algorithm
+// (so "alg:none" forgery is not possible). On older libraries or when the
+// second argument is just a string, the algorithm is not enforced and an
+// attacker can forge tokens by setting `"alg": "none"` in the header.
 ```
 
 ```php
@@ -1353,6 +1357,7 @@ declare(strict_types=1);
 
 // SECURE: Enforce query depth and complexity limits (webonyx/graphql-php)
 use GraphQL\GraphQL;
+use GraphQL\Validator\DocumentValidator;
 use GraphQL\Validator\Rules\QueryDepth;
 use GraphQL\Validator\Rules\QueryComplexity;
 
@@ -1392,21 +1397,33 @@ in a single request that bypasses per-request rate limiting.
 
 declare(strict_types=1);
 
-// SECURE: Limit batch size
+// SECURE: Limit batch size without consuming the downstream request body.
+// Read the PSR-7 stream, but rewind before/after so later handlers still see it.
 final class GraphQLBatchMiddleware
 {
     private const int MAX_BATCH_SIZE = 5;
 
     public function process(Request $request, RequestHandlerInterface $handler): Response
     {
-        $body = json_decode($request->getBody()->getContents(), true);
+        $stream = $request->getBody();
+        if ($stream->isSeekable()) {
+            $stream->rewind();
+        }
+        $raw = $stream->getContents();
+        if ($stream->isSeekable()) {
+            $stream->rewind();
+        }
 
-        if (is_array($body) && array_is_list($body)) {
-            if (count($body) > self::MAX_BATCH_SIZE) {
-                return new JsonResponse([
-                    'error' => 'Batch size exceeds maximum of ' . self::MAX_BATCH_SIZE,
-                ], 400);
-            }
+        try {
+            $body = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return new JsonResponse(['error' => 'Invalid JSON payload'], 400);
+        }
+
+        if (is_array($body) && array_is_list($body) && count($body) > self::MAX_BATCH_SIZE) {
+            return new JsonResponse([
+                'error' => 'Batch size exceeds maximum of ' . self::MAX_BATCH_SIZE,
+            ], 400);
         }
 
         return $handler->handle($request);
@@ -1437,15 +1454,25 @@ disabled.
 
 declare(strict_types=1);
 
-// SECURE: Suppress field suggestions in production
-// Custom error formatter that strips suggestions
-$result = GraphQL::executeQuery($schema, $query);
+use GraphQL\Error\Error;
+use GraphQL\Error\FormattedError;
+use GraphQL\GraphQL;
 
-$output = $result->toArray(
-    $_ENV['APP_ENV'] === 'prod'
-        ? \GraphQL\Error\DebugFlag::NONE
-        : \GraphQL\Error\DebugFlag::INCLUDE_DEBUG_MESSAGE
-);
+// SECURE: Register a custom error formatter that strips the "Did you mean …?"
+// suggestion tail from validation messages before returning errors to clients.
+// Field suggestions leak the schema even when introspection is disabled.
+$formatter = static function (Error $error): array {
+    $formatted = FormattedError::createFromException($error);
+    $formatted['message'] = preg_replace(
+        '/\s*Did you mean[^?]*\?\s*$/u',
+        '',
+        (string) $formatted['message']
+    );
+    return $formatted;
+};
+
+$result  = GraphQL::executeQuery($schema, $query);
+$output  = $result->setErrorFormatter($formatter)->toArray();
 ```
 
 ### N+1 Query DoS
@@ -1542,8 +1569,12 @@ class ApiController
 {
     public function create(Request $request): JsonResponse
     {
-        // PHP may parse form data, JSON, XML, etc. depending on Content-Type
-        $data = $request->toArray(); // What if Content-Type: text/xml with XXE?
+        // PHP itself only parses application/x-www-form-urlencoded and
+        // multipart/form-data into $_POST. JSON/XML must be handled manually
+        // or by framework middleware. $request->toArray() here relies on
+        // whatever framework decoder is wired up — if that silently accepts
+        // text/xml, you may end up with XXE or unexpected parser behavior.
+        $data = $request->toArray();
 
         return new JsonResponse($data);
     }
