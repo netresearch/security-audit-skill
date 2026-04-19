@@ -36,11 +36,19 @@ class UsersController < ApplicationController
   end
 end
 
-# VULNERABLE: Using attributes= or update_attributes without strong params
+# VULNERABLE: Bypassing strong parameters. Modern Rails raises
+# ActiveModel::ForbiddenAttributesError if you assign raw
+# ActionController::Parameters to a model; the bypass shapes to look
+# for in audits are:
+#   1. An explicit .permit!  (permit everything)
+#   2. to_unsafe_h / to_unsafe_hash (strips the "forbidden" flag)
+#   3. .to_h after permit(*Model.attribute_names)  (allowlists every
+#      attribute, including role / is_admin)
 class UsersController < ApplicationController
   def update
     @user = User.find(params[:id])
-    @user.attributes = params[:user]  # No filtering at all
+    @user.attributes = params[:user].permit!        # permit-everything
+    # @user.attributes = params[:user].to_unsafe_h  # equivalent bypass
     @user.save
   end
 end
@@ -309,15 +317,19 @@ end
 ```
 
 ```ruby
-# SECURE: Validate filename and verify resolved path
+# SECURE: Validate filename and verify resolved path. Enforce a
+# directory boundary when comparing — plain `start_with?(UPLOADS_DIR)`
+# would accept "#{UPLOADS_DIR}_private/..." because that's a prefix
+# of the allowed root. Append File::SEPARATOR before comparing.
 class DownloadsController < ApplicationController
   UPLOADS_DIR = Rails.root.join("uploads").to_s
+  UPLOADS_ROOT = UPLOADS_DIR + File::SEPARATOR
 
   def show
     basename = File.basename(params[:filename]) # Strip directory components
     full_path = File.realpath(File.join(UPLOADS_DIR, basename))
 
-    unless full_path.start_with?(UPLOADS_DIR)
+    unless full_path == UPLOADS_DIR || full_path.start_with?(UPLOADS_ROOT)
       head :not_found
       return
     end

@@ -309,11 +309,21 @@ func downloadHandler(c *gin.Context) {
         return
     }
 
-    // Resolve full path and verify it's within the uploads directory
+    // Resolve full path and verify it's within the uploads directory.
+    // HasPrefix alone is not enough: "/var/app/uploads" is a prefix of
+    // "/var/app/uploads_secret/…", so a sibling directory with a matching
+    // prefix would pass the check. Enforce a directory boundary either by
+    // appending the OS separator before the compare, or (preferred) by
+    // using filepath.Rel and rejecting results that start with "..".
     uploadsDir := "/var/app/uploads"
     fullPath := filepath.Join(uploadsDir, base)
     resolved, err := filepath.EvalSymlinks(fullPath)
-    if err != nil || !strings.HasPrefix(resolved, uploadsDir) {
+    if err != nil {
+        c.JSON(404, gin.H{"error": "file not found"})
+        return
+    }
+    rel, err := filepath.Rel(uploadsDir, resolved)
+    if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
         c.JSON(404, gin.H{"error": "file not found"})
         return
     }

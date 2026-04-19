@@ -112,7 +112,15 @@ end
 
 **Security implication:** Ruby's `system`, `exec`, `%x{}`, and backticks all invoke a shell when given a single string argument. The array form of `system` and `exec` bypasses the shell entirely, making it immune to injection. Always prefer the array form. CWE-78: Improper Neutralization of Special Elements used in an OS Command.
 
-**Detection regex:** `\bsystem\s*\(` , `\bexec\s*\(` , `` `.+#\{`` (backtick with interpolation)
+**Detection regex (run each separately):**
+
+```bash
+# System / exec calls that take a single string (shell invocation) — check the array-vs-string form manually.
+grep -rnE '\b(system|exec)\s*\(' --include='*.rb' .
+# Backtick invocations containing #{...} interpolation — the backtick
+# here is escaped with a backslash to keep the inline code span intact.
+grep -rnP '\x60[^\x60]*#\{' --include='*.rb' .
+```
 
 ---
 
@@ -198,10 +206,10 @@ end
 
 # SECURE: Pass user input as data, not template content
 def render_greeting(name)
-  template = ERB.new("Hello, <%= @name %>!")
-  b = binding
-  b.local_variable_set(:name, name)
-  # Or use a struct/OpenStruct for the binding context
+  # Match the template variable to the hash key. `result_with_hash`
+  # binds locals, so the template must reference `<%= name %>`, not
+  # `@name` (which is an instance variable and wouldn't be set).
+  template = ERB.new("Hello, <%= name %>!")
   template.result_with_hash(name: ERB::Util.html_escape(name))
 end
 

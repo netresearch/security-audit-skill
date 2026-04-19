@@ -273,7 +273,14 @@ async fn get_user_sqlx_safe(pool: &PgPool, username: &str) -> Result<User, sqlx:
 
 **Security implication:** ORM raw query methods bypass injection protection. Always use query builders or explicit bind parameters.
 
-**Detection regex:** `sql_query\s*\(\s*format!\s*\(|query(_as)?\s*\(\s*&format!\s*\(`
+**Detection:** the inline forms (`sql_query(format!(...))`, `query_as(&format!(...))`) are caught by the regex below. The more common shape — a `let` binding that builds the query string, then gets passed into `query_as(&query)` — needs a two-pass check: first list files that use `format!(...)` against a `SELECT/INSERT/UPDATE/DELETE` literal, then verify those same files pass the resulting variable into a raw-SQL method.
+
+```bash
+# Pass 1: find format! calls that look like SQL.
+grep -rnP 'format!\s*\([^)]*\b(SELECT|INSERT|UPDATE|DELETE)\b' --include='*.rs' .
+# Pass 2: for each hit, check whether the variable reaches a raw-SQL entry point.
+grep -rnP '\b(sql_query|query|query_as|query_scalar|execute)\s*\(\s*&[A-Za-z_]' --include='*.rs' .
+```
 
 ### 8. Command Injection via std::process::Command (CWE-78)
 

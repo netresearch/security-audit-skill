@@ -46,7 +46,15 @@ func handleLoginSafe(w http.ResponseWriter, r *http.Request) {
 
 **Security implication:** Data races on security-critical variables can cause authentication bypass, privilege escalation, or inconsistent authorization decisions. Always run tests with `-race` flag: `go test -race ./...`
 
-**Detection regex:** `go\s+(func|test)\b` combined with shared variable writes — best detected with `go vet -race` or `go build -race`.
+**Detection:** static regexes catch obvious `go func(){ ... }()` sites but can't reason about shared state. The Go toolchain's built-in data-race detector is the right answer — it instruments the binary and reports races at runtime:
+
+```bash
+go test -race ./...            # run tests with the race detector
+go run -race ./cmd/server      # instrument a running binary
+go build -race -o ./bin/server ./cmd/server   # produce an instrumented build
+```
+
+`go vet` does not have a `-race` mode; the `-race` flag belongs to `go test` / `go run` / `go build` (it instruments the binary — you still have to exercise it).
 
 ### 2. Unsafe Pointer Usage (CWE-119, CWE-787)
 
@@ -570,11 +578,25 @@ func isAllowedRole(role string) bool {
     return slices.Contains(allowed, role)
 }
 
-// SECURE: maps.Clone for safe copy (prevents unintended shared state)
+// SECURE: maps.Clone produces a SHALLOW copy — the returned map has
+// its own backing store, so the caller can add or remove keys without
+// touching `original`. But reference-typed values (slices, maps,
+// pointers, structs containing them) are still shared. For `map[string]bool`
+// this is safe because bool is a value type; for a map of slices or
+// structs-with-slices you must deep-copy the values yourself.
 import "maps"
 
 func clonePermissions(original map[string]bool) map[string]bool {
-    return maps.Clone(original) // Deep copy, no shared references
+    return maps.Clone(original) // OK: bool values are not references.
+}
+
+// Example: when values are slices, maps.Clone is NOT enough.
+func cloneRoleAssignments(original map[string][]string) map[string][]string {
+    out := make(map[string][]string, len(original))
+    for k, v := range original {
+        out[k] = append([]string(nil), v...)   // copy each slice
+    }
+    return out
 }
 ```
 
