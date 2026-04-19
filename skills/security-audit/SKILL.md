@@ -70,11 +70,11 @@ $hash = password_hash($password, PASSWORD_ARGON2ID);
 $token = bin2hex(random_bytes(32));
 ```
 
-Scanners (semgrep, trivy, gitleaks): see `references/automated-scanning.md`.
+Scanners (semgrep/opengrep, trivy, gitleaks): see `references/automated-scanning.md`.
 
 ## Security Checklist
 
-- [ ] `semgrep --config auto`, `trivy fs --severity HIGH,CRITICAL`, `gitleaks detect` all clean
+- [ ] `semgrep --config auto` (or `opengrep`), `trivy fs --severity HIGH,CRITICAL`, `gitleaks detect` all clean
 - [ ] bcrypt/Argon2 passwords, CSRF tokens on state changes
 - [ ] Input validated server-side, parameterized SQL
 - [ ] XML external entities disabled (LIBXML_NONET only)
