@@ -143,7 +143,7 @@ User-controlled `src` attributes on `f:image` let Fluid load arbitrary files. In
 <f:image image="{user.avatar}" />
 ```
 
-### 9. Custom ViewHelpers without `$escapingInterceptorEnabled = true`
+### 9. Custom ViewHelpers with `$escapeOutput` / `$escapeChildren` disabled
 
 ```php
 // VULNERABLE: ViewHelper that opts its arguments out of auto-escaping

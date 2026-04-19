@@ -2,7 +2,7 @@
 
 Security patterns specific to Symfony — voters, firewalls, CSRF, Security Bundle, Rate Limiter. Cross-framework patterns (middleware, input validation, output encoding) live in `framework-security.md`.
 
-### Security Voters for Authorization
+## Security Voters for Authorization
 
 Voters provide fine-grained, reusable authorization logic.
 
@@ -84,7 +84,7 @@ final class DocumentController extends AbstractController
 }
 ```
 
-### Firewall Configuration
+## Firewall Configuration
 
 ```yaml
 # config/packages/security.yaml
@@ -139,7 +139,7 @@ security:
         ROLE_SUPER_ADMIN: [ROLE_ADMIN, ROLE_ALLOWED_TO_SWITCH]
 ```
 
-### CSRF Protection
+## CSRF Protection
 
 ```php
 <?php
@@ -188,7 +188,7 @@ final class FormController extends AbstractController
 {{ form_end(form) }}
 ```
 
-### Security Bundle Configuration
+## Security Bundle Configuration
 
 ```yaml
 # config/packages/security.yaml - Additional security settings
@@ -222,14 +222,15 @@ final class SecureService
         private readonly AuthorizationCheckerInterface $authChecker,
     ) {}
 
-    public function performSensitiveAction(): void
+    public function performSensitiveAction(object $resource): void
     {
         // Check role
         if (!$this->authChecker->isGranted('ROLE_ADMIN')) {
             throw new AccessDeniedException('Admin access required');
         }
 
-        // Check voter-based permission
+        // Check voter-based permission — $resource comes from the caller
+        // (controller route argument, repository lookup, etc.)
         if (!$this->authChecker->isGranted('EDIT', $resource)) {
             throw new AccessDeniedException('Cannot edit this resource');
         }
@@ -237,7 +238,7 @@ final class SecureService
 }
 ```
 
-### Rate Limiter Component
+## Rate Limiter Component
 
 ```php
 <?php
@@ -265,8 +266,11 @@ final class LoginController extends AbstractController
 
     public function login(Request $request): Response
     {
-        // Create limiter based on client IP
-        $limiter = $this->loginLimiter->create($request->getClientIp());
+        // Create limiter based on client IP. getClientIp() can return null
+        // (reverse-proxy misconfig, CLI harness), so fall back to a fixed
+        // bucket. Prefer a stable identifier (username + IP) when available.
+        $limiterKey = $request->getClientIp() ?? 'unknown-client';
+        $limiter = $this->loginLimiter->create($limiterKey);
 
         // Check if rate limit exceeded
         $limit = $limiter->consume();
@@ -287,7 +291,7 @@ final class LoginController extends AbstractController
 }
 ```
 
-### Detection Patterns for Symfony
+## Detection Patterns for Symfony
 
 ```php
 // Grep patterns for Symfony security issues:

@@ -2,7 +2,7 @@
 
 Security patterns specific to Laravel — Gates/Policies, mass assignment, CSRF, Crypt facade, Query Builder. Cross-framework patterns live in `framework-security.md`.
 
-### Gates and Policies
+## Gates and Policies
 
 ```php
 <?php
@@ -82,7 +82,7 @@ final class PostController extends Controller
 // @endcan
 ```
 
-### Mass Assignment Protection
+## Mass Assignment Protection
 
 ```php
 <?php
@@ -157,7 +157,7 @@ final class StorePostRequest extends FormRequest
 }
 ```
 
-### CSRF Middleware
+## CSRF Middleware
 
 ```php
 <?php
@@ -204,7 +204,7 @@ final class VerifyCsrfToken extends Middleware
 }
 ```
 
-### Encryption (Crypt Facade)
+## Encryption (Crypt Facade)
 
 ```php
 <?php
@@ -251,7 +251,7 @@ final class SecureStorageService
 // - Store in environment variable, never in config files
 ```
 
-### Query Builder Parameterization
+## Query Builder Parameterization
 
 ```php
 <?php
@@ -307,7 +307,7 @@ $users = DB::table('users')
     ->get();
 ```
 
-### Detection Patterns for Laravel
+## Detection Patterns for Laravel
 
 ```php
 // Grep patterns for Laravel security issues:

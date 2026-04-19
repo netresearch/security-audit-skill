@@ -68,7 +68,7 @@ $hash  = password_hash($password, PASSWORD_ARGON2ID);
 $token = bin2hex(random_bytes(32));   // never mt_rand/rand
 ```
 
-Scanners (semgrep/opengrep, trivy, gitleaks): see `automated-scanning.md`.
+Scanners (semgrep/opengrep, trivy, gitleaks): see `references/automated-scanning.md`.
 
 ## Security Checklist
 
@@ -85,7 +85,7 @@ Scanners (semgrep/opengrep, trivy, gitleaks): see `automated-scanning.md`.
 
 - **NEVER** interpolate `${{ inputs.* }}` / `${{ github.event.* }}` in `run:` — use `env:`
 - Dependency triage: upgrade > override > dismiss with rationale
-- See `gha-security.md`
+- See `references/gha-security.md`
 
 ## Verification
 

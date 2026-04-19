@@ -154,7 +154,7 @@ lib.jump {
 }
 ```
 
-Any `parameter.data` that reads from `GP:` should be validated against an allowlist before it reaches `typolink`. TYPO3 9+ mitigates HMAC-unsigned external URLs in some places (see `PageLinkHandler`), but a raw `parameter.data = GP:url` bypasses it.
+Any `parameter.data` that reads from `GP:` should be validated against an allowlist before it reaches `typolink`. Link-building is routed through `LinkService` and then through per-type handlers (`PageLinkHandler`, `ExternalLinkHandler`, `TelephoneLinkHandler`, etc.). `ExternalLinkHandler` handles external URLs and does not validate them against a host allowlist — validation must happen in the calling controller or a TypoScript `if.isTrue` check, before the value reaches `typolink.parameter`. TYPO3's HMAC / `cHash` machinery covers internal parameter integrity + caching, not external-URL trust.
 
 ### 6. `HMENU` with `if.isTrue.cObject` evaluation order
 
@@ -218,7 +218,7 @@ editor:
       - Vendor/UnknownPlugin/unpinned@latest   # any JS file; runs in editor context
 ```
 
-Cross-ref: the existing `typo3-ckeditor5` skill covers CKEditor 5 plugin development best practices; use this section to audit unknown / pinned-at-latest plugins.
+For CKEditor 5 plugin authoring / preset best-practices, the sibling `netresearch/typo3-ckeditor5-skill` repo is the canonical reference; this section focuses on auditing unknown or `@latest`-pinned plugins that already landed in a site package.
 
 ### 9. `permissions.file` / `permissions.file.default`
 
@@ -256,4 +256,4 @@ Not a direct vulnerability, but flag during audit: does disabling advanced UI hi
 - `typo3-security.md` — PHP-level TYPO3 patterns
 - `typo3-fluid-security.md` — Fluid template escaping + ViewHelper pitfalls
 - `framework-security.md` — cross-framework middleware / validation patterns
-- `typo3-ckeditor5` skill — for CKEditor 5 preset authoring
+- External: `netresearch/typo3-ckeditor5-skill` — CKEditor 5 preset authoring (separate skill repo)

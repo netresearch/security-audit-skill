@@ -2,7 +2,7 @@
 
 Security patterns specific to TYPO3 CMS — PHP-level patterns only. For Fluid template auto-escape / ViewHelper pitfalls see `typo3-fluid-security.md`; for TypoScript / TSconfig see `typo3-typoscript-security.md`.
 
-### QueryBuilder: createNamedParameter() for SQL Safety
+## QueryBuilder: createNamedParameter() for SQL Safety
 
 TYPO3's QueryBuilder provides SQL injection protection through named parameters.
 
@@ -17,6 +17,10 @@ use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 // VULNERABLE: String concatenation in QueryBuilder
 final class UserRepositoryUnsafe
 {
+    public function __construct(
+        private readonly ConnectionPool $connectionPool,
+    ) {}
+
     public function findByUsername(string $username): array
     {
         $queryBuilder = $this->connectionPool
@@ -103,7 +107,7 @@ final class UserRepositorySafe
 }
 ```
 
-### FormProtection (CSRF Prevention)
+## FormProtection (CSRF Prevention)
 
 TYPO3 uses form protection tokens (CSRF tokens) for backend modules and install tool.
 
@@ -121,8 +125,10 @@ final class BackendModuleController
         private readonly FormProtectionFactory $formProtectionFactory,
     ) {}
 
-    public function formAction(): ResponseInterface
-    {
+    public function formAction(
+        ServerRequestInterface $request,
+        int $recordUid,                 // typically a route argument
+    ): ResponseInterface {
         $formProtection = $this->formProtectionFactory->createFromRequest($request);
 
         // Generate token for a specific form/action combination
@@ -138,8 +144,10 @@ final class BackendModuleController
         return $this->htmlResponse();
     }
 
-    public function deleteAction(ServerRequestInterface $request): ResponseInterface
-    {
+    public function deleteAction(
+        ServerRequestInterface $request,
+        int $recordUid,                 // typically a route argument
+    ): ResponseInterface {
         $formProtection = $this->formProtectionFactory->createFromRequest($request);
         $token = $request->getParsedBody()['csrfToken'] ?? '';
 
@@ -162,7 +170,7 @@ final class BackendModuleController
 }
 ```
 
-### Trusted Properties (HMAC-Signed Form Field Lists)
+## Trusted Properties (HMAC-Signed Form Field Lists)
 
 ```php
 <?php
@@ -226,7 +234,7 @@ final class UserControllerSafe extends ActionController
 }
 ```
 
-### FAL (File Abstraction Layer) for Safe File Handling
+## FAL (File Abstraction Layer) for Safe File Handling
 
 ```php
 <?php
@@ -274,7 +282,7 @@ final class FileUploadService
 // Configuration: $GLOBALS['TYPO3_CONF_VARS']['BE']['fileDenyPattern']
 ```
 
-### IgnoreValidation Annotation Risks
+## IgnoreValidation Annotation Risks
 
 ```php
 <?php
@@ -314,7 +322,7 @@ final class RegistrationController extends ActionController
 }
 ```
 
-### Content Security in TypoScript
+## Content Security in TypoScript
 
 ```typoscript
 # Configure Content Security Policy headers via TypoScript
@@ -379,7 +387,7 @@ return \TYPO3\CMS\Core\Security\ContentSecurityPolicy\Map::fromArray([
 ]);
 ```
 
-### Backend Module Access Control
+## Backend Module Access Control
 
 ```php
 <?php
@@ -430,7 +438,7 @@ final class AdminController extends ActionController
 }
 ```
 
-### Detection Patterns for TYPO3
+## Detection Patterns for TYPO3
 
 ```php
 // Grep patterns for TYPO3 security issues:
