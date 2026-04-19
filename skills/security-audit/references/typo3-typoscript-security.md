@@ -42,9 +42,11 @@ lib.productPrice {
 **Detection:**
 ```bash
 # All userFunc / preUserFunc / postUserFunc usages — every one needs manual review.
-grep -rnE '\b(pre|post)?[Uu]serFunc\s*=' --include='*.typoscript' --include='*.ts' .
+# POSIX ERE (grep -E) does not portably support \s or \b; use character classes.
+grep -rnE '(^|[^A-Za-z])(pre|post)?[Uu]serFunc[[:space:]]*=' \
+  --include='*.typoscript' --include='*.ts' .
 # Inside TCA / Services / YAML, the same concept reaches through 'userFunc' keys:
-grep -rnE "'userFunc'\s*=>|\"userFunc\"\s*=>" \
+grep -rnE "'userFunc'[[:space:]]*=>|\"userFunc\"[[:space:]]*=>" \
   --include='*.php' Configuration/ 2>/dev/null
 ```
 
@@ -74,7 +76,7 @@ The allowed marker prefixes inside `insertData` (`GP:`, `TSFE:`, `page:`, `field
 **Detection:**
 ```bash
 # insertData = 1 combined with GP: / POST: / cObj.data = *user* earlier in the same object
-grep -rnE 'stdWrap\.insertData\s*=\s*1' --include='*.typoscript' --include='*.ts' .
+grep -rnE 'stdWrap\.insertData[[:space:]]*=[[:space:]]*1' --include='*.typoscript' --include='*.ts' .
 ```
 
 ### 3. `GP:`, `TSFE->fe_user`, and raw request data without `htmlSpecialChars`
@@ -189,7 +191,7 @@ config.debug = 1
 **Detection:**
 ```bash
 # Site-wide no-cache or debug.
-grep -rnE 'config\.(no_cache|debug)\s*=\s*1' \
+grep -rnE 'config\.(no_cache|debug)[[:space:]]*=[[:space:]]*1' \
   --include='*.typoscript' --include='*.ts' --include='*.yaml' .
 ```
 
