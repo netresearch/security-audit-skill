@@ -6,7 +6,7 @@ For PHP-level TYPO3 patterns see `typo3-security.md`; for TypoScript / TSconfig 
 
 ## Escape pipeline
 
-Fluid's default behaviour is context-sensitive auto-escaping: `{variable}` produces HTML-escaped output in HTML templates, and JSON-encoded output in JSON contexts. **This only holds for variables passed through the default output pipeline.** Several shapes opt out.
+Fluid applies HTML-escaping (via `htmlspecialchars`) by default to every `{variable}` output. There is **no automatic context switch** to JSON, JS, or URL encoding — if your template renders into a `<script>` block, an attribute, or a JSON payload, escaping has to be explicit (`f:format.json`, a controller-side `JsonResponse`, or a context-appropriate ViewHelper). Several Fluid shapes also opt out of the default HTML escape entirely.
 
 ### 1. `f:format.raw` — explicit opt-out
 
@@ -21,11 +21,14 @@ Fluid's default behaviour is context-sensitive auto-escaping: `{variable}` produ
 <f:format.html parseFuncTSPath="lib.parseFunc_RTE">{article.body}</f:format.html>
 ```
 
-`f:format.raw` should only be applied to content that has already been sanitised — typically RTE output processed by `lib.parseFunc_RTE` (which runs through `htmlSanitizer` since TYPO3 10.3). If you see `-> f:format.raw()` on a field that came directly from a `TextField`, a backend `input` / `text` TCA column, or from `request.arguments`, treat it as an XSS sink.
+`f:format.raw` should only be applied to content that has already been sanitised — typically RTE output processed by `lib.parseFunc_RTE`, which runs through `htmlSanitizer` since TYPO3 10.4.29 / 11.5.13 / 12.1 (integrated in response to [TYPO3-CORE-SA-2022-007](https://typo3.org/security/advisory/typo3-core-sa-2022-007)). If you see `-> f:format.raw()` on a field that came directly from a `TextField`, a backend `input` / `text` TCA column, or from `request.arguments`, treat it as an XSS sink.
 
 **Detection:**
 ```bash
-grep -rnP '(->\s*f:format\.raw\s*\(\)|<f:format\.raw\b)' --include='*.html' .
+# POSIX ERE; portable across GNU and BSD grep. Covers the common Fluid template
+# extensions — .html (web), .xml (RSS/sitemap), .txt (plain-text email).
+grep -rnE '(->[[:space:]]*f:format\.raw[[:space:]]*\(\)|<f:format\.raw([[:space:]]|>|/))' \
+  --include='*.html' --include='*.xml' --include='*.txt' .
 # Then manually verify each hit is sanitiser output, not raw user data.
 ```
 
@@ -44,13 +47,16 @@ HTML-context auto-escape handles `<` `>` `&` `"` `'` — but not JavaScript-cont
 <a href="#" data-user-id="{user.id}" class="js-load-user">Load</a>
 ```
 
-Fluid's default escape passes through `htmlspecialchars`. That is correct for element-text context but insufficient for JavaScript string context, where `</script>`, `\x00`, and Unicode line terminators (`\u2028` / `\u2029`) all terminate or break out of a string literal.
+Fluid's default escape passes through `htmlspecialchars`. That is correct for element-text context but insufficient for JavaScript string context, where `</script>` closes the `<script>` element from inside any string, raw newlines (and `\u2028` / `\u2029` pre-ES2019) terminate the string literal, and — in template-literal context — an unescaped backtick or `${` breaks out.
 
 **Detection:**
 ```bash
-# Fluid variables appearing inside JavaScript strings / event handlers.
-grep -rnP '(on[a-z]+\s*=\s*"[^"]*\{[a-zA-Z_]|<script\b[^>]*>[\s\S]*?\{[a-zA-Z_])' \
-  --include='*.html' .
+# Same-line case: Fluid variables inside inline event handlers or a <script> tag
+# that opens and closes on the same line as the interpolation.
+grep -rnE '(on[a-z]+[[:space:]]*=[[:space:]]*"[^"]*\{[a-zA-Z_]|<script[^>]*>[^<]*\{[a-zA-Z_])' \
+  --include='*.html' --include='*.xml' .
+# Cross-line case (grep is line-oriented; requires a multiline-capable tool):
+#   rg -U --multiline-dotall '<script\b[^>]*>[\s\S]*?\{[a-zA-Z_]' -g '*.html' -g '*.xml'
 ```
 
 ### 3. `htmlentitiesDecode` double-decode
@@ -67,7 +73,8 @@ grep -rnP '(on[a-z]+\s*=\s*"[^"]*\{[a-zA-Z_]|<script\b[^>]*>[\s\S]*?\{[a-zA-Z_])
 
 **Detection:**
 ```bash
-grep -rnP '->\s*f:format\.htmlentitiesDecode\b' --include='*.html' .
+grep -rnE '->[[:space:]]*f:format\.htmlentitiesDecode([^A-Za-z_]|$)' \
+  --include='*.html' --include='*.xml' --include='*.txt' .
 ```
 
 ## Template / partial injection
@@ -81,8 +88,10 @@ grep -rnP '->\s*f:format\.htmlentitiesDecode\b' --include='*.html' .
 <!-- VULNERABLE: Same via section -->
 <f:render section="{request.arguments.section}" />
 
-<!-- SECURE: Allowlist resolved server-side, with a safe default -->
-<f:render partial="Layout/{layout}" arguments="{_all}" />
+<!-- SECURE: Allowlist resolved server-side, with a safe default.
+     Pass only the arguments the partial actually needs — see §5 on why
+     {_all} is avoided in production templates. -->
+<f:render partial="Layout/{layout}" arguments="{layout: layout, item: item}" />
 <!-- Controller: $this->view->assign('layout', in_array($req, ['Plain','Sidebar','Two-Col']) ? $req : 'Plain'); -->
 ```
 
@@ -91,7 +100,8 @@ Fluid resolves partials against `partialRootPaths`, which is controlled by TypoS
 **Detection:**
 ```bash
 # Partial / section name interpolated from a variable.
-grep -rnP '<f:render\b[^>]*\b(partial|section)\s*=\s*"\{' --include='*.html' .
+grep -rnE '<f:render[[:space:]][^>]*(partial|section)[[:space:]]*=[[:space:]]*"\{' \
+  --include='*.html' --include='*.xml' --include='*.txt' .
 ```
 
 ### 5. `arguments="{_all}"` over-sharing
@@ -154,17 +164,33 @@ final class UnsafeViewHelper extends AbstractViewHelper
     // ...
 }
 
-// SECURE: Opt back into escaping, or escape manually for the correct context
-final class SafeViewHelper extends AbstractViewHelper
+// SECURE (option A): Let Fluid's default pipeline escape once. Return the value
+// raw; Fluid applies htmlspecialchars() at render time because $escapeOutput is true.
+final class SafeTextViewHelper extends AbstractViewHelper
 {
-    protected $escapeOutput = true;
+    protected $escapeOutput = true;   // default; shown for clarity
+
     public function render(): string
     {
-        return htmlspecialchars(
+        return (string)$this->arguments['value'];
+    }
+}
+
+// SECURE (option B): ViewHelper must emit an HTML fragment (wraps its value
+// in markup). Disable Fluid's auto-escape on the output so the fragment survives,
+// then escape the untrusted parts manually for the correct context.
+final class SafeFragmentViewHelper extends AbstractViewHelper
+{
+    protected $escapeOutput = false;  // fragment contains HTML; do not re-escape
+
+    public function render(): string
+    {
+        $value = htmlspecialchars(
             (string)$this->arguments['value'],
             ENT_QUOTES | ENT_HTML5,
             'UTF-8'
         );
+        return '<span class="tag">' . $value . '</span>';
     }
 }
 ```
@@ -174,8 +200,8 @@ A custom ViewHelper is often where Fluid's auto-escape safety is silently defeat
 **Detection:**
 ```bash
 # ViewHelpers that disable escape. Every hit needs justification.
-grep -rnP '\$escape(Output|Children)\s*=\s*false' \
-  --include='*.php' --include='*ViewHelper.php' .
+grep -rnE '\$escape(Output|Children)[[:space:]]*=[[:space:]]*false' \
+  --include='*.php' .
 ```
 
 ## Fluid 4 / TYPO3 13–14 changes to audit
@@ -185,16 +211,14 @@ Fluid 4 ships with TYPO3 13 and changes several escaping defaults. When upgradin
 | Area | Fluid 3 | Fluid 4 |
 |---|---|---|
 | Default escape behaviour of some numeric ViewHelpers | string-cast then escape | strict type check, may throw |
-| `f:format.raw` on `NULL` / missing variable | empty string | unchanged |
-| `f:security.ifAuthenticated` | requires explicit `frontendUser` / `backendUser` | unchanged |
-| Deprecated: `v:` namespace `vhs` third-party pack | used for many custom escapes | removed; update templates |
-| Namespaces declared via `{namespace vhs=...}` top-of-file | worked | removed; use inline `f:` core helpers |
+| Third-party `fluidtypo3/vhs` extension | ships with TYPO3 9–12 workflows | requires a TYPO3-13-compatible release; audit `ext_emconf.php` version constraints (not a Fluid-core change — vhs is a separate extension) |
+| `{namespace …}` top-of-file and `xmlns:…` form | both supported | both still supported in Fluid core; `xmlns:` form is preferred for IDE tooling and static analysis |
 
 A template-audit checklist for the 3 → 4 jump:
 
 - [ ] Run `typo3 extensionscanner:scan` against every site package; inspect every `templates:/Fluid` hit
-- [ ] `grep -rnP 'xmlns:[a-z]+' Resources/Private/Templates/` — any non-`f:` namespace likely comes from `vhs` or a removed third-party pack
-- [ ] `grep -rn '{namespace ' Resources/Private/Templates/` — same
+- [ ] `grep -rnE 'xmlns:[a-z]+' Resources/Private/Templates/` — non-core namespaces (vhs, f7t, in-house ViewHelper packs) need a TYPO3-13-compatible release or an in-house update; the declaration syntax itself is not removed
+- [ ] `grep -rn '{namespace ' Resources/Private/Templates/` — same audit question for the top-of-file declaration form
 - [ ] Review every `->f:format.raw()` hit on dynamic content; Fluid 4 does not change its semantics but the upgrade is a reasonable time to tighten them
 - [ ] Re-run an authenticated-crawler XSS scanner (e.g. nikto, zap) against key pages that use user-supplied content
 
@@ -208,7 +232,7 @@ A template-audit checklist for the 3 → 4 jump:
 - [ ] `f:cObject typoscriptObjectPath="{...}"` uses a hardcoded path
 - [ ] `f:link.external` / `f:uri.external` URIs are host-allowlisted in the controller
 - [ ] Custom ViewHelpers do not set `$escapeOutput = false` or `$escapeChildren = false` without explicit justification and manual context-appropriate escaping
-- [ ] Fluid 4 migration: removed `vhs` / third-party namespace declarations are audited and replaced
+- [ ] Fluid 4 migration: third-party ViewHelper packs (notably `vhs`) have TYPO3-13-compatible releases pinned in `ext_emconf.php`
 
 ## Related references
 

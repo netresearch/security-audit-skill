@@ -116,20 +116,20 @@ TYPO3 uses form protection tokens (CSRF tokens) for backend modules and install 
 declare(strict_types=1);
 
 use TYPO3\CMS\Core\FormProtection\FormProtectionFactory;
-use TYPO3\CMS\Core\FormProtection\BackendFormProtection;
+use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 
-// SECURE: Generate and validate CSRF tokens in backend modules
-final class BackendModuleController
+// SECURE: Generate and validate CSRF tokens in a backend Extbase module
+final class BackendModuleController extends ActionController
 {
     public function __construct(
         private readonly FormProtectionFactory $formProtectionFactory,
     ) {}
 
-    public function formAction(
-        ServerRequestInterface $request,
-        int $recordUid,                 // typically a route argument
-    ): ResponseInterface {
-        $formProtection = $this->formProtectionFactory->createFromRequest($request);
+    public function formAction(int $recordUid): ResponseInterface
+    {
+        // $this->request is an ExtbaseRequestInterface that also implements
+        // ServerRequestInterface — no positional request argument needed.
+        $formProtection = $this->formProtectionFactory->createFromRequest($this->request);
 
         // Generate token for a specific form/action combination
         $token = $formProtection->generateToken(
@@ -144,12 +144,10 @@ final class BackendModuleController
         return $this->htmlResponse();
     }
 
-    public function deleteAction(
-        ServerRequestInterface $request,
-        int $recordUid,                 // typically a route argument
-    ): ResponseInterface {
-        $formProtection = $this->formProtectionFactory->createFromRequest($request);
-        $token = $request->getParsedBody()['csrfToken'] ?? '';
+    public function deleteAction(int $recordUid): ResponseInterface
+    {
+        $formProtection = $this->formProtectionFactory->createFromRequest($this->request);
+        $token = (string)($this->request->getParsedBody()['csrfToken'] ?? '');
 
         // Validate token before processing
         if (!$formProtection->validateToken(
@@ -275,11 +273,13 @@ final class FileUploadService
     }
 }
 
-// FAL denies these file extensions by default (configurable in Install Tool):
-// php, php3, php4, php5, php6, php7, php8, phpsh, phtml, pht, phar,
-// shtml, cgi, pl, asp, aspx, js, htaccess, ...
-//
-// Configuration: $GLOBALS['TYPO3_CONF_VARS']['BE']['fileDenyPattern']
+// FAL's default deny pattern (FILE_DENY_PATTERN_DEFAULT):
+//   \.(php[3-8]?|phpsh|phtml|pht|phar|shtml|cgi)(\..*)?$|^\.htaccess$
+// Blocks: php, php3-php8, phpsh, phtml, pht, phar, shtml, cgi, .htaccess
+// NOT blocked by default: pl, asp, aspx, js, jsp, py, rb, sh, exe, ...
+// Tighten $GLOBALS['TYPO3_CONF_VARS']['BE']['fileDenyPattern'] if the host
+// stack serves any of these via an interpreter (IIS .asp/.aspx, Perl .pl,
+// or a misconfigured web server handling .js as a script).
 ```
 
 ## IgnoreValidation Annotation Risks

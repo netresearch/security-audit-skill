@@ -44,7 +44,10 @@ lib.productPrice {
 # All userFunc / preUserFunc / postUserFunc usages — every one needs manual review.
 # POSIX ERE (grep -E) does not portably support \s or \b; use character classes.
 grep -rnE '(^|[^A-Za-z])(pre|post)?[Uu]serFunc[[:space:]]*=' \
-  --include='*.typoscript' --include='*.ts' .
+  --include='*.typoscript' .
+# Note: legacy pre-TYPO3-10 repos may still use the .ts extension for TypoScript.
+# That extension collides with TypeScript source, so re-run the recipe scoped to
+# Configuration/TypoScript/ or typo3conf/ rather than adding --include='*.ts' globally.
 # Inside TCA / Services / YAML, the same concept reaches through 'userFunc' keys:
 grep -rnE "'userFunc'[[:space:]]*=>|\"userFunc\"[[:space:]]*=>" \
   --include='*.php' Configuration/ 2>/dev/null
@@ -75,8 +78,8 @@ The allowed marker prefixes inside `insertData` (`GP:`, `TSFE:`, `page:`, `field
 
 **Detection:**
 ```bash
-# insertData = 1 combined with GP: / POST: / cObj.data = *user* earlier in the same object
-grep -rnE 'stdWrap\.insertData[[:space:]]*=[[:space:]]*1' --include='*.typoscript' --include='*.ts' .
+# insertData = 1 combined with GP: / cObj.data = *user* earlier in the same object
+grep -rnE 'stdWrap\.insertData[[:space:]]*=[[:space:]]*1' --include='*.typoscript' .
 ```
 
 ### 3. `GP:`, `TSFE->fe_user`, and raw request data without `htmlSpecialChars`
@@ -101,18 +104,20 @@ lib.search {
 }
 ```
 
-`data = GP:…` / `data = POST:…` / `data = TSFE:fe_user|…` bring raw request or session content directly into the output pipeline. Any TEXT or COA_INT using this pattern without `htmlSpecialChars = 1` is an XSS sink.
+`data = GP:…` (TYPO3's merged GET+POST accessor) and `data = TSFE:fe_user|…` bring raw request or session content directly into the output pipeline; `register:` and `field:` can carry tainted content that was written earlier in the pipeline. Any TEXT or COA_INT using these patterns without `htmlSpecialChars = 1` is an XSS sink.
 
 **Detection:**
 ```bash
-# GP / POST reads feeding a cObject TEXT without a nearby htmlSpecialChars
-grep -rnP '\bdata\s*=\s*(GP|POST|GPvar|TSFE):' --include='*.typoscript' --include='*.ts' . \
+# Untrusted-input accessors feeding a cObject TEXT without a nearby htmlSpecialChars.
+# Note: GP is the documented merged GET+POST accessor; there is no bare POST: key.
+grep -rnE '(^|[^A-Za-z_])data[[:space:]]*=[[:space:]]*(GP|TSFE|register|field):' \
+  --include='*.typoscript' . \
   | while IFS= read -r hit; do
       file="${hit%%:*}"
       lineno=$(echo "$hit" | cut -d: -f2)
       # look for htmlSpecialChars within 10 lines of the hit
       awk -v n="$lineno" 'NR>=n-10 && NR<=n+10' "$file" \
-        | grep -q 'htmlSpecialChars\s*=\s*1' \
+        | grep -qE 'htmlSpecialChars[[:space:]]*=[[:space:]]*1' \
         || echo "$hit  # no htmlSpecialChars nearby"
   done
 ```
@@ -192,7 +197,7 @@ config.debug = 1
 ```bash
 # Site-wide no-cache or debug.
 grep -rnE 'config\.(no_cache|debug)[[:space:]]*=[[:space:]]*1' \
-  --include='*.typoscript' --include='*.ts' --include='*.yaml' .
+  --include='*.typoscript' --include='*.yaml' .
 ```
 
 ## TSconfig (backend)
@@ -245,7 +250,7 @@ Not a direct vulnerability, but flag during audit: does disabling advanced UI hi
 
 - [ ] All `userFunc` / `preUserFunc` / `postUserFunc` point at hardcoded, version-controlled callables — not at values influenced by sitepackage upload, forms, or pipeline inputs
 - [ ] `stdWrap.insertData = 1` is never applied to values that came from `GP:`, `POST:`, or untrusted database rows
-- [ ] Every `data = GP:…` / `data = POST:…` is followed by `htmlSpecialChars = 1` (or is wrapped in a cObject that escapes)
+- [ ] Every `data = GP:…` (merged GET+POST) and `data = TSFE:fe_user|…` is followed by `htmlSpecialChars = 1` (or is wrapped in a cObject that escapes)
 - [ ] `typolink.parameter.data = GP:…` is validated against an allowlist in a controller before reaching TypoScript
 - [ ] `typolink.ATagParams.data` is not sourced from request data
 - [ ] `config.no_cache = 1` and `config.debug = 1` do not appear in committed site configuration
