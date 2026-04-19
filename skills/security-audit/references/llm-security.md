@@ -260,14 +260,20 @@ jq -r '
   | .key as $name
   | (.value.args // [])
   | .[]
-  | select(test("@latest$")              # explicitly @latest
-        or (test("@[0-9]") | not))       # OR no @<version> suffix at all
+  # Only look at strings that are plausible npm package identifiers:
+  # start with @scope/... or a lowercase letter/digit. This excludes
+  # flags ("-y", "--latest") and filesystem paths ("/home/…", "./foo").
+  | select(type == "string" and test("^@[a-z0-9][a-z0-9._-]*/|^[a-z0-9][a-z0-9._-]*"))
+  | select(test("@latest$")                # explicitly @latest
+        or (test("@[0-9]") | not))          # OR no @<version> suffix
   | "\($name): unpinned package arg \(.)"
 ' mcp.json .claude/mcp.json 2>/dev/null
-# grep fallback (single-line configs only) — matches @latest or a package
-# arg that doesn't end in @<digit>; handles scoped and unscoped packages:
-grep -rnE '"@?[a-z0-9][a-z0-9._/-]*(@latest)?"' mcp.json .claude/mcp.json 2>/dev/null \
-  | grep -vE '@[0-9]+\.[0-9]' | grep -E '@latest|"[^"]*"$' || true
+# The jq path above parses the document. If jq is unavailable, a tight
+# grep fallback for single-line configs — only matches quoted strings
+# that look like npm package identifiers (not flags / paths / URLs):
+grep -rhoE '"(@[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._/-]*|[a-z0-9][a-z0-9._-]*)(@latest)?"' \
+  mcp.json .claude/mcp.json 2>/dev/null \
+  | grep -vE '@[0-9]+\.[0-9]+' | sort -u
 
 # HTTP (non-HTTPS) MCP server URLs
 grep -rnE '"url":[[:space:]]*"http://' mcp.json .claude/mcp.json
@@ -451,23 +457,29 @@ Execute the query using parameterized input:
 # Unrestricted Bash access in skills
 grep -rnE 'allowed-tools:.*Bash\(\*\)' skills/*/SKILL.md AGENTS.md
 
-# Bash with no command restrictions. Use awk so we can inspect each tool entry
+# Bash with no command restrictions. We need to inspect each tool entry
 # individually — a simple `grep -v 'Bash('` would drop lines that MIX scoped
 # and unscoped Bash (e.g. "Bash(git status), Bash, Read"), which is exactly
-# the dangerous case we want to catch.
+# the dangerous case we want to catch. The Claude Code format is
+# space-separated; other harnesses use commas. Tokenize on both at top level,
+# respecting parentheses so "Bash(git status)" stays one token.
 awk '
   /allowed-tools:/ {
     sub(/.*allowed-tools:[[:space:]]*/, "")
-    # Split on commas; Bash(...) entries stay intact because commas inside
-    # parens are not at top level (awk split is naive — for production use a
-    # proper parser).
-    n = split($0, parts, /,[[:space:]]*/)
-    for (i = 1; i <= n; i++) {
-      if (parts[i] ~ /^Bash[[:space:]]*$/ || parts[i] == "Bash") {
-        print FILENAME ":" FNR ": unconstrained Bash — " $0
-        break
-      }
+    line = $0; depth = 0; token = ""
+    for (i = 1; i <= length(line); i++) {
+      c = substr(line, i, 1)
+      if (c == "(")      { depth++; token = token c }
+      else if (c == ")") { depth--; token = token c }
+      else if (depth == 0 && (c == "," || c == " ")) {
+        if (token == "Bash") {
+          print FILENAME ":" FNR ": unconstrained Bash — " $0
+          token = ""; break
+        }
+        token = ""
+      } else { token = token c }
     }
+    if (token == "Bash") print FILENAME ":" FNR ": unconstrained Bash — " $0
   }
 ' skills/*/SKILL.md
 
@@ -588,22 +600,32 @@ You are a cleanup assistant.
 }
 ```
 
-The hook scripts (`check_risky_command.py`, `gate_executable_writes.py`) read the tool input from stdin, decide whether to allow/warn/block, and signal the result via exit code. A minimal Bash-command gate looks like:
+Hook scripts read the tool input from stdin, decide what to do, and signal the result via exit code. Two conventions are common:
+
+- **Warn-only** — print a `<system-reminder>` to stdout and `sys.exit(0)`. Claude sees the message but the tool call still runs. This is what ships in `scripts/check_risky_command.py` (`data.get("command")` shape).
+- **Blocking** — `sys.exit(2)` to block the tool call outright. Claude Code treats exit 2 as a hard block; the message on stderr surfaces to the user.
+
+A minimal **blocking** gate — distinct from the shipped warn-only script — looks like this:
 
 ```python
-# scripts/check_risky_command.py
+# scripts/gate_destructive_bash.py (not the same as check_risky_command.py;
+# this one blocks instead of warning).
 import json, re, sys
 
 DANGEROUS = re.compile(
     r"(rm\s+-rf|DROP\s+TABLE|mkfs|dd\s+if=|git\s+push.*--force|curl[^|]*\|[^|]*(ba)?sh)",
     re.IGNORECASE,
 )
-data = json.load(sys.stdin)
-cmd = (data.get("tool_input", {}) or {}).get("command", "")
+try:
+    data = json.load(sys.stdin)
+except json.JSONDecodeError:
+    sys.exit(0)
+# PreToolUse hook payload: {"tool_name": "Bash", "tool_input": {"command": "..."}, ...}
+cmd = (data.get("tool_input") or {}).get("command") or data.get("command", "")
 if DANGEROUS.search(cmd):
     print("Destructive command blocked — request manual execution from the user.",
           file=sys.stderr)
-    sys.exit(2)  # exit 2 blocks the tool call in Claude Code
+    sys.exit(2)
 sys.exit(0)
 ```
 
@@ -615,29 +637,34 @@ grep -rnE 'Bash\(\*\)' skills/*/SKILL.md AGENTS.md .claude/settings*
 
 # Skills with more tools than likely needed. Don't naively split on spaces —
 # `Bash(git status)` is a single tool but contains a space. awk walks the
-# string and respects parentheses.
-grep -n 'allowed-tools:' skills/*/SKILL.md | awk -F'allowed-tools:' '
-  {
-    line = $2
+# string and respects parentheses. Read files directly so FILENAME/FNR are
+# meaningful (piping through grep would make FILENAME the literal "-").
+awk '
+  /allowed-tools:/ {
+    raw = $0
+    sub(/.*allowed-tools:[[:space:]]*/, "", raw)
     n = 0; depth = 0; token = ""
-    for (i = 1; i <= length(line); i++) {
-      c = substr(line, i, 1)
+    for (i = 1; i <= length(raw); i++) {
+      c = substr(raw, i, 1)
       if (c == "(")      { depth++; token = token c }
       else if (c == ")") { depth--; token = token c }
       else if (depth == 0 && (c == "," || c == " ")) {
-        if (token ~ /[A-Za-z]/) { n++ }
+        if (token ~ /[A-Za-z]/) n++
         token = ""
       } else { token = token c }
     }
     if (token ~ /[A-Za-z]/) n++
-    if (n > 6) print FILENAME ": " n " tools — " $0
+    if (n > 6) print FILENAME ":" FNR ": " n " tools — " $0
   }
-'
+' skills/*/SKILL.md
 
-# Missing hooks.json or empty hooks (real schema is event-keyed object)
-[ ! -f .claude/hooks.json ] && echo "WARNING: No hooks.json found"
-jq -e '.hooks | objects | to_entries | length > 0' .claude/hooks.json >/dev/null 2>&1 \
-  || echo "WARNING: hooks.json exists but declares no event handlers"
+# hooks.json presence + shape. Guard the jq check so we do not emit a second
+# "declares no event handlers" warning when the file is simply missing.
+if [ ! -f .claude/hooks.json ]; then
+  echo "WARNING: No .claude/hooks.json found"
+elif ! jq -e '.hooks | objects | to_entries | length > 0' .claude/hooks.json >/dev/null 2>&1; then
+  echo "WARNING: .claude/hooks.json exists but declares no event handlers"
+fi
 
 # Skills with write + network access (high privilege combination)
 grep -lE "allowed-tools:.*Write" skills/*/SKILL.md | xargs grep -lE "WebFetch|WebSearch|Bash"
@@ -1086,17 +1113,25 @@ done
 # live inside the hook script). Audit the scripts themselves:
 jq -r '.. | .command? // empty' .claude/hooks.json 2>/dev/null | sort -u | while read -r cmd; do
   [ -z "$cmd" ] && continue
-  # Resolve ${CLAUDE_PLUGIN_ROOT} / ${CLAUDE_SKILL_DIR} to the repo root for audit:
-  script=$(echo "$cmd" | awk '{print $NF}' | sed 's|\${CLAUDE_[A-Z_]*}|.|')
+  # Resolve ${CLAUDE_PLUGIN_ROOT} / ${CLAUDE_SKILL_DIR} to the repo root for audit.
+  # Pick the FIRST token that looks like a script (.py/.sh/.js/.rb/.ts)
+  # rather than the last — the script path can appear before trailing args
+  # (e.g., "python3 scripts/foo.py --verbose").
+  script=$(echo "$cmd" \
+    | awk '{for(i=1;i<=NF;i++) if($i ~ /\.(py|sh|js|rb|ts|mjs|cjs)$/) {print $i; exit}}' \
+    | sed 's|\${CLAUDE_[A-Z_]*}|.|')
+  [ -z "$script" ] && continue   # shell builtin or embedded command, not a script
   [ -r "$script" ] || { echo "MISSING: hook script $script not readable"; continue; }
   # Flag scripts that do nothing (no exit-2 path) — they cannot block:
   grep -qE 'sys\.exit\(2\)|exit[[:space:]]+2\b' "$script" \
     || echo "WARNING: $script never exits 2 — it cannot block a tool call"
 done
 
-# 4. Dangerous shell constructs inside hook commands themselves
+# 4. Dangerous shell constructs inside hook commands themselves.
+# Use word-boundary alternation so "rm …" and "eval …" at the start of a
+# command are caught (requiring a leading space would miss them).
 jq -r '.. | .command? // empty' .claude/hooks.json 2>/dev/null \
-  | grep -iE 'curl|wget|[[:space:]]eval[[:space:]]|[[:space:]]rm[[:space:]]|\|[[:space:]]*(ba)?sh' \
+  | grep -iE '(^|[[:space:]])(curl|wget|eval|rm)([[:space:]]|$)|\|[[:space:]]*(ba)?sh' \
   && echo "WARNING: Hook commands themselves contain potentially dangerous constructs"
 ```
 
