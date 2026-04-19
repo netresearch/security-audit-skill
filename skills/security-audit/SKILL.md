@@ -56,43 +56,41 @@ $stmt->execute([$id]);
 echo htmlspecialchars($input, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 ```
 
-**API keys (encrypt at rest):**
+**API keys, passwords, randomness:**
 ```php
-$nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
-$encrypted = 'enc:' . base64_encode($nonce . sodium_crypto_secretbox($apiKey, $nonce, $key));
+$n = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+$enc = 'enc:' . base64_encode($n . sodium_crypto_secretbox($apiKey, $n, $key));
+password_hash($pw, PASSWORD_ARGON2ID);
+bin2hex(random_bytes(32));   // never mt_rand/rand
 ```
 
-**Password hashing + randomness:**
-```php
-$hash  = password_hash($password, PASSWORD_ARGON2ID);
-$token = bin2hex(random_bytes(32));   // never mt_rand/rand
-```
-
-Scanners (semgrep/opengrep, trivy, gitleaks): see `references/automated-scanning.md`.
+Automated scanners: `references/automated-scanning.md`.
 
 ## Security Checklist
 
-- [ ] `semgrep` (or `opengrep`), `trivy fs --severity HIGH,CRITICAL`, `gitleaks detect` clean
-- [ ] bcrypt/Argon2 passwords, CSRF tokens on state changes, TLS 1.2+
-- [ ] Input validated server-side; parameterized SQL; XML entities off (LIBXML_NONET)
+- [ ] `semgrep`/`opengrep`, `trivy fs --severity HIGH,CRITICAL`, `gitleaks` clean
+- [ ] bcrypt/Argon2 passwords, CSRF on state changes, TLS 1.2+
+- [ ] Server-side input validation; parameterized SQL; XML entities off
 - [ ] Output encoding + CSP; no unserialize() on user input
-- [ ] API keys encrypted (sodium_crypto_secretbox); exception messages sanitized
-- [ ] Secrets out of VCS; audit logging enabled
-- [ ] File uploads validated, renamed, outside web root
-- [ ] Headers: HSTS, X-Content-Type-Options; dependencies scanned
+- [ ] API keys encrypted; exception messages sanitized
+- [ ] Secrets out of VCS; audit logging on
+- [ ] Uploads validated, renamed, outside web root
+- [ ] Headers HSTS + X-Content-Type-Options; dependencies scanned
 
 ## GitHub Actions Security
 
 - **NEVER** interpolate `${{ inputs.* }}` / `${{ github.event.* }}` in `run:` — use `env:`
-- Dependency triage: upgrade > override > dismiss with rationale
-- See `references/gha-security.md`
+- Dependency triage: upgrade > override > dismiss. Full patterns: `references/gha-security.md`.
 
 ## Verification
 
 ```bash
-./scripts/security-audit.sh /path/to/project    # PHP
-./scripts/github-security-audit.sh owner/repo   # GitHub
+./scripts/security-audit-dispatcher.sh /path/to/project  # auto-detect stack
+./scripts/security-audit.sh /path/to/project             # PHP-only
+./scripts/github-security-audit.sh owner/repo            # GH repo
 ```
+
+Dispatcher detects the stack from indicator files and runs matching `scripts/scanners/*.sh` (17 ecosystems; see `references/` index).
 
 ---
 
