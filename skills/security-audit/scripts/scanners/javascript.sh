@@ -32,7 +32,7 @@ scan_js() {
     for dir in "${SCAN_DIRS[@]}"; do
         local matches
         # shellcheck disable=SC2086
-        matches=$(grep -rn -E "$pattern" "$dir" $JS_INCLUDES --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.next --exclude-dir=coverage 2>/dev/null || true)
+        matches=$(grep -rn -P "$pattern" "$dir" $JS_INCLUDES --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.next --exclude-dir=coverage 2>/dev/null || true)
         if [[ -n "$matches" ]]; then
             results+="$matches"$'\n'
         fi
@@ -47,7 +47,7 @@ scan_js_count() {
     for dir in "${SCAN_DIRS[@]}"; do
         local count
         # shellcheck disable=SC2086
-        count=$(grep -rn -E "$pattern" "$dir" $JS_INCLUDES --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.next --exclude-dir=coverage 2>/dev/null | wc -l || echo "0")
+        count=$(grep -rn -P "$pattern" "$dir" $JS_INCLUDES --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.next --exclude-dir=coverage 2>/dev/null | wc -l || echo "0")
         total=$((total + count))
     done
     echo "$total"

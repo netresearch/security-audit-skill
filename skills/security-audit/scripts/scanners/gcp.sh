@@ -13,7 +13,7 @@ WARNINGS=0
 scan_iac() {
     local pattern="$1"
     local limit="${2:-5}"
-    grep -rn -E "$pattern" "$PROJECT_DIR" \
+    grep -rn -P "$pattern" "$PROJECT_DIR" \
         --include="*.tf" --include="*.json" --include="*.yaml" --include="*.yml" \
         2>/dev/null | head -"$limit" || true
 }

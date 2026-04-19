@@ -4,6 +4,17 @@
 #
 # Checks for: API keys, tokens, passwords, private keys, cloud credentials,
 # database connection strings, and other sensitive values in source code and git history.
+#
+# Requires Bash 4+ (uses associative arrays via `declare -A`). macOS /bin/bash
+# is 3.2 — install GNU bash via Homebrew and invoke via that newer binary.
+
+# Fail fast with a clear message under Bash 3.x.
+if (( BASH_VERSINFO[0] < 4 )); then
+    echo "ERROR: scripts/scanners/secrets.sh requires Bash 4+ (current: $BASH_VERSION)" >&2
+    echo "  macOS ships Bash 3.2 as /bin/bash; install GNU bash via Homebrew and" >&2
+    echo "  re-run the dispatcher under that binary." >&2
+    exit 1
+fi
 
 set -e
 
@@ -84,8 +95,16 @@ EXCLUDE_FILES="\.(lock|sum|min\.js|min\.css|map|woff|woff2|ttf|eot|png|jpg|jpeg|
 
 for name in "${!SECRET_PATTERNS[@]}"; do
     pattern="${SECRET_PATTERNS[$name]}"
-    MATCHES=$(grep -rn -E "$pattern" "$PROJECT_DIR" \
-        --include="*.{js,ts,jsx,tsx,py,java,cs,go,rs,rb,php,yaml,yml,json,xml,env,cfg,conf,ini,toml,properties,sh,bash,zsh}" \
+    # GNU/BSD grep --include does NOT support brace expansion; pass each
+    # extension as a separate --include flag.
+    MATCHES=$(grep -rn -P "$pattern" "$PROJECT_DIR" \
+        --include="*.js" --include="*.ts" --include="*.jsx" --include="*.tsx" \
+        --include="*.py" --include="*.java" --include="*.cs" --include="*.go" \
+        --include="*.rs" --include="*.rb" --include="*.php" \
+        --include="*.yaml" --include="*.yml" --include="*.json" --include="*.xml" \
+        --include="*.env" --include="*.cfg" --include="*.conf" --include="*.ini" \
+        --include="*.toml" --include="*.properties" \
+        --include="*.sh" --include="*.bash" --include="*.zsh" \
         2>/dev/null | grep -vE "$EXCLUDE_DIRS" | grep -vE "$EXCLUDE_FILES" | grep -vE "\.(example|sample|template)" | head -5 || true)
 
     if [[ -n "$MATCHES" ]]; then
@@ -98,7 +117,10 @@ done
 # === Check for .env files in repo ===
 echo ""
 echo "=== Environment Files ==="
-ENV_FILES=$(find "$PROJECT_DIR" -maxdepth 3 -name ".env" -o -name ".env.local" -o -name ".env.production" 2>/dev/null | grep -vE "$EXCLUDE_DIRS" || true)
+# Parenthesise the -name alternations so -maxdepth 3 applies to all of them
+# (without parens, -maxdepth binds only to the first -name and the others
+# search the whole tree).
+ENV_FILES=$(find "$PROJECT_DIR" -maxdepth 3 \( -name ".env" -o -name ".env.local" -o -name ".env.production" \) 2>/dev/null | grep -vE "$EXCLUDE_DIRS" || true)
 if [[ -n "$ENV_FILES" ]]; then
     echo "WARNING: Environment files found (should not be in VCS):"
     echo "$ENV_FILES"

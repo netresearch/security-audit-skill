@@ -39,7 +39,7 @@ scan_joomla() {
     local results=""
     for dir in "${SCAN_DIRS[@]}"; do
         local matches
-        matches=$(grep -rn -E "$pattern" "$dir" --include="*.php" 2>/dev/null || true)
+        matches=$(grep -rn -P "$pattern" "$dir" --include="*.php" 2>/dev/null || true)
         if [[ -n "$matches" ]]; then
             results+="$matches"$'\n'
         fi

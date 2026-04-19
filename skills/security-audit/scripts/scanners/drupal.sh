@@ -46,7 +46,7 @@ scan_drupal() {
     local results=""
     for dir in "${SCAN_DIRS[@]}"; do
         local matches
-        matches=$(grep -rn -E "$pattern" "$dir" --include="*.php" --include="*.module" --include="*.install" 2>/dev/null || true)
+        matches=$(grep -rn -P "$pattern" "$dir" --include="*.php" --include="*.module" --include="*.install" 2>/dev/null || true)
         if [[ -n "$matches" ]]; then
             results+="$matches"$'\n'
         fi
@@ -59,7 +59,7 @@ scan_drupal_count() {
     local total=0
     for dir in "${SCAN_DIRS[@]}"; do
         local count
-        count=$(grep -rn -E "$pattern" "$dir" --include="*.php" --include="*.module" --include="*.install" 2>/dev/null | wc -l || echo "0")
+        count=$(grep -rn -P "$pattern" "$dir" --include="*.php" --include="*.module" --include="*.install" 2>/dev/null | wc -l || echo "0")
         total=$((total + count))
     done
     echo "$total"

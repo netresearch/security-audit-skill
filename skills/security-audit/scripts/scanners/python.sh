@@ -31,9 +31,9 @@ scan_py() {
         local matches
         if [[ "$dir" == "$PROJECT_DIR" ]]; then
             # Only scan .py files in root, not recursively (subdirs handled separately)
-            matches=$(grep -n -E "$pattern" "$dir"/*.py 2>/dev/null || true)
+            matches=$(grep -n -P "$pattern" "$dir"/*.py 2>/dev/null || true)
         else
-            matches=$(grep -rn -E "$pattern" "$dir" --include="*.py" 2>/dev/null || true)
+            matches=$(grep -rn -P "$pattern" "$dir" --include="*.py" 2>/dev/null || true)
         fi
         if [[ -n "$matches" ]]; then
             results+="$matches"$'\n'
@@ -49,9 +49,9 @@ scan_py_count() {
     for dir in "${SCAN_DIRS[@]}"; do
         local count
         if [[ "$dir" == "$PROJECT_DIR" ]]; then
-            count=$(grep -n -E "$pattern" "$dir"/*.py 2>/dev/null | wc -l || echo "0")
+            count=$(grep -n -P "$pattern" "$dir"/*.py 2>/dev/null | wc -l || echo "0")
         else
-            count=$(grep -rn -E "$pattern" "$dir" --include="*.py" 2>/dev/null | wc -l || echo "0")
+            count=$(grep -rn -P "$pattern" "$dir" --include="*.py" 2>/dev/null | wc -l || echo "0")
         fi
         total=$((total + count))
     done
