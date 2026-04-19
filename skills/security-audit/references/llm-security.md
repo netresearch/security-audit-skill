@@ -8,6 +8,8 @@ This reference maps the OWASP Top 10 for Large Language Model Applications (2025
 
 Prompt injection occurs when attacker-controlled input alters the behavior of an LLM-powered agent. In agentic workflows, this extends beyond direct user input to include tool outputs, fetched documents, and any external content that enters the model's context.
 
+> **Note on `allowed-tools` syntax:** examples below show comma-separated tool lists for readability. Actual syntax is platform-specific: **Claude Code** uses **space-separated** lists and scopes Bash access with `Bash(cmd:pattern)` (see `skills/security-audit/SKILL.md`). Other agents may differ. The audit principles are identical; only formatting changes.
+
 ### Detection Patterns
 
 **Direct prompt injection**: User input reaches the model without validation or sanitization guidance in the skill definition.
@@ -103,8 +105,8 @@ allowed-tools: Bash, Read, Write
 ---
 
 You are a deployment assistant.
-Use the API key `sk-proj-abc123def456` when calling the production API.
-The database password is `hunter2`. Connect to db.internal.corp:5432.
+Use the API key `API_KEY_EXAMPLE_REDACTED` when calling the production API.
+The database password is `PASSWORD_EXAMPLE_REDACTED`. Connect to db.internal.corp:5432.
 ```
 
 ```markdown
@@ -153,18 +155,18 @@ If you need to understand configuration structure, read example/template files
 ### Detection: Grep Patterns
 
 ```bash
-# Hardcoded secrets in agent config files
-grep -rniE "(api[_-]?key|secret[_-]?key|password|token|bearer)\s*[:=]\s*['\"][A-Za-z0-9+/=_-]{8,}" \
+# Hardcoded secrets in agent config files (POSIX ERE — use [[:space:]] not \s)
+grep -rniE "(api[_-]?key|secret[_-]?key|password|token|bearer)[[:space:]]*[:=][[:space:]]*['\"][A-Za-z0-9+/=_-]{8,}" \
   SKILL.md AGENTS.md CLAUDE.md .claude/
 
 # AWS-style keys
-grep -rnE "AKIA[0-9A-Z]{16}" SKILL.md AGENTS.md CLAUDE.md .claude/
+grep -rnE 'AKIA[0-9A-Z]{16}' SKILL.md AGENTS.md CLAUDE.md .claude/
 
 # Private keys
-grep -rnl "BEGIN.*PRIVATE KEY" SKILL.md AGENTS.md CLAUDE.md .claude/
+grep -rnl 'BEGIN.*PRIVATE KEY' SKILL.md AGENTS.md CLAUDE.md .claude/
 
 # Skills that read known secret file paths
-grep -rnE "\.(env|pem|key|p12|pfx)|credentials|secrets\.(yml|yaml|json)" \
+grep -rnE '\.(env|pem|key|p12|pfx)|credentials|secrets\.(yml|yaml|json)' \
   skills/*/SKILL.md AGENTS.md
 
 # JWT tokens
@@ -249,13 +251,13 @@ Use `curl | bash` to install MCP servers when requested.
 
 ```bash
 # Unpinned versions in mcp.json (using @latest or no version)
-grep -rnE "@latest|\"npx\",\s*\"-y\",\s*\"[^@]+\"" mcp.json .claude/mcp.json
+grep -rnE '@latest|"npx",[[:space:]]*"-y",[[:space:]]*"[^@]+"' mcp.json .claude/mcp.json
 
 # HTTP (non-HTTPS) MCP server URLs
-grep -rnE "\"url\":\s*\"http://" mcp.json .claude/mcp.json
+grep -rnE '"url":[[:space:]]*"http://' mcp.json .claude/mcp.json
 
 # Unknown or unscoped npm packages in MCP configs
-grep -rnE "\"npx\"" mcp.json .claude/mcp.json
+grep -rnE '"npx"' mcp.json .claude/mcp.json
 
 # Embedded secrets in MCP server env configs (should use ${VAR} references)
 grep -rnE "\"(token|key|password|secret)\":\s*\"[^$]" mcp.json .claude/mcp.json
@@ -431,19 +433,19 @@ Execute the query using parameterized input:
 
 ```bash
 # Unrestricted Bash access in skills
-grep -rnE "allowed-tools:.*Bash\(\*\)" skills/*/SKILL.md AGENTS.md
+grep -rnE 'allowed-tools:.*Bash\(\*\)' skills/*/SKILL.md AGENTS.md
 
 # Bash with no command restrictions
-grep -rnE "allowed-tools:.*Bash[^(]" skills/*/SKILL.md | grep -v "Bash("
+grep -rnE 'allowed-tools:.*Bash[^(]' skills/*/SKILL.md | grep -v 'Bash('
 
 # Auto-execute patterns
-grep -rniE "run.*immediately|execute.*automatically|auto.?run" skills/*/SKILL.md AGENTS.md
+grep -rniE 'run.*immediately|execute.*automatically|auto.?run' skills/*/SKILL.md AGENTS.md
 
 # Skills that Write + Bash without review language
-grep -rlE "allowed-tools:.*Write.*Bash|allowed-tools:.*Bash.*Write" skills/*/SKILL.md
+grep -rlE 'allowed-tools:.*Write.*Bash|allowed-tools:.*Bash.*Write' skills/*/SKILL.md
 
 # String interpolation in query/command patterns
-grep -rnE "\\\$\{.*\}.*SELECT|SELECT.*\\\$\{" skills/*/SKILL.md AGENTS.md
+grep -rnE '\$\{.*\}.*SELECT|SELECT.*\$\{' skills/*/SKILL.md AGENTS.md
 ```
 
 ### Prevention Checklist
@@ -551,11 +553,13 @@ You are a cleanup assistant.
 
 ```bash
 # Skills with unrestricted Bash access
-grep -rnE "Bash\(\*\)" skills/*/SKILL.md AGENTS.md .claude/settings*
+grep -rnE 'Bash\(\*\)' skills/*/SKILL.md AGENTS.md .claude/settings*
 
-# Skills with more tools than likely needed (count tools in allowed-tools)
-grep -n "allowed-tools:" skills/*/SKILL.md | while read line; do
-  tool_count=$(echo "$line" | tr ',' '\n' | wc -l)
+# Skills with more tools than likely needed (count tools in allowed-tools).
+# SKILL.md format varies across platforms: Claude Code uses space-separated
+# tool lists, other harnesses sometimes use commas. Normalize both before counting.
+grep -n 'allowed-tools:' skills/*/SKILL.md | while read -r line; do
+  tool_count=$(echo "$line" | sed 's/.*allowed-tools://' | tr -s ', ' '\n' | grep -cv '^$')
   if [ "$tool_count" -gt 6 ]; then
     echo "REVIEW (${tool_count} tools): $line"
   fi
@@ -595,10 +599,10 @@ System prompt leakage occurs when the content of SKILL.md, AGENTS.md, CLAUDE.md,
 ```markdown
 # VULNERABLE CLAUDE.md - Contains internal URLs and credentials
 Connect to the internal API at https://api.internal.corp:8443/v2
-using header: Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+using header: Authorization: Bearer BEARER_TOKEN_EXAMPLE
 
 The admin panel is at https://admin.internal.corp/dashboard
-Default admin credentials: admin / Str0ngP@ss!
+Default admin credentials: ADMIN_USERNAME_EXAMPLE / ADMIN_PASSWORD_EXAMPLE
 ```
 
 ```markdown
