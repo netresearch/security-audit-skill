@@ -1382,3 +1382,2534 @@ llm_reviews:
       Report specific injection vectors and their remediation.
     severity: error
     desc: "Review GitHub Actions for injection vectors, permission scope, and secret exposure"
+
+  # === Imported from evandervecht/security-audit-skill fork (2026-04-19) ===
+  # Per-language, per-framework, cloud, mobile, and IaC checkpoints.
+  # Authored by E van der Vecht (MIT + CC-BY-SA-4.0 dual-licensed).
+  # Consumed by scripts/security-audit-dispatcher.sh and scripts/scanners/*.sh.
+
+  # === SECURITY DOCUMENTATION ===
+  # === SECRETS NOT IN VCS ===
+  # === COMPOSER AUDIT IN CI ===
+  # === XXE PREVENTION ===
+  # Use command type to avoid false positives from glob fallback to config files
+  # === SQL INJECTION PREVENTION ===
+  # === XSS PREVENTION ===
+  # Use command type to avoid false positives from glob fallback to config files
+  # === DEPENDABOT FOR SECURITY ===
+  # === DESERIALIZATION PREVENTION ===
+  # === INSECURE PASSWORD HASHING ===
+  # === COMMAND INJECTION ===
+  # === INSECURE RANDOMNESS ===
+  # === INFORMATION DISCLOSURE ===
+  # === FILE UPLOAD SAFETY ===
+  # === COOKIE SECURITY ===
+  # === OPEN REDIRECT ===
+  # === SECURITY HEADERS ===
+  # === CODE INJECTION (CWE-94) ===
+  # === IDOR (CWE-639) ===
+  # === SECRET SCANNING ===
+  # === SUPPLY CHAIN ===
+  # === TYPE JUGGLING (CWE-843) ===
+  # === PHAR DESERIALIZATION (CWE-502) ===
+  # === SSTI (CWE-1336) ===
+  # === EMAIL HEADER INJECTION (CWE-93) ===
+  # === LDAP INJECTION (CWE-90) ===
+  # === INSECURE TOKEN GENERATION (CWE-330) ===
+  # === LOG INJECTION / CRLF (CWE-117) ===
+  # === SESSION FIXATION (CWE-384) ===
+  # === HOST HEADER POISONING (CWE-644) ===
+  # === MASS ASSIGNMENT (CWE-915) ===
+  # === SAST TOOLING ===
+  # === DEPENDENCY SCANNING ===
+  # === GITLEAKS IN CI ===
+  # === PATH TRAVERSAL PREVENTION (CWE-22) ===
+  # === SEMGREP IN CI ===
+  # === SECURITY POLICY ===
+  # === INFRASTRUCTURE-AS-CODE SECURITY ===
+  - id: SA-IAC-01
+    type: command
+    target: "! grep -rqP '^USER\\s+root' Dockerfile* 2>/dev/null || ! grep -rqP '^USER\\s' Dockerfile* 2>/dev/null"
+    severity: warning
+    desc: "Dockerfile should not run as root - add a USER directive with a non-root user"
+
+
+  - id: SA-IAC-02
+    type: command
+    target: "! grep -rqE '(COPY|ADD).*\\.env' Dockerfile* 2>/dev/null"
+    severity: error
+    desc: "Dockerfile must not copy .env files into image layers (secrets leak)"
+
+
+  - id: SA-IAC-03
+    type: command
+    target: "! grep -rqE 'ARG.*(PASSWORD|SECRET|TOKEN|API_KEY)' Dockerfile* 2>/dev/null"
+    severity: error
+    desc: "Dockerfile ARG must not contain secrets (visible in image history)"
+
+
+  - id: SA-IAC-04
+    type: command
+    target: "! grep -rqE '^FROM\\s+\\w+\\s*$' Dockerfile* 2>/dev/null"
+    severity: warning
+    desc: "Dockerfile base images should be pinned to specific tags or digests, not latest"
+
+
+  - id: SA-IAC-05
+    type: command
+    target: "! grep -rqE 'privileged:\\s*true' docker-compose*.yml 2>/dev/null"
+    severity: error
+    desc: "Docker Compose must not use privileged mode (container escape risk)"
+
+
+  - id: SA-IAC-06
+    type: command
+    target: "! grep -rqE '/var/run/docker\\.sock' docker-compose*.yml 2>/dev/null"
+    severity: error
+    desc: "Docker Compose must not mount Docker socket (container escape risk)"
+
+
+  - id: SA-IAC-07
+    type: command
+    target: "! grep -rqE 'runAsUser:\\s*0' k8s/ kubernetes/ deploy/ manifests/ charts/ 2>/dev/null"
+    severity: error
+    desc: "Kubernetes pods must not run as root (runAsUser: 0)"
+
+
+  - id: SA-IAC-08
+    type: command
+    target: "! grep -rqE 'hostNetwork:\\s*true' k8s/ kubernetes/ deploy/ manifests/ charts/ 2>/dev/null"
+    severity: error
+    desc: "Kubernetes pods should not use host networking"
+
+
+  - id: SA-IAC-09
+    type: command
+    target: "! grep -rqE 'cidr_blocks.*0\\.0\\.0\\.0/0' *.tf **/*.tf 2>/dev/null"
+    severity: warning
+    desc: "Terraform security groups should not allow unrestricted ingress (0.0.0.0/0)"
+
+
+  - id: SA-IAC-10
+    type: command
+    target: "! grep -rqE 'acl.*public' *.tf **/*.tf 2>/dev/null"
+    severity: warning
+    desc: "Terraform S3 buckets should not use public ACLs"
+
+
+  # === FRONTEND/CLIENT-SIDE SECURITY ===
+  - id: SA-FE-01
+    type: not_contains
+    target: "**/*.js"
+    pattern: ".innerHTML ="
+    severity: warning
+    desc: "Direct innerHTML assignment may enable DOM-based XSS - use textContent or sanitize"
+
+
+  - id: SA-FE-02
+    type: not_contains
+    target: "**/*.js"
+    pattern: "document.write("
+    severity: warning
+    desc: "document.write() may enable DOM-based XSS - use DOM manipulation methods"
+
+
+  - id: SA-FE-03
+    type: command
+    target: "! grep -rqE 'eval\\s*\\(' --include='*.js' --include='*.ts' . 2>/dev/null"
+    severity: warning
+    desc: "eval() in JavaScript enables code injection - use safer alternatives"
+
+
+  - id: SA-FE-04
+    type: command
+    target: "! grep -rqE 'localStorage\\.(set|get)Item.*(token|password|secret|key|credential|session)' --include='*.js' --include='*.ts' . 2>/dev/null"
+    severity: error
+    desc: "Sensitive data (tokens, passwords, secrets) must not be stored in localStorage"
+
+
+  - id: SA-FE-05
+    type: command
+    target: "! grep -rqE 'Access-Control-Allow-Origin.*\\*' --include='*.php' --include='*.js' --include='*.conf' --include='*.yaml' --include='*.yml' . 2>/dev/null"
+    severity: warning
+    desc: "CORS wildcard (*) origin should be avoided - use specific allowed origins"
+
+
+  - id: SA-FE-06
+    type: command
+    target: "! grep -rqE 'new Function\\s*\\(' --include='*.js' --include='*.ts' . 2>/dev/null"
+    severity: warning
+    desc: "new Function() enables dynamic code execution - use safer alternatives"
+
+
+  # === AI/LLM AGENT SECURITY ===
+  - id: SA-AI-01
+    type: command
+    target: "! grep -rqE '(api_key|apiKey|API_KEY|secret|password|token)\\s*[:=]\\s*[\"'\\''](sk-|AKIA|ghp_|ghs_)' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
+    severity: error
+    desc: "AI agent config files must not contain hardcoded API keys or secrets"
+
+
+  - id: SA-AI-02
+    type: command
+    target: "! grep -rqE 'dangerouslyDisableSandbox|--no-verify|--force' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
+    severity: error
+    desc: "AI agent configs must not disable safety mechanisms (sandbox, hooks, verification)"
+
+
+  - id: SA-AI-03
+    type: command
+    target: "! grep -rqE 'Bash\\(\\*\\)|allowed-tools:.*Bash\\b[^(]' SKILL.md skills/*/SKILL.md 2>/dev/null"
+    severity: warning
+    desc: "AI skills should not grant unrestricted Bash access - scope to specific commands"
+
+
+  - id: SA-AI-04
+    type: command
+    target: "! grep -rqE '\"version\"\\s*:\\s*\"latest\"' .claude/mcp*.json mcp.json 2>/dev/null"
+    severity: warning
+    desc: "MCP server versions should be pinned, not 'latest' (supply chain risk)"
+
+
+  # === JAVASCRIPT/TYPESCRIPT SECURITY ===
+  - id: SA-JS-01
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "eval\\("
+    severity: error
+    desc: "eval() usage detected - potential code injection"
+
+
+  - id: SA-JS-02
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "\\.innerHTML\\s*="
+    severity: error
+    desc: "innerHTML assignment detected - potential DOM XSS"
+
+
+  - id: SA-JS-03
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "document\\.write\\("
+    severity: error
+    desc: "document.write() usage detected - potential DOM XSS"
+
+
+  - id: SA-JS-04
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "addEventListener\\(.message"
+    severity: warning
+    desc: "postMessage handler detected - verify origin validation"
+
+
+  - id: SA-JS-05
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "Math\\.random\\(\\)"
+    severity: warning
+    desc: "Math.random() is not cryptographically secure - use crypto.getRandomValues()"
+
+
+  - id: SA-JS-06
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "__proto__"
+    severity: error
+    desc: "__proto__ access detected - potential prototype pollution"
+
+
+  - id: SA-JS-07
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "new\\s+Function\\("
+    severity: error
+    desc: "Function constructor detected - equivalent to eval()"
+
+
+  - id: SA-JS-08
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "setTimeout\\(\\s*['\"`]"
+    severity: error
+    desc: "setTimeout with string argument - implicit eval()"
+
+
+  - id: SA-JS-09
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "\\.outerHTML\\s*="
+    severity: error
+    desc: "outerHTML assignment detected - potential DOM XSS"
+
+
+  - id: SA-JS-10
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "\\bdebugger\\b"
+    severity: warning
+    desc: "debugger statement detected - must not ship to production"
+
+
+  - id: SA-JS-11
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "require\\(.serialize-javascript"
+    severity: warning
+    desc: "serialize-javascript outputs executable JS - ensure output is never eval'd"
+
+
+  - id: SA-JS-12
+    type: regex
+    target: "**/*.{ts,tsx}"
+    pattern: ":\\s*any\\b"
+    severity: warning
+    desc: "TypeScript 'any' type disables type checking - use 'unknown' for untrusted input"
+
+
+  - id: SA-JS-13
+    type: regex
+    target: "**/*.{ts,tsx}"
+    pattern: "as\\s+unknown\\s+as"
+    severity: error
+    desc: "Double type assertion bypasses TypeScript safety - use runtime validation"
+
+
+  - id: SA-JS-14
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "import\\([^)]*\\$\\{"
+    severity: error
+    desc: "Dynamic import with template variable - potential module injection"
+
+
+  - id: SA-JS-15
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "setInterval\\(\\s*['\"`]"
+    severity: error
+    desc: "setInterval with string argument - implicit eval()"
+
+
+  - id: SA-JS-17
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "postMessage\\([^,]+,\\s*['\"]\\*['\"]"
+    severity: error
+    desc: "postMessage with wildcard origin - data exposed to any frame"
+
+
+  # === NODE.JS SERVER-SIDE SECURITY (Phase 3) ===
+  - id: SA-NODE-01
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "child_process.*exec\\("
+    severity: error
+    desc: "child_process.exec() with potential command injection — use execFile or spawn instead"
+
+
+  - id: SA-NODE-02
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "fs\\.(readFile|writeFile|readdir|unlink).*req\\.(query|params|body)"
+    severity: error
+    desc: "fs operation with user input — validate and restrict paths with path.resolve + startsWith"
+
+
+  - id: SA-NODE-03
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "require\\s*\\(\\s*['\"]vm2?['\"]\\s*\\)"
+    severity: error
+    desc: "vm/vm2 module is not a security boundary — use OS-level isolation for untrusted code"
+
+
+  - id: SA-NODE-04
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "Buffer\\.(allocUnsafe|allocUnsafeSlow)\\s*\\("
+    severity: warning
+    desc: "Buffer.allocUnsafe returns uninitialized memory — use Buffer.alloc unless fully overwritten"
+
+
+  - id: SA-NODE-05
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "require\\s*\\(\\s*[^'\"\\s].*[+`]"
+    severity: error
+    desc: "Dynamic require() with variable path — use an allowlist of permitted modules"
+
+
+  - id: SA-NODE-06
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "(hashSync|compareSync|pbkdf2Sync|scryptSync)\\s*\\("
+    severity: warning
+    desc: "Synchronous crypto in request handler blocks event loop — use async variant"
+
+
+  - id: SA-NODE-07
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "res\\.(setHeader|writeHead)\\s*\\([^)]*req\\.(query|params|body|headers)"
+    severity: error
+    desc: "User input in HTTP response header — risk of CRLF injection"
+
+
+  - id: SA-NODE-08
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "Math\\.random\\s*\\("
+    severity: warning
+    desc: "Math.random() is not cryptographically secure — use crypto.randomUUID() or crypto.randomBytes()"
+
+
+  - id: SA-NODE-09
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "http\\.createServer\\s*\\("
+    severity: warning
+    desc: "http.createServer — verify headersTimeout, requestTimeout, and body size limits are set"
+
+
+  - id: SA-NODE-10
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "Object\\.assign\\s*\\([^,]+,\\s*req\\.(body|query|params)"
+    severity: error
+    desc: "Object.assign with user input — risk of prototype pollution"
+
+
+  - id: SA-NODE-11
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "\\beval\\s*\\("
+    severity: error
+    desc: "eval() executes arbitrary code — use safe alternatives"
+
+
+  - id: SA-NODE-12
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "createHash\\s*\\(\\s*['\"]md5['\"]"
+    severity: warning
+    desc: "MD5 is cryptographically broken — use SHA-256 or stronger"
+
+
+  - id: SA-NODE-13
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "createHash\\s*\\(\\s*['\"]sha1['\"]"
+    severity: warning
+    desc: "SHA-1 is cryptographically weak — use SHA-256 or stronger"
+
+
+  - id: SA-NODE-14
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "new\\s+Function\\s*\\("
+    severity: error
+    desc: "new Function() is equivalent to eval — use safe alternatives"
+
+
+  - id: SA-NODE-15
+    type: regex
+    target: "**/*.{js,ts,mjs,cjs}"
+    pattern: "fetch\\s*\\(\\s*req\\.(query|params|body)"
+    severity: error
+    desc: "fetch with user-supplied URL — risk of SSRF, validate and restrict URLs"
+
+
+  # === PYTHON SECURITY CHECKS (Phase 4) ===
+  - id: SA-PY-01
+    type: regex
+    target: "**/*.py"
+    pattern: "pickle\\.(loads|load)\\("
+    severity: error
+    desc: "Insecure deserialization via pickle"
+
+
+  - id: SA-PY-02
+    type: regex
+    target: "**/*.py"
+    pattern: "eval\\("
+    severity: error
+    desc: "Code injection via eval()"
+
+
+  - id: SA-PY-03
+    type: regex
+    target: "**/*.py"
+    pattern: "exec\\("
+    severity: error
+    desc: "Code injection via exec()"
+
+
+  - id: SA-PY-04
+    type: regex
+    target: "**/*.py"
+    pattern: "subprocess\\.\\w+\\(.*shell\\s*=\\s*True"
+    severity: error
+    desc: "Command injection via subprocess with shell=True"
+
+
+  - id: SA-PY-05
+    type: regex
+    target: "**/*.py"
+    pattern: "os\\.system\\("
+    severity: error
+    desc: "Command injection via os.system()"
+
+
+  - id: SA-PY-06
+    type: regex
+    target: "**/*.py"
+    pattern: "yaml\\.load\\("
+    severity: error
+    desc: "Unsafe YAML loading — use yaml.safe_load() instead"
+
+
+  - id: SA-PY-07
+    type: regex
+    target: "**/*.py"
+    pattern: "execute\\(f\""
+    severity: error
+    desc: "SQL injection via f-string in query"
+
+
+  - id: SA-PY-08
+    type: regex
+    target: "**/*.py"
+    pattern: "execute\\(.*\\.format\\("
+    severity: error
+    desc: "SQL injection via .format() in query"
+
+
+  - id: SA-PY-09
+    type: regex
+    target: "**/*.py"
+    pattern: "hashlib\\.md5\\("
+    severity: warning
+    desc: "Weak hash algorithm MD5 — use SHA-256+ or argon2 for passwords"
+
+
+  - id: SA-PY-10
+    type: regex
+    target: "**/*.py"
+    pattern: "hashlib\\.sha1\\("
+    severity: warning
+    desc: "Weak hash algorithm SHA1 — use SHA-256+ for integrity checks"
+
+
+  - id: SA-PY-11
+    type: regex
+    target: "**/*.py"
+    pattern: "tempfile\\.mktemp\\("
+    severity: error
+    desc: "Deprecated tempfile.mktemp() has race condition — use mkstemp()"
+
+
+  - id: SA-PY-12
+    type: regex
+    target: "**/*.py"
+    pattern: "__import__\\("
+    severity: warning
+    desc: "Dynamic import via __import__() — validate module names against a whitelist"
+
+
+  - id: SA-PY-13
+    type: regex
+    target: "**/*.py"
+    pattern: "xml\\.etree\\.ElementTree"
+    severity: warning
+    desc: "Standard library XML parser — use defusedxml to prevent XXE attacks"
+
+
+  - id: SA-PY-14
+    type: regex
+    target: "**/*.py"
+    pattern: "Template\\s*\\(.*\\w+.*\\)"
+    severity: warning
+    desc: "Jinja2/Mako Template with variable input — risk of SSTI"
+
+
+  - id: SA-PY-15
+    type: regex
+    target: "**/*.py"
+    pattern: "os\\.popen\\("
+    severity: error
+    desc: "Command injection via os.popen()"
+
+
+  - id: SA-PY-16
+    type: regex
+    target: "**/*.py"
+    pattern: "compile\\(.*,.*,"
+    severity: warning
+    desc: "compile() with dynamic input — risk of code injection"
+
+
+  - id: SA-PY-17
+    type: regex
+    target: "**/*.py"
+    pattern: "shelve\\.open\\("
+    severity: warning
+    desc: "shelve uses pickle internally — insecure deserialization risk"
+
+
+  - id: SA-PY-18
+    type: regex
+    target: "**/*.py"
+    pattern: "marshal\\.loads\\("
+    severity: warning
+    desc: "Insecure deserialization via marshal"
+
+
+  # === RUBY SECURITY CHECKS (Phase 4) ===
+  - id: SA-RB-01
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\beval\\s*\\("
+    severity: error
+    desc: "eval() usage — potential code injection"
+
+
+  - id: SA-RB-02
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\.send\\s*\\("
+    severity: warning
+    desc: "send() with dynamic method — potential method injection"
+
+
+  - id: SA-RB-03
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\bsystem\\s*\\("
+    severity: warning
+    desc: "system() call — verify no user input in command string"
+
+
+  - id: SA-RB-04
+    type: regex
+    target: "**/*.rb"
+    pattern: "Marshal\\.load\\s*\\("
+    severity: error
+    desc: "Marshal.load — insecure deserialization of untrusted data"
+
+
+  - id: SA-RB-05
+    type: regex
+    target: "**/*.rb"
+    pattern: "YAML\\.load\\s*\\("
+    severity: error
+    desc: "YAML.load without safe_load — insecure deserialization risk"
+
+
+  - id: SA-RB-06
+    type: regex
+    target: "**/*.rb"
+    pattern: "ERB\\.new\\s*\\("
+    severity: warning
+    desc: "ERB.new — audit for template injection with user input"
+
+
+  - id: SA-RB-07
+    type: regex
+    target: "**/*.rb"
+    pattern: "find_by_sql\\s*\\("
+    severity: error
+    desc: "find_by_sql — risk of SQL injection with string interpolation"
+
+
+  - id: SA-RB-08
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\.html_safe\\b"
+    severity: warning
+    desc: "html_safe bypasses Rails XSS escaping — audit for user input"
+
+
+  - id: SA-RB-09
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\braw\\s*\\("
+    severity: warning
+    desc: "raw() bypasses Rails XSS escaping — audit for user input"
+
+
+  - id: SA-RB-10
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\bKernel\\.open\\s*\\("
+    severity: error
+    desc: "Kernel.open — pipe injection and SSRF risk with user input"
+
+
+  - id: SA-RB-11
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\.permit!\\b"
+    severity: error
+    desc: "permit! allows all params — mass assignment vulnerability"
+
+
+  - id: SA-RB-12
+    type: regex
+    target: "**/*.rb"
+    pattern: "Digest::MD5"
+    severity: warning
+    desc: "MD5 is cryptographically broken — use SHA-256 or bcrypt"
+
+
+  - id: SA-RB-13
+    type: regex
+    target: "**/*.rb"
+    pattern: "Digest::SHA1"
+    severity: warning
+    desc: "SHA-1 is cryptographically weak — use SHA-256 or stronger"
+
+
+  - id: SA-RB-14
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\bexec\\s*\\("
+    severity: warning
+    desc: "exec() call — verify no user input in command string"
+
+
+  - id: SA-RB-15
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\bopen\\s*\\(\\s*[\"']\\|"
+    severity: error
+    desc: "open() with pipe prefix — direct command execution"
+
+
+  # === JAVA SECURITY CHECKS (Phase 2) ===
+  - id: SA-JAVA-01
+    type: regex
+    target: "**/*.java"
+    pattern: "new\\s+ObjectInputStream\\s*\\("
+    severity: error
+    desc: "ObjectInputStream deserialization — risk of RCE via gadget chains"
+
+
+  - id: SA-JAVA-02
+    type: regex
+    target: "**/*.java"
+    pattern: "new\\s+XMLDecoder\\s*\\("
+    severity: error
+    desc: "XMLDecoder deserialization — enables arbitrary code execution"
+
+
+  - id: SA-JAVA-03
+    type: regex
+    target: "**/*.java"
+    pattern: "InitialContext\\s*\\(\\s*\\)[\\s\\S]{0,100}\\.lookup\\s*\\("
+    severity: error
+    desc: "JNDI lookup — risk of remote class loading (Log4Shell pattern)"
+
+
+  - id: SA-JAVA-04
+    type: regex
+    target: "**/*.java"
+    pattern: "Class\\.forName\\s*\\("
+    severity: warning
+    desc: "Reflection via Class.forName — risk of arbitrary class instantiation"
+
+
+  - id: SA-JAVA-05
+    type: regex
+    target: "**/*.java"
+    pattern: "(createStatement|executeQuery|executeUpdate)\\s*\\([^)]*\\+"
+    severity: error
+    desc: "JDBC string concatenation — SQL injection risk, use PreparedStatement"
+
+
+  - id: SA-JAVA-06
+    type: regex
+    target: "**/*.java"
+    pattern: "DocumentBuilderFactory\\.newInstance\\s*\\("
+    severity: warning
+    desc: "XML parsing without explicit XXE protection — disable external entities"
+
+
+  - id: SA-JAVA-07
+    type: regex
+    target: "**/*.java"
+    pattern: "Runtime\\.getRuntime\\s*\\(\\s*\\)\\.exec\\s*\\("
+    severity: error
+    desc: "Runtime.exec — command injection risk, use ProcessBuilder with array args"
+
+
+  - id: SA-JAVA-08
+    type: regex
+    target: "**/*.java"
+    pattern: "getInstance\\s*\\(\\s*\"(MD5|SHA-1)\"\\s*\\)"
+    severity: warning
+    desc: "Weak hash algorithm (MD5/SHA-1) — use SHA-256 or stronger"
+
+
+  - id: SA-JAVA-09
+    type: regex
+    target: "**/*.java"
+    pattern: "new\\s+Random\\s*\\("
+    severity: warning
+    desc: "java.util.Random is predictable — use SecureRandom for security operations"
+
+
+  - id: SA-JAVA-10
+    type: regex
+    target: "**/*.java"
+    pattern: "Cipher\\.getInstance\\s*\\(\\s*\"(DES|.*ECB)"
+    severity: error
+    desc: "Weak cipher (DES/ECB) — use AES-GCM for authenticated encryption"
+
+
+  - id: SA-JAVA-11
+    type: regex
+    target: "**/*.java"
+    pattern: "(openConnection|openStream)\\s*\\(\\s*\\)"
+    severity: warning
+    desc: "URL.openConnection/openStream — SSRF risk, validate and restrict URLs"
+
+
+  - id: SA-JAVA-12
+    type: regex
+    target: "**/*.java"
+    pattern: "new\\s+File\\s*\\(\\s*[^)]*\\+\\s*(request|req|param|input|args)"
+    severity: warning
+    desc: "File path from user input — path traversal risk, validate canonical path"
+
+
+  # === C# SECURITY CHECKS (Phase 2) ===
+  - id: SA-CS-01
+    type: regex
+    target: "**/*.cs"
+    pattern: "new\\s+BinaryFormatter\\s*\\("
+    severity: error
+    desc: "BinaryFormatter deserialization — RCE risk, use System.Text.Json"
+
+
+  - id: SA-CS-02
+    type: regex
+    target: "**/*.cs"
+    pattern: "new\\s+NetDataContractSerializer\\s*\\("
+    severity: error
+    desc: "NetDataContractSerializer — insecure deserialization with type embedding"
+
+
+  - id: SA-CS-03
+    type: regex
+    target: "**/*.cs"
+    pattern: "FromSqlRaw\\s*\\(\\s*\\$"
+    severity: error
+    desc: "FromSqlRaw with interpolation — SQL injection, use FromSqlInterpolated"
+
+
+  - id: SA-CS-04
+    type: regex
+    target: "**/*.cs"
+    pattern: "new\\s+XmlDocument\\s*\\("
+    severity: warning
+    desc: "XmlDocument — set XmlResolver=null and disable DTD processing"
+
+
+  - id: SA-CS-05
+    type: regex
+    target: "**/*.cs"
+    pattern: "Process\\.Start\\s*\\("
+    severity: warning
+    desc: "Process.Start — command injection risk, set UseShellExecute=false"
+
+
+  - id: SA-CS-06
+    type: regex
+    target: "**/*.cs"
+    pattern: "MD5\\.Create\\s*\\("
+    severity: warning
+    desc: "MD5 is cryptographically broken — use SHA256 or stronger"
+
+
+  - id: SA-CS-07
+    type: regex
+    target: "**/*.cs"
+    pattern: "SHA1\\.Create\\s*\\("
+    severity: warning
+    desc: "SHA-1 is cryptographically weak — use SHA256 or stronger"
+
+
+  - id: SA-CS-08
+    type: regex
+    target: "**/*.cs"
+    pattern: "new\\s+Random\\s*\\("
+    severity: warning
+    desc: "System.Random is predictable — use RandomNumberGenerator for security"
+
+
+  - id: SA-CS-09
+    type: regex
+    target: "**/*.cs"
+    pattern: "DESCryptoServiceProvider"
+    severity: error
+    desc: "DES is broken (56-bit key) — use AES-GCM"
+
+
+  - id: SA-CS-10
+    type: regex
+    target: "**/*.cs"
+    pattern: "AllowAnyOrigin\\s*\\("
+    severity: error
+    desc: "CORS AllowAnyOrigin — use explicit origin allowlist"
+
+
+  - id: SA-CS-11
+    type: regex
+    target: "**/*.cs"
+    pattern: "DirectorySearcher\\s*\\(\\s*\\$"
+    severity: error
+    desc: "LDAP injection via DirectorySearcher with interpolation"
+
+
+  - id: SA-CS-12
+    type: regex
+    target: "**/*.cs"
+    pattern: "UseShellExecute\\s*=\\s*true"
+    severity: warning
+    desc: "UseShellExecute=true passes args through shell — set to false"
+
+
+  # === GO SECURITY CHECKS ===
+  - id: SA-GO-01
+    type: regex
+    target: "**/*.go"
+    pattern: "unsafe\\.(Pointer|Sizeof|Slice|String|Offsetof|Alignof)"
+    severity: warning
+    desc: "unsafe package usage — bypasses Go memory safety, audit required"
+
+
+  - id: SA-GO-02
+    type: regex
+    target: "**/*.go"
+    pattern: "\"text/template\""
+    severity: error
+    desc: "text/template does not escape HTML — use html/template for web output"
+
+
+  - id: SA-GO-03
+    type: regex
+    target: "**/*.go"
+    pattern: "(Sprintf|\"\\s*\\+).*(SELECT|INSERT|UPDATE|DELETE|select|insert|update|delete)"
+    severity: error
+    desc: "SQL string concatenation — use parameterized queries"
+
+
+  - id: SA-GO-04
+    type: regex
+    target: "**/*.go"
+    pattern: "exec\\.Command\\s*\\(\\s*\"(sh|bash|cmd|powershell)\""
+    severity: error
+    desc: "Shell invocation via exec.Command — risk of command injection"
+
+
+  - id: SA-GO-05
+    type: regex
+    target: "**/*.go"
+    pattern: "filepath\\.Join\\s*\\(.*\\b(r\\.|req\\.|request\\.|URL)"
+    severity: warning
+    desc: "filepath.Join with user input — validate resolved path stays within base"
+
+
+  - id: SA-GO-06
+    type: regex
+    target: "**/*.go"
+    pattern: "InsecureSkipVerify\\s*:\\s*true"
+    severity: error
+    desc: "TLS certificate verification disabled — enables MITM attacks"
+
+
+  - id: SA-GO-07
+    type: regex
+    target: "**/*.go"
+    pattern: "\"math/rand\""
+    severity: warning
+    desc: "math/rand is not cryptographically secure — use crypto/rand for secrets"
+
+
+  - id: SA-GO-08
+    type: regex
+    target: "**/*.go"
+    pattern: "http\\.(Get|Post|Head)\\s*\\(.*\\b(r\\.|req\\.|request\\.|URL)"
+    severity: error
+    desc: "HTTP request with user-controlled URL — SSRF risk"
+
+
+  - id: SA-GO-09
+    type: regex
+    target: "**/*.go"
+    pattern: "log\\.(Print|Fatal|Panic)(f|ln)?\\s*\\("
+    severity: warning
+    desc: "Unstructured logging — use log/slog for security event logging"
+
+
+  - id: SA-GO-10
+    type: regex
+    target: "**/*.go"
+    pattern: "Header\\(\\)\\.Set\\s*\\(.*\\b(r\\.|req\\.)"
+    severity: warning
+    desc: "HTTP header set with request data — risk of header injection"
+
+
+  - id: SA-GO-11
+    type: regex
+    target: "**/*.go"
+    pattern: "VersionTLS1[01]\\b"
+    severity: error
+    desc: "TLS 1.0/1.1 is insecure — use TLS 1.2 or higher"
+
+
+  - id: SA-GO-12
+    type: regex
+    target: "**/*.go"
+    pattern: "(password|secret|apiKey|token)\\s*[:=]\\s*\"[^\"]{8,}\""
+    severity: error
+    desc: "Potential hardcoded credential — use environment variables or secret manager"
+
+
+  # === RUST SECURITY CHECKS ===
+  - id: SA-RS-01
+    type: regex
+    target: "**/*.rs"
+    pattern: "unsafe\\s*\\{|unsafe\\s+fn\\s|unsafe\\s+impl\\s"
+    severity: warning
+    desc: "unsafe block/fn/impl — bypasses Rust safety guarantees, audit required"
+
+
+  - id: SA-RS-02
+    type: regex
+    target: "**/*.rs"
+    pattern: "extern\\s+\"C\"\\s*\\{|#\\[no_mangle\\]"
+    severity: warning
+    desc: "FFI boundary — audit for null pointers, lifetime issues, and error handling"
+
+
+  - id: SA-RS-03
+    type: regex
+    target: "**/*.rs"
+    pattern: "panic!\\s*\\(|todo!\\s*\\(|unimplemented!\\s*\\("
+    severity: warning
+    desc: "panic!/todo!/unimplemented! in code — can cause DoS via unwinding"
+
+
+  - id: SA-RS-04
+    type: regex
+    target: "**/*.rs"
+    pattern: "\\.unwrap\\(\\)|\\.expect\\(\\s*\""
+    severity: warning
+    desc: ".unwrap()/.expect() can panic — use ? or match in production paths"
+
+
+  - id: SA-RS-05
+    type: regex
+    target: "**/*.rs"
+    pattern: "as\\s+\\*const\\s|as\\s+\\*mut\\s"
+    severity: warning
+    desc: "Raw pointer cast — potential use-after-free or null deref in unsafe code"
+
+
+  - id: SA-RS-06
+    type: regex
+    target: "**/*.rs"
+    pattern: "sql_query\\s*\\(\\s*format!|query.*&format!"
+    severity: error
+    desc: "SQL query with format! string — use parameterized queries"
+
+
+  - id: SA-RS-07
+    type: regex
+    target: "**/*.rs"
+    pattern: "Command::new\\s*\\(\\s*\"(sh|bash|cmd|powershell)\""
+    severity: error
+    desc: "Shell invocation via Command::new — risk of command injection"
+
+
+  - id: SA-RS-08
+    type: regex
+    target: "**/*.rs"
+    pattern: "\\.join\\s*\\(.*\\b(req|input|param|query|user)"
+    severity: warning
+    desc: "Path join with user input — validate resolved path stays within base"
+
+
+  - id: SA-RS-09
+    type: regex
+    target: "**/*.rs"
+    pattern: "serde_json::from_(str|slice|reader)\\s*\\("
+    severity: warning
+    desc: "Deserialization of potentially untrusted data — enforce size limits"
+
+
+  - id: SA-RS-10
+    type: regex
+    target: "**/*.rs"
+    pattern: "==\\s*(token|secret|hmac|hash|key|password|mac|signature)"
+    severity: error
+    desc: "Non-constant-time comparison of secret — use constant_time_eq"
+
+
+  - id: SA-RS-11
+    type: regex
+    target: "**/*.rs"
+    pattern: "mem::forget\\s*\\(|ManuallyDrop::new\\s*\\("
+    severity: warning
+    desc: "mem::forget/ManuallyDrop prevents cleanup — sensitive data may persist"
+
+
+  - id: SA-RS-12
+    type: regex
+    target: "**/*.rs"
+    pattern: "(password|secret|api_key|token)\\s*[:=]\\s*\"[^\"]{8,}\""
+    severity: error
+    desc: "Potential hardcoded credential — use environment variables or secret manager"
+
+
+  # === VUE.JS SECURITY CHECKS ===
+  - id: SA-VUE-01
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: "v-html\\s*="
+    severity: warning
+    desc: "v-html directive — potential XSS if used with user input"
+
+
+  - id: SA-VUE-02
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: "Vue\\.compile\\s*\\("
+    severity: error
+    desc: "Vue.compile() with dynamic input — potential template injection"
+
+
+  - id: SA-VUE-03
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: ":(href|src)\\s*=\\s*\"[^\"]*[a-zA-Z]"
+    severity: warning
+    desc: "v-bind:href/src with variable — validate URL protocol to prevent javascript: XSS"
+
+
+  - id: SA-VUE-04
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: "beforeEnter\\s*:|beforeEach\\s*\\("
+    severity: warning
+    desc: "Client-side route guard — ensure server-side authorization exists"
+
+
+  - id: SA-VUE-05
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: "(computed|watch|methods)\\s*:\\s*\\{[^}]*eval\\s*\\("
+    severity: error
+    desc: "eval() in Vue reactivity hook — potential code injection"
+
+
+  - id: SA-VUE-06
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: "(defineStore|new\\s+Vuex\\.Store)\\s*\\([^)]*\\{[\\s\\S]*?(token|secret|password|apiKey|api_key|ssn|creditCard)"
+    severity: error
+    desc: "Sensitive data in Vuex/Pinia store — exposed via DevTools"
+
+
+  - id: SA-VUE-07
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: "(asyncData|serverPrefetch|fetch)\\s*\\([^)]*\\)\\s*\\{[\\s\\S]*?(secret|internal|private|apiKey|connectionString)"
+    severity: error
+    desc: "SSR hydration may leak server-only data to client HTML"
+
+
+  - id: SA-VUE-08
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: "Vue\\.mixin\\s*\\(|app\\.mixin\\s*\\("
+    severity: warning
+    desc: "Global mixin — applies to every component, audit for side effects"
+
+
+  # === ANGULAR SECURITY CHECKS ===
+  - id: SA-ANG-01
+    type: regex
+    target: "**/*.{ts,html}"
+    pattern: "bypassSecurityTrust(Html|Script|Url|ResourceUrl)\\s*\\("
+    severity: error
+    desc: "bypassSecurityTrust* disables Angular sanitization — audit for user input"
+
+
+  - id: SA-ANG-02
+    type: regex
+    target: "**/*.{ts,html}"
+    pattern: "compiler\\.compileModuleAndAllComponentsAsync|Component\\(\\s*\\{\\s*template\\s*:"
+    severity: error
+    desc: "Dynamic template compilation — potential template injection"
+
+
+  - id: SA-ANG-03
+    type: regex
+    target: "**/*.{ts,html}"
+    pattern: "@Pipe[\\s\\S]*?bypassSecurityTrust"
+    severity: error
+    desc: "Pipe with bypassSecurityTrust — reusable sanitization bypass"
+
+
+  - id: SA-ANG-04
+    type: regex
+    target: "**/*.{ts,html}"
+    pattern: "\\[innerHTML\\]\\s*="
+    severity: warning
+    desc: "innerHTML binding — verify input is sanitized before binding"
+
+
+  - id: SA-ANG-05
+    type: regex
+    target: "**/*.{ts,html}"
+    pattern: "canActivate|CanActivate|canLoad|CanLoad"
+    severity: warning
+    desc: "Client-side route guard — ensure server-side authorization exists"
+
+
+  - id: SA-ANG-06
+    type: regex
+    target: "**/*.{ts,html}"
+    pattern: "HttpInterceptor[\\s\\S]*?intercept\\s*\\("
+    severity: warning
+    desc: "HTTP interceptor — verify tokens are only sent to trusted origins"
+
+
+  - id: SA-ANG-07
+    type: regex
+    target: "**/*.{ts,html}"
+    pattern: "eval\\s*\\([^)]*\\)|new\\s+Function\\s*\\("
+    severity: error
+    desc: "eval/new Function in Angular code — potential code injection"
+
+
+  - id: SA-ANG-08
+    type: regex
+    target: "**/*.{ts,html}"
+    pattern: "ngZone\\.run\\s*\\([\\s\\S]*?(password|token|secret|creditCard|ssn|apiKey)"
+    severity: warning
+    desc: "Sensitive data in Zone.js context — may persist in memory"
+
+
+  # === REACT SECURITY CHECKS ===
+  - id: SA-REACT-01
+    type: regex
+    target: "**/*.{jsx,tsx}"
+    pattern: "dangerouslySetInnerHTML"
+    severity: warning
+    desc: "dangerouslySetInnerHTML usage — potential XSS"
+
+
+  - id: SA-REACT-02
+    type: regex
+    target: "**/*.{jsx,tsx}"
+    pattern: "\\{\\s*\\.\\.\\.(?:user|props|data|input|params|query)"
+    severity: warning
+    desc: "Spreading user-controlled object as JSX props — may inject dangerouslySetInnerHTML"
+
+
+  - id: SA-REACT-03
+    type: regex
+    target: "**/*.{jsx,tsx}"
+    pattern: "href\\s*=\\s*\\{(?!['\"](https?:|mailto:|/)[^}])"
+    severity: warning
+    desc: "Dynamic href from variable — potential javascript: protocol XSS"
+
+
+  - id: SA-REACT-04
+    type: regex
+    target: "**/*.{jsx,tsx}"
+    pattern: "'use client'[\\s\\S]*?\\b(password|secret|token|ssn|creditCard|hash)\\b"
+    severity: warning
+    desc: "Client component may receive sensitive data as props — data visible in browser"
+
+
+  - id: SA-REACT-05
+    type: regex
+    target: "**/*.{jsx,tsx}"
+    pattern: "\\beval\\s*\\(|new\\s+Function\\s*\\("
+    severity: error
+    desc: "eval() or Function constructor — code injection risk"
+
+
+  - id: SA-REACT-06
+    type: regex
+    target: "**/*.{jsx,tsx}"
+    pattern: "useState\\s*\\(\\s*\\{[^}]*(token|secret|password|refreshToken|cvv|ssn|creditCard)"
+    severity: warning
+    desc: "Sensitive data in React state — visible in DevTools"
+
+
+  - id: SA-REACT-07
+    type: regex
+    target: "**/*.{jsx,tsx}"
+    pattern: "useEffect\\s*\\(\\s*\\(\\)\\s*=>\\s*\\{[^}]*fetch\\s*\\([^)]*\\)\\.then"
+    severity: warning
+    desc: "useEffect fetch without visible auth — verify credentials are included"
+
+
+  - id: SA-REACT-08
+    type: regex
+    target: "**/*.{jsx,tsx}"
+    pattern: "key\\s*=\\s*\\{[^}]*(index|idx|i)\\s*\\}"
+    severity: info
+    desc: "Array index as React key — may cause state leaks between list items"
+
+
+  # === NEXT.JS SECURITY CHECKS ===
+  - id: SA-NEXT-01
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx}"
+    pattern: "'use server'[\\s\\S]*?export\\s+async\\s+function\\s+\\w+"
+    severity: warning
+    desc: "Server Action — verify auth/authorization check inside function body"
+
+
+  - id: SA-NEXT-02
+    type: regex
+    target: "**/*.{js,ts}"
+    pattern: "export\\s+async\\s+function\\s+(GET|POST|PUT|DELETE|PATCH)\\s*\\("
+    severity: warning
+    desc: "Next.js API route handler — verify authentication is enforced"
+
+
+  - id: SA-NEXT-03
+    type: regex
+    target: "**/*.env*"
+    pattern: "NEXT_PUBLIC_[A-Z_]*(SECRET|KEY|PASSWORD|TOKEN|CREDENTIAL|PRIVATE|DATABASE)"
+    severity: error
+    desc: "NEXT_PUBLIC_ env var with secret-like name — exposed to client bundle"
+
+
+  - id: SA-NEXT-04
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx}"
+    pattern: "(getServerSideProps|getStaticProps)[\\s\\S]*?return\\s*\\{\\s*props:"
+    severity: warning
+    desc: "getServerSideProps/getStaticProps return — verify no sensitive fields in props"
+
+
+  - id: SA-NEXT-05
+    type: regex
+    target: "**/next.config.{js,mjs,ts}"
+    pattern: "hostname:\\s*['\"]?\\*{1,2}['\"]?"
+    severity: error
+    desc: "Wildcard hostname in next/image config — SSRF risk via image optimization"
+
+
+  - id: SA-NEXT-06
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx}"
+    pattern: "Response\\.redirect\\s*\\([^)]*searchParams|redirect\\s*\\(\\s*(?:req|request)"
+    severity: warning
+    desc: "Redirect with user-controlled destination — potential open redirect"
+
+
+  - id: SA-NEXT-07
+    type: regex
+    target: "**/*.{js,ts,jsx,tsx}"
+    pattern: "JSON\\.stringify\\s*\\([^)]*(config|secret|user|session|token|key|credential)"
+    severity: warning
+    desc: "JSON.stringify of potentially sensitive object — may leak in RSC payload"
+
+
+  - id: SA-NEXT-08
+    type: regex
+    target: "**/*.{js,ts}"
+    pattern: "export\\s+async\\s+function\\s+POST\\s*\\([^)]*\\)\\s*\\{[^}]*(?:cookie|session|auth)"
+    severity: warning
+    desc: "POST handler with cookie/session auth — verify CSRF protection"
+
+
+  # === NUXT SECURITY CHECKS ===
+  - id: SA-NUXT-01
+    type: regex
+    target: "server/**/*.{js,ts}"
+    pattern: "defineEventHandler\\s*\\(\\s*async\\s*\\(\\s*event\\s*\\)"
+    severity: warning
+    desc: "Nitro server handler — verify authentication middleware is applied"
+
+
+  - id: SA-NUXT-02
+    type: regex
+    target: "**/*.{vue,js,ts}"
+    pattern: "useFetch\\s*\\(\\s*['\"][^'\"]*admin|useAsyncData\\s*\\(\\s*['\"][^'\"]*secret"
+    severity: warning
+    desc: "useFetch/useAsyncData fetching sensitive endpoint — data exposed in hydration payload"
+
+
+  - id: SA-NUXT-03
+    type: regex
+    target: "**/nuxt.config.{js,ts}"
+    pattern: "runtimeConfig[\\s\\S]*?public\\s*:\\s*\\{[^}]*(secret|password|token|key|credential|private|database)"
+    severity: error
+    desc: "Secret in runtimeConfig.public — exposed to client"
+
+
+  - id: SA-NUXT-04
+    type: regex
+    target: "**/*.vue"
+    pattern: "v-html\\s*="
+    severity: warning
+    desc: "v-html directive — potential XSS, especially dangerous in SSR context"
+
+
+  - id: SA-NUXT-05
+    type: regex
+    target: "server/**/*.{js,ts}"
+    pattern: "exec\\s*\\(|execSync\\s*\\(|\\$queryRawUnsafe\\s*\\("
+    severity: error
+    desc: "Shell exec or raw SQL in Nitro handler — injection risk"
+
+
+  - id: SA-NUXT-06
+    type: regex
+    target: "plugins/**/*.{js,ts}"
+    pattern: "defineNuxtPlugin\\s*\\(\\s*(?:async\\s*)?\\(\\s*nuxtApp\\s*\\)\\s*=>"
+    severity: info
+    desc: "Nuxt plugin without enforce/dependsOn — verify execution order for security plugins"
+
+
+  # === SPRING SECURITY CHECKS ===
+  - id: SA-SPRING-01
+    type: regex
+    target: "**/*.java"
+    pattern: "requestMatchers\\s*\\(\\s*\"\\/(api|admin)\\/\\*\\*\"\\s*\\)\\s*\\.\\s*permitAll\\s*\\(\\s*\\)"
+    severity: error
+    desc: "Spring Security permitAll overreach — verify scope is intentionally broad"
+
+
+  - id: SA-SPRING-02
+    type: regex
+    target: "**/*.java"
+    pattern: "parseExpression\\s*\\(\\s*[a-zA-Z_]\\w*\\s*\\)"
+    severity: error
+    desc: "SpEL expression parsed from untrusted input — injection risk"
+
+
+  - id: SA-SPRING-03
+    type: regex
+    target: "**/*.java"
+    pattern: "include\\s*:\\s*[\"']?\\*[\"']?|exposure\\.include\\s*=\\s*\\*"
+    severity: error
+    desc: "Spring Boot actuator wildcard exposure — secrets and heap dumps accessible"
+
+
+  - id: SA-SPRING-04
+    type: regex
+    target: "**/*.java"
+    pattern: "csrf\\s*\\(\\s*(?:csrf|c)\\s*->\\s*(?:csrf|c)\\.disable\\s*\\(\\s*\\)\\s*\\)|\\.csrf\\(\\)\\.disable\\(\\)"
+    severity: warning
+    desc: "CSRF protection disabled — verify endpoint is stateless (JWT/Bearer)"
+
+
+  - id: SA-SPRING-05
+    type: regex
+    target: "**/*.java"
+    pattern: "@PreAuthorize\\s*\\("
+    severity: warning
+    desc: "@PreAuthorize found — verify @EnableMethodSecurity is declared on a @Configuration class"
+
+
+  - id: SA-SPRING-06
+    type: regex
+    target: "**/*.java"
+    pattern: "return\\s+(?:request|param|input|query|\\w+)\\s*;"
+    severity: warning
+    desc: "Controller return value may be user-controlled — Thymeleaf SSTI risk"
+
+
+  - id: SA-SPRING-07
+    type: regex
+    target: "**/*.java"
+    pattern: "@ModelAttribute\\s+(?!.*Dto|.*Request|.*Form|.*Command)\\w+\\s+\\w+"
+    severity: warning
+    desc: "@ModelAttribute binds to entity directly — mass assignment risk"
+
+
+  - id: SA-SPRING-08
+    type: regex
+    target: "**/*.java"
+    pattern: "enableDefaultTyping\\s*\\(|activateDefaultTyping\\s*\\("
+    severity: error
+    desc: "Jackson default typing enabled — deserialization gadget chain risk"
+
+
+  # === .NET SECURITY CHECKS ===
+  - id: SA-DOTNET-01
+    type: regex
+    target: "**/*.cs"
+    pattern: "UseAuthentication\\s*\\(\\s*\\)[\\s\\S]{0,200}UseRouting\\s*\\(\\s*\\)|MapControllers\\s*\\(\\s*\\)[\\s\\S]{0,200}UseAuthentication\\s*\\(\\s*\\)|UseAuthorization\\s*\\(\\s*\\)[\\s\\S]{0,200}UseAuthentication\\s*\\(\\s*\\)"
+    severity: error
+    desc: "ASP.NET Core middleware ordering wrong — auth must come before routing/endpoints"
+
+
+  - id: SA-DOTNET-02
+    type: regex
+    target: "**/*.cs"
+    pattern: "FromSqlRaw\\s*\\(\\s*\\$\"|FromSqlRaw\\s*\\(\\s*\"[^\"]*\"\\s*\\+|ExecuteSqlRaw\\s*\\(\\s*\\$\"|ExecuteSqlRaw\\s*\\(\\s*\"[^\"]*\"\\s*\\+"
+    severity: error
+    desc: "Entity Framework raw SQL with string interpolation/concatenation — SQL injection"
+
+
+  - id: SA-DOTNET-03
+    type: regex
+    target: "**/*.cs"
+    pattern: "\\[AllowAnonymous\\]\\s*(?:\\r?\\n\\s*)*(?:public\\s+class|\\[(?:ApiController|Route)\\])"
+    severity: error
+    desc: "[AllowAnonymous] on controller class — all actions are publicly accessible"
+
+
+  - id: SA-DOTNET-04
+    type: regex
+    target: "**/*.cs"
+    pattern: "Html\\.Raw\\s*\\((?!.*Sanitiz)|@\\(\\s*\\(MarkupString\\)\\s*\\w+"
+    severity: error
+    desc: "Razor Html.Raw or MarkupString with unsanitized input — XSS risk"
+
+
+  - id: SA-DOTNET-05
+    type: regex
+    target: "**/*.cs"
+    pattern: "AllowAnyOrigin\\s*\\(\\s*\\)|SetIsOriginAllowed\\s*\\(\\s*_?\\s*=>\\s*true\\s*\\)"
+    severity: error
+    desc: "CORS policy allows any origin — credential theft via cross-origin requests"
+
+
+  - id: SA-DOTNET-06
+    type: regex
+    target: "**/*.cs"
+    pattern: "IgnoreAntiforgeryTokenAttribute\\s*\\(\\s*\\)|IgnoreAntiforgeryToken\\]"
+    severity: warning
+    desc: "Anti-forgery token validation disabled — CSRF risk"
+
+
+  - id: SA-DOTNET-07
+    type: regex
+    target: "**/*.cs"
+    pattern: "DisableAutomaticKeyGeneration\\s*\\(\\s*\\)"
+    severity: warning
+    desc: "Data Protection automatic key generation disabled — keys will expire without rotation"
+
+
+  - id: SA-DOTNET-08
+    type: regex
+    target: "**/*.cs"
+    pattern: "class\\s+\\w+Hub\\s*:\\s*Hub\\b"
+    severity: warning
+    desc: "SignalR hub found — verify [Authorize] attribute is applied"
+
+
+  # === BLAZOR SECURITY CHECKS ===
+  - id: SA-BLAZOR-01
+    type: regex
+    target: "**/*.{razor,cs}"
+    pattern: "Http\\.\\w+Async\\s*\\(\\s*\"[^\"]*(?:admin|secret|internal|private|manage)"
+    severity: error
+    desc: "Blazor WASM calling sensitive API — verify server-side [Authorize] enforcement"
+
+
+  - id: SA-BLAZOR-02
+    type: regex
+    target: "**/*.{razor,cs}"
+    pattern: "(?:private|protected|public)\\s+string\\s+(?:creditCard|cvv|ssn|password|secret|token|apiKey)\\s*="
+    severity: warning
+    desc: "Sensitive data stored in Blazor component state — exposure via circuit or prerender"
+
+
+  - id: SA-BLAZOR-03
+    type: regex
+    target: "**/*.{razor,cs}"
+    pattern: "InvokeVoidAsync\\s*\\(\\s*\"eval\"|InvokeAsync\\s*\\(\\s*\"eval\""
+    severity: error
+    desc: "JS interop calling eval — injection risk from untrusted input"
+
+
+  - id: SA-BLAZOR-04
+    type: regex
+    target: "**/*.{razor,cs}"
+    pattern: "\\[Authorize\\][\\s\\S]{0,200}prerender\\s*:\\s*true"
+    severity: warning
+    desc: "[Authorize] with prerender enabled — auth state may not be available during prerender"
+
+
+  - id: SA-BLAZOR-05
+    type: regex
+    target: "**/*.{razor,cs}"
+    pattern: "OnInitializedAsync[\\s\\S]{0,300}(?:Sensitive|Secret|Private|Confidential|GetCredentials|GetTokens)"
+    severity: warning
+    desc: "Sensitive data loaded in OnInitializedAsync — may leak via prerendering"
+
+
+  # === DJANGO SECURITY ===
+  - id: SA-DJANGO-01
+    type: regex
+    target: "**/*.py"
+    pattern: "\\.raw\\s*\\(\\s*f[\"']|\\.raw\\s*\\(\\s*[\"'].*%s.*[\"']\\s*%|\\.extra\\s*\\(|cursor\\.execute\\s*\\(\\s*f[\"']|cursor\\.execute\\s*\\(\\s*[\"'].*%s.*[\"']\\s*%"
+    severity: error
+    desc: "Django ORM injection via raw(), extra(), or cursor.execute() with string interpolation"
+
+
+  - id: SA-DJANGO-02
+    type: regex
+    target: "**/*.py"
+    pattern: "@csrf_exempt|csrf_exempt\\s*\\(|decorators\\.csrf\\s+import\\s+csrf_exempt"
+    severity: error
+    desc: "CSRF protection disabled via @csrf_exempt decorator"
+
+
+  - id: SA-DJANGO-03
+    type: regex
+    target: "**/*.py"
+    pattern: "DEBUG\\s*=\\s*True"
+    severity: error
+    desc: "Django DEBUG=True — exposes tracebacks, SQL queries, and settings in production"
+
+
+  - id: SA-DJANGO-04
+    type: regex
+    target: "**/*.py"
+    pattern: "mark_safe\\s*\\(|\\.safestring\\s+import|safestring\\.mark_safe"
+    severity: error
+    desc: "XSS risk via mark_safe() — bypasses Django auto-escaping"
+
+
+  - id: SA-DJANGO-05
+    type: regex
+    target: "**/*.py"
+    pattern: "SECRET_KEY\\s*=\\s*[\"'][^\"']{8,}[\"']"
+    severity: error
+    desc: "Django SECRET_KEY hardcoded in source — enables session/token forgery if leaked"
+
+
+  - id: SA-DJANGO-06
+    type: regex
+    target: "**/*.py"
+    pattern: "PickleSerializer|SESSION_SERIALIZER.*[Pp]ickle"
+    severity: error
+    desc: "Pickle session serializer — enables RCE if SECRET_KEY is compromised"
+
+
+  - id: SA-DJANGO-07
+    type: regex
+    target: "**/*.py"
+    pattern: "path\\s*\\(\\s*[\"']admin/[\"']|url\\s*\\(\\s*r?\\s*[\"'].*admin/"
+    severity: warning
+    desc: "Django admin on default /admin/ URL — consider obscuring path and adding IP restrictions"
+
+
+  - id: SA-DJANGO-08
+    type: regex
+    target: "**/*.py"
+    pattern: "FileField\\s*\\(\\s*upload_to\\s*=\\s*[\"'][^\"']*[\"'](?:\\s*\\)|\\s*,\\s*\\))|request\\.FILES\\["
+    severity: warning
+    desc: "File upload without visible validation — verify size, type, and filename sanitization"
+
+
+  # === FLASK SECURITY ===
+  - id: SA-FLASK-01
+    type: regex
+    target: "**/*.py"
+    pattern: "render_template_string\\s*\\("
+    severity: error
+    desc: "Flask render_template_string() — potential SSTI if user input reaches template"
+
+
+  - id: SA-FLASK-02
+    type: regex
+    target: "**/*.py"
+    pattern: "request\\.args\\s*\\[|request\\.args\\.get\\s*\\(|request\\.form\\s*\\[|request\\.form\\.get\\s*\\(|request\\.values"
+    severity: warning
+    desc: "Flask request parameter access — verify input is validated before use"
+
+
+  - id: SA-FLASK-03
+    type: regex
+    target: "**/*.py"
+    pattern: "send_file\\s*\\(\\s*f[\"']|send_file\\s*\\(\\s*.*request\\.|send_file\\s*\\(\\s*os\\.path\\.join"
+    severity: error
+    desc: "Flask send_file() with dynamic path — potential path traversal"
+
+
+  - id: SA-FLASK-04
+    type: regex
+    target: "**/*.py"
+    pattern: "app\\.run\\s*\\(.*debug\\s*=\\s*True|\\.config\\s*\\[\\s*[\"']DEBUG[\"']\\s*\\]\\s*=\\s*True|FLASK_DEBUG\\s*=\\s*1"
+    severity: error
+    desc: "Flask debug=True — Werkzeug debugger enables arbitrary code execution"
+
+
+  - id: SA-FLASK-05
+    type: regex
+    target: "**/*.py"
+    pattern: "secret_key\\s*=\\s*[\"'][^\"']{1,30}[\"']|app\\.config\\s*\\[\\s*[\"']SECRET_KEY[\"']\\s*\\]\\s*=\\s*[\"']"
+    severity: error
+    desc: "Flask SECRET_KEY hardcoded or weak — enables session cookie forgery"
+
+
+  - id: SA-FLASK-06
+    type: regex
+    target: "**/*.py"
+    pattern: "db\\.session\\.execute\\s*\\(\\s*f[\"']|db\\.session\\.execute\\s*\\(\\s*[\"'].*%s.*[\"']\\s*%|db\\.engine\\.execute\\s*\\(\\s*f[\"']|\\.execute\\s*\\(\\s*f[\"']SELECT|\\.execute\\s*\\(\\s*f[\"']INSERT|\\.execute\\s*\\(\\s*f[\"']UPDATE|\\.execute\\s*\\(\\s*f[\"']DELETE"
+    severity: error
+    desc: "SQLAlchemy raw query with string interpolation — SQL injection risk"
+
+
+  # === FASTAPI SECURITY ===
+  - id: SA-FASTAPI-01
+    type: regex
+    target: "**/*.py"
+    pattern: "@app\\.(get|post|put|patch|delete)\\("
+    severity: warning
+    desc: "FastAPI endpoint without Depends() — verify authentication is not missing"
+
+
+  - id: SA-FASTAPI-02
+    type: regex
+    target: "**/*.py"
+    pattern: "def\\s+\\w+\\s*\\([^)]*:\\s*dict\\s*[,\\)]|:\\s*Any\\s*[,\\)=]|extra\\s*=\\s*[\"']allow[\"']"
+    severity: warning
+    desc: "Pydantic validation bypass via dict/Any type or extra='allow'"
+
+
+  - id: SA-FASTAPI-03
+    type: regex
+    target: "**/*.py"
+    pattern: "allow_origins\\s*=\\s*\\[\\s*[\"']\\*[\"']\\s*\\]|CORSMiddleware.*allow_origins.*\\*"
+    severity: error
+    desc: "FastAPI CORS wildcard origin — allows any domain to make cross-origin requests"
+
+
+  - id: SA-FASTAPI-04
+    type: regex
+    target: "**/*.py"
+    pattern: "response\\.headers\\s*\\[.*\\]\\s*=\\s*f[\"']|response\\.headers\\s*\\[.*\\]\\s*=.*request\\.|.headers\\s*\\[\\s*[\"']Set-Cookie[\"']\\s*\\]\\s*="
+    severity: warning
+    desc: "Response header set from user input — potential header injection"
+
+
+  - id: SA-FASTAPI-05
+    type: regex
+    target: "**/*.py"
+    pattern: "UploadFile.*filename|file\\.filename|shutil\\.copyfileobj\\s*\\(\\s*file"
+    severity: warning
+    desc: "FastAPI file upload — verify size limit, type validation, and filename sanitization"
+
+
+  - id: SA-FASTAPI-06
+    type: regex
+    target: "**/*.py"
+    pattern: "algorithms\\s*=\\s*\\[.*none.*\\]|jwt\\.decode\\s*\\(\\s*token\\s*,\\s*[^,]+\\s*\\)\\s*$|ACCESS_TOKEN_EXPIRE.*(?:525600|86400|43200)"
+    severity: error
+    desc: "OAuth2/JWT implementation issue — algorithm confusion, missing validation, or excessive expiry"
+
+
+  # === GIN (GO) SECURITY CHECKS ===
+  - id: SA-GIN-01
+    type: regex
+    target: "**/*.go"
+    pattern: "\\.Use\\(auth[A-Za-z]*\\("
+    severity: error
+    desc: "Auth middleware may be registered after routes — verify ordering"
+
+
+  - id: SA-GIN-02
+    type: regex
+    target: "**/*.go"
+    pattern: "c\\.(Bind|ShouldBind|ShouldBindJSON|BindJSON|ShouldBindQuery)\\s*\\("
+    severity: warning
+    desc: "Gin binding function — verify struct does not contain sensitive fields (mass assignment)"
+
+
+  - id: SA-GIN-03
+    type: regex
+    target: "**/*.go"
+    pattern: "template\\.HTML\\s*\\(|c\\.Data\\s*\\([^)]*\"text/html|c\\.Writer\\.WriteString\\s*\\("
+    severity: error
+    desc: "Raw HTML output bypassing template auto-escaping — potential XSS"
+
+
+  - id: SA-GIN-04
+    type: regex
+    target: "**/*.go"
+    pattern: "AllowAllOrigins\\s*:\\s*true|AllowOrigins\\s*:\\s*\\[\\s*\"\\*\"\\s*\\]|AllowOriginFunc\\s*:.*return\\s+true"
+    severity: error
+    desc: "CORS misconfiguration — wildcard or permissive origin policy"
+
+
+  - id: SA-GIN-05
+    type: regex
+    target: "**/*.go"
+    pattern: "c\\.(File|FileAttachment)\\s*\\([^)]*c\\.(Param|Query|PostForm)\\s*\\("
+    severity: error
+    desc: "User-controlled path in c.File/c.FileAttachment — path traversal risk"
+
+
+  - id: SA-GIN-06
+    type: regex
+    target: "**/*.go"
+    pattern: "gin\\.New\\s*\\(\\s*\\)"
+    severity: warning
+    desc: "gin.New() without default middleware — verify Recovery() is registered first"
+
+
+  # === RAILS SECURITY CHECKS ===
+  - id: SA-RAILS-01
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\.permit!|params\\[:[a-z_]+\\]\\.permit\\([^)]*(?:role|admin|superuser|permission)"
+    severity: error
+    desc: "Mass assignment — permit! or permitting sensitive fields"
+
+
+  - id: SA-RAILS-02
+    type: regex
+    target: "**/*.rb"
+    pattern: "\\.html_safe|raw\\s*\\(|<%=="
+    severity: error
+    desc: "html_safe/raw/<%== bypasses Rails auto-escaping — XSS risk"
+
+
+  - id: SA-RAILS-03
+    type: regex
+    target: "**/*.rb"
+    pattern: "find_by_sql\\s*\\(.*#\\{|\\.where\\s*\\(.*#\\{|\\.order\\s*\\(\\s*params"
+    severity: error
+    desc: "String interpolation in SQL query — SQL injection risk"
+
+
+  - id: SA-RAILS-04
+    type: regex
+    target: "**/*.rb"
+    pattern: "skip_before_action\\s*:verify_authenticity_token|protect_from_forgery\\s+with:\\s*:null_session"
+    severity: error
+    desc: "CSRF protection disabled or misconfigured"
+
+
+  - id: SA-RAILS-05
+    type: regex
+    target: "**/*.rb"
+    pattern: "send_file\\s*.*params\\[|send_data\\s*.*filename:\\s*params\\["
+    severity: error
+    desc: "User-controlled path in send_file/send_data — path traversal risk"
+
+
+  - id: SA-RAILS-06
+    type: regex
+    target: "**/*.rb"
+    pattern: "render\\s+inline:\\s*.*params\\[|render\\s+inline:\\s*.*#\\{"
+    severity: error
+    desc: "User input in render inline: — server-side template injection"
+
+
+  - id: SA-RAILS-07
+    type: regex
+    target: "**/*.rb"
+    pattern: "has_one_attached\\s+:\\w+"
+    severity: warning
+    desc: "Active Storage attachment — verify content_type and size validation"
+
+
+  - id: SA-RAILS-08
+    type: regex
+    target: "**/*.rb"
+    pattern: "class\\s+\\w+Channel\\s*<\\s*ApplicationCable::Channel"
+    severity: warning
+    desc: "Action Cable channel — verify authentication in Connection and authorization in subscribed"
+
+
+  # === EXPRESS SECURITY CHECKS ===
+  - id: SA-EXPRESS-01
+    type: regex
+    target: "**/*.{js,ts}"
+    pattern: "app\\.(get|post|put|delete|use)\\s*\\([^)]*\\)[\\s\\S]*?app\\.use\\s*\\(\\s*helmet\\s*\\("
+    severity: error
+    desc: "Routes defined before helmet middleware — missing security headers"
+
+
+  - id: SA-EXPRESS-02
+    type: regex
+    target: "**/*.{js,ts}"
+    pattern: "execSync\\s*\\(.*req\\.(params|query|body)|exec\\s*\\(.*req\\.(params|query|body)"
+    severity: error
+    desc: "User input in shell command — command injection risk"
+
+
+  - id: SA-EXPRESS-03
+    type: regex
+    target: "**/*.{js,ts}"
+    pattern: "res\\.sendFile\\s*\\(\\s*(?:req\\.(params|query|body)|path\\.join\\s*\\([^)]*req\\.(params|query|body))"
+    severity: error
+    desc: "User-controlled path in res.sendFile — path traversal risk"
+
+
+  - id: SA-EXPRESS-04
+    type: regex
+    target: "**/*.{js,ts}"
+    pattern: "session\\s*\\(\\s*\\{[^}]*secret\\s*:\\s*['\"][^'\"]{0,20}['\"]|cookie\\s*:\\s*\\{[^}]*httpOnly\\s*:\\s*false|cookie\\s*:\\s*\\{[^}]*secure\\s*:\\s*false"
+    severity: error
+    desc: "Insecure session configuration — weak secret, missing httpOnly, or missing secure flag"
+
+
+  - id: SA-EXPRESS-05
+    type: regex
+    target: "**/*.{js,ts}"
+    pattern: "app\\.(post|put)\\s*\\(\\s*['\"\\/][^'\"]*(?:login|auth|token|password|register)[^'\"]*['\"]"
+    severity: warning
+    desc: "Auth endpoint — verify rate limiting is applied"
+
+
+  - id: SA-EXPRESS-06
+    type: regex
+    target: "**/*.{js,ts}"
+    pattern: "findByIdAndUpdate\\s*\\([^,]+,\\s*req\\.body\\s*\\)|\\.create\\s*\\(\\s*req\\.body\\s*\\)"
+    severity: warning
+    desc: "Passing req.body directly to database operation — mass assignment risk"
+
+
+  # === NESTJS SECURITY CHECKS ===
+  - id: SA-NEST-01
+    type: regex
+    target: "**/*.ts"
+    pattern: "@UseGuards\\s*\\(\\s*RolesGuard\\s*,\\s*AuthGuard\\s*\\)"
+    severity: error
+    desc: "RolesGuard before AuthGuard — authorization checked before authentication"
+
+
+  - id: SA-NEST-02
+    type: regex
+    target: "**/*.ts"
+    pattern: "new\\s+ValidationPipe\\s*\\(\\s*\\{[^}]*whitelist\\s*:\\s*false"
+    severity: error
+    desc: "ValidationPipe with whitelist:false — extra properties not stripped (mass assignment)"
+
+
+  - id: SA-NEST-03
+    type: regex
+    target: "**/*.ts"
+    pattern: "@Column\\s*\\(\\s*\\)\\s*\\n\\s*password\\s*:|@Column\\s*\\(\\s*\\)\\s*\\n\\s*(?:secret|token|hash|internal)"
+    severity: warning
+    desc: "Sensitive entity column without @Exclude — may be exposed in API responses"
+
+
+  - id: SA-NEST-04
+    type: regex
+    target: "**/*.ts"
+    pattern: "@Param\\s*\\(\\s*['\"][^'\"]+['\"]\\s*\\)\\s+\\w+\\s*:\\s*string"
+    severity: warning
+    desc: "Route parameter without ParseIntPipe/ParseUUIDPipe — type confusion risk"
+
+
+  - id: SA-NEST-05
+    type: regex
+    target: "**/*.ts"
+    pattern: "@Public\\s*\\(\\s*\\)\\s*\\n\\s*@(Delete|Put|Patch)\\s*\\(|@Public\\s*\\(\\s*\\)\\s*\\n\\s*@Controller"
+    severity: error
+    desc: "@Public on state-changing endpoint or entire controller — auth bypass"
+
+
+  - id: SA-NEST-06
+    type: regex
+    target: "**/*.ts"
+    pattern: "@WebSocketGateway\\s*\\("
+    severity: warning
+    desc: "WebSocket gateway — verify handleConnection authentication and message-level guards"
+
+
+  # === AWS SECURITY CHECKS ===
+  - id: SA-AWS-01
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "\"Action\"\\s*:\\s*\"\\*\"|\"Action\"\\s*:\\s*\\[\\s*\"\\*\"\\s*\\]"
+    severity: error
+    desc: "IAM policy with wildcard Action — grants unrestricted permissions"
+
+
+  - id: SA-AWS-02
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "\"Effect\"\\s*:\\s*\"Allow\"[^}]*\"Action\"\\s*:\\s*\"sts:AssumeRole\"(?![^}]*\"Condition\")"
+    severity: warning
+    desc: "AssumeRole without conditions — missing MFA, IP, or external ID restriction"
+
+
+  - id: SA-AWS-03
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "\"Principal\"\\s*:\\s*\\{\\s*\"AWS\"\\s*:\\s*\"\\*\"\\s*\\}|\"Principal\"\\s*:\\s*\"\\*\""
+    severity: error
+    desc: "Overly permissive trust policy — any principal can assume role"
+
+
+  - id: SA-AWS-04
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "\"Action\"\\s*:\\s*\"iam:PassRole\"[^}]*\"Resource\"\\s*:\\s*\"\\*\""
+    severity: error
+    desc: "iam:PassRole with wildcard resource — privilege escalation risk"
+
+
+  - id: SA-AWS-05
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "acl\\s*=\\s*\"public-read\"|acl\\s*=\\s*\"public-read-write\""
+    severity: error
+    desc: "S3 bucket with public ACL — data exposure risk"
+
+
+  - id: SA-AWS-06
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "block_public_acls\\s*=\\s*false|block_public_policy\\s*=\\s*false|restrict_public_buckets\\s*=\\s*false"
+    severity: error
+    desc: "S3 public access block disabled — bucket may become publicly accessible"
+
+
+  - id: SA-AWS-07
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "environment\\s*\\{[^}]*variables\\s*=\\s*\\{[^}]*(PASSWORD|SECRET|API_KEY|TOKEN|PRIVATE_KEY)\\s*=\\s*\"[^\"]+\""
+    severity: error
+    desc: "Lambda environment variable contains hardcoded secret"
+
+
+  - id: SA-AWS-08
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "policy_arn\\s*=\\s*\"arn:aws:iam::aws:policy/AdministratorAccess\"|policy_arn\\s*=\\s*\"arn:aws:iam::aws:policy/PowerUserAccess\""
+    severity: error
+    desc: "Lambda or role with AdministratorAccess/PowerUserAccess — overly permissive"
+
+
+  - id: SA-AWS-09
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "cidr_blocks\\s*=\\s*\\[\\s*\"0\\.0\\.0\\.0/0\"\\s*\\]|CidrIp:\\s*[\"']?0\\.0\\.0\\.0/0"
+    severity: error
+    desc: "Security group ingress open to 0.0.0.0/0 — unrestricted internet access"
+
+
+  - id: SA-AWS-10
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "enable_key_rotation\\s*=\\s*false"
+    severity: warning
+    desc: "KMS key rotation disabled — keys should be rotated automatically"
+
+
+  - id: SA-AWS-11
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "is_multi_region_trail\\s*=\\s*false|enable_log_file_validation\\s*=\\s*false"
+    severity: error
+    desc: "CloudTrail not multi-region or missing log validation"
+
+
+  - id: SA-AWS-12
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "password\\s*=\\s*\"[^\"]+\"|master_password\\s*=\\s*\"[^\"]+\""
+    severity: error
+    desc: "Hardcoded password in Terraform/CloudFormation — use Secrets Manager"
+
+
+  # === GCP SECURITY CHECKS ===
+  - id: SA-GCP-01
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "role\\s*=\\s*\"roles/(owner|editor)\"|\"roles/(owner|editor)\""
+    severity: error
+    desc: "GCP primitive role (Owner/Editor) — use granular predefined roles"
+
+
+  - id: SA-GCP-02
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "resource\\s+\"google_service_account_key\"|google_service_account_key\\s*\\{"
+    severity: error
+    desc: "Service account key file — use Workload Identity Federation instead"
+
+
+  - id: SA-GCP-03
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "\"allUsers\"|\"allAuthenticatedUsers\"|member\\s*=\\s*\"allUsers\"|member\\s*=\\s*\"allAuthenticatedUsers\""
+    severity: error
+    desc: "allUsers/allAuthenticatedUsers binding — public access to GCP resource"
+
+
+  - id: SA-GCP-04
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "google_storage_bucket_iam[^}]*(allUsers|allAuthenticatedUsers)|predefinedAcl:\\s*public"
+    severity: error
+    desc: "Public Cloud Storage bucket — data exposure risk"
+
+
+  - id: SA-GCP-05
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "uniform_bucket_level_access\\s*=\\s*false"
+    severity: warning
+    desc: "Uniform bucket-level access disabled — inconsistent ACLs possible"
+
+
+  - id: SA-GCP-06
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "environment_variables\\s*=\\s*\\{[^}]*(PASSWORD|SECRET|API_KEY|TOKEN|PRIVATE_KEY)\\s*=\\s*\"[^\"]+\""
+    severity: error
+    desc: "Cloud Functions environment variable contains hardcoded secret"
+
+
+  - id: SA-GCP-07
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "cloudfunctions\\.invoker[^}]*allUsers|allUsers[^}]*cloudfunctions\\.invoker"
+    severity: error
+    desc: "Cloud Function invocable by allUsers — unauthenticated access"
+
+
+  - id: SA-GCP-08
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "source_ranges\\s*=\\s*\\[\\s*\"0\\.0\\.0\\.0/0\"\\s*\\]|sourceRanges:[^}]*0\\.0\\.0\\.0/0"
+    severity: error
+    desc: "VPC firewall rule open to 0.0.0.0/0 — unrestricted internet ingress"
+
+
+  - id: SA-GCP-09
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "google_kms_crypto_key_iam[^}]*(allUsers|allAuthenticatedUsers)"
+    severity: error
+    desc: "KMS key accessible by allUsers — encryption key exposure"
+
+
+  - id: SA-GCP-10
+    type: regex
+    target: "**/*.{tf,json,yaml,yml}"
+    pattern: "exempted_members\\s*=\\s*\\["
+    severity: warning
+    desc: "Audit log exemptions configured — all access should be logged"
+
+
+  # === AZURE SECURITY CHECKS ===
+  - id: SA-AZURE-01
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "role_definition_name\\s*=\\s*\"(Owner|Contributor)\"|8e3af657-a8ff-443c-a75c-2fe8c4bcb635|b24988ac-6180-42a0-ab88-20f7382dd24c"
+    severity: error
+    desc: "Owner/Contributor role assignment — use least-privilege roles"
+
+
+  - id: SA-AZURE-02
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "role_definition_name\\s*=\\s*\"Storage Blob Data Owner\"(?![^}]*condition\\s*=)"
+    severity: warning
+    desc: "Storage Blob Data Owner without conditions — add ABAC conditions"
+
+
+  - id: SA-AZURE-03
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "allow_nested_items_to_be_public\\s*=\\s*true|allow_blob_public_access\\s*=\\s*true|allowBlobPublicAccess['\"]?\\s*[:=]\\s*['\"]?true|container_access_type\\s*=\\s*\"(blob|container)\""
+    severity: error
+    desc: "Public blob access enabled — anonymous access to storage data"
+
+
+  - id: SA-AZURE-04
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "authLevel[\"\\s]*[:=]\\s*[\"']?anonymous|\"authLevel\"\\s*:\\s*\"anonymous\""
+    severity: error
+    desc: "Azure Function with anonymous auth level — no authentication required"
+
+
+  - id: SA-AZURE-05
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "app_settings\\s*=\\s*\\{[^}]*(PASSWORD|SECRET|KEY|TOKEN|CONNECTION)\\s*=\\s*\"(?!@Microsoft\\.KeyVault)[^\"]+\""
+    severity: error
+    desc: "Hardcoded secret in Azure Function app settings — use Key Vault references"
+
+
+  - id: SA-AZURE-06
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "source_address_prefix\\s*=\\s*\"\\*\"|sourceAddressPrefix['\"]?\\s*[:=]\\s*['\"]\\*['\"]|\"sourceAddressPrefix\"\\s*:\\s*\"\\*\""
+    severity: error
+    desc: "NSG inbound rule open to * — unrestricted internet access"
+
+
+  - id: SA-AZURE-07
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "purge_protection_enabled\\s*=\\s*false|enablePurgeProtection:\\s*false|\"enablePurgeProtection\"\\s*:\\s*false"
+    severity: error
+    desc: "Key Vault missing purge protection — keys can be permanently deleted"
+
+
+  - id: SA-AZURE-08
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "enable_rbac_authorization\\s*=\\s*false|access_policy\\s*\\{"
+    severity: warning
+    desc: "Key Vault using access policies instead of RBAC — harder to audit"
+
+
+  - id: SA-AZURE-09
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "azurerm_monitor_diagnostic_setting"
+    severity: warning
+    desc: "Diagnostic setting present — verify all critical log categories are enabled"
+
+
+  - id: SA-AZURE-10
+    type: regex
+    target: "**/*.{tf,json,bicep,yaml,yml}"
+    pattern: "public_network_access_enabled\\s*=\\s*true|start_ip_address\\s*=\\s*\"0\\.0\\.0\\.0\""
+    severity: error
+    desc: "Azure SQL public network access or permissive firewall rule"
+
+
+  # === WORDPRESS SECURITY ===
+  - id: SA-WP-01
+    type: regex
+    target: "**/*.php"
+    pattern: "\\$wpdb\\s*->\\s*(query|get_results|get_row|get_var|get_col)\\s*\\(\\s*[\"']"
+    severity: error
+    desc: "$wpdb query without $wpdb->prepare() — SQL injection risk"
+
+
+  - id: SA-WP-02
+    type: regex
+    target: "**/*.php"
+    pattern: "unserialize\\s*\\(\\s*\\$_(GET|POST|REQUEST|COOKIE|SERVER)|unserialize\\s*\\(\\s*\\$"
+    severity: error
+    desc: "unserialize() with user-controlled input — object injection risk"
+
+
+  - id: SA-WP-03
+    type: regex
+    target: "**/*.php"
+    pattern: "echo\\s+\\$(?!.*esc_html|.*esc_attr|.*esc_url|.*wp_kses|.*absint|.*intval)"
+    severity: error
+    desc: "Unescaped output — use esc_html(), esc_attr(), esc_url(), or wp_kses()"
+
+
+  - id: SA-WP-04
+    type: regex
+    target: "**/*.php"
+    pattern: "register_rest_route\\s*\\([^)]*(?!permission_callback)[^)]*\\)|permission_callback.*__return_true"
+    severity: error
+    desc: "REST API route without permission_callback or with __return_true — unauthenticated access"
+
+
+  - id: SA-WP-05
+    type: regex
+    target: "**/*.php"
+    pattern: "update_option\\s*\\(|update_post_meta\\s*\\(|delete_option\\s*\\(|delete_post_meta\\s*\\("
+    severity: warning
+    desc: "Option/meta modification — verify current_user_can() and nonce checks are present"
+
+
+  - id: SA-WP-06
+    type: regex
+    target: "**/*.php"
+    pattern: "\\$_POST\\[.*\\]\\s*(?!.*wp_verify_nonce|.*check_ajax_referer|.*wp_nonce)"
+    severity: error
+    desc: "POST data processed without nonce verification — CSRF risk"
+
+
+  - id: SA-WP-07
+    type: regex
+    target: "**/*.php"
+    pattern: "move_uploaded_file\\s*\\(|\\$_FILES\\s*\\[.*\\]\\s*\\[.tmp_name.\\]"
+    severity: error
+    desc: "Direct file upload handling — use wp_handle_upload() with MIME validation"
+
+
+  - id: SA-WP-08
+    type: regex
+    target: "**/*.php"
+    pattern: "WP_DEBUG.*true|WP_DEBUG_DISPLAY.*true|DISALLOW_FILE_EDIT.*false"
+    severity: error
+    desc: "wp-config.php misconfiguration — debug enabled or file editing allowed in production"
+
+
+  - id: SA-WP-09
+    type: regex
+    target: "**/*.php"
+    pattern: "^<\\?php\\s*\\n(?!.*defined\\s*\\(\\s*['\"]ABSPATH['\"])"
+    severity: warning
+    desc: "PHP file missing defined('ABSPATH') check — direct file access possible"
+
+
+  - id: SA-WP-10
+    type: regex
+    target: "**/*.php"
+    pattern: "\\$table_prefix\\s*=\\s*['\"]wp_['\"]"
+    severity: warning
+    desc: "Default WordPress table prefix wp_ — makes targeted SQL injection easier"
+
+
+  # === DRUPAL SECURITY ===
+  - id: SA-DRUPAL-01
+    type: regex
+    target: "**/*.{php,module,install}"
+    pattern: "db_query\\s*\\(\\s*[\"'].*\\$|->query\\s*\\(\\s*[\"'].*\\$|sprintf\\s*\\(\\s*[\"']SELECT"
+    severity: error
+    desc: "Drupal database query with string interpolation — SQL injection risk"
+
+
+  - id: SA-DRUPAL-02
+    type: regex
+    target: "**/*.{php,module,install}"
+    pattern: "#markup.*\\$|#markup.*\\.\\s*\\$|#markup.*getRequest|#markup.*->get\\s*\\("
+    severity: error
+    desc: "Render array #markup with user input — XSS risk, use #plain_text or Html::escape()"
+
+
+  - id: SA-DRUPAL-03
+    type: regex
+    target: "**/*.{php,module,install}"
+    pattern: "['\"]#markup['\"]\\s*=>\\s*.*\\$(?!.*Html::escape|.*Xss::filter|.*check_plain|.*t\\()"
+    severity: error
+    desc: "Unescaped variable in #markup — XSS risk"
+
+
+  - id: SA-DRUPAL-04
+    type: regex
+    target: "**/*.{php,module,install}"
+    pattern: "->delete\\s*\\(\\s*\\)|->save\\s*\\(\\s*\\)"
+    severity: warning
+    desc: "Entity state change — verify Form API CSRF protection or _csrf_token route requirement"
+
+
+  - id: SA-DRUPAL-05
+    type: regex
+    target: "**/*.{php,module,install}"
+    pattern: "entityQuery\\s*\\([^)]*\\)(?!.*accessCheck)|->load\\s*\\(\\s*\\$"
+    severity: error
+    desc: "Entity query or load without access check — bypasses node/field access control"
+
+
+  - id: SA-DRUPAL-06
+    type: regex
+    target: "**/*.{php,module,install}"
+    pattern: "hash_salt.*=\\s*['\"]['\"]|error_level.*verbose|update_free_access.*TRUE"
+    severity: error
+    desc: "Drupal settings.php misconfiguration — empty hash_salt, verbose errors, or update access"
+
+
+  # === JOOMLA SECURITY ===
+  - id: SA-JOOMLA-01
+    type: regex
+    target: "**/*.php"
+    pattern: "->where\\s*\\(.*[\"'].*\\.\\s*\\$|setQuery\\s*\\(\\s*[\"'].*\\$|->where\\s*\\(\\s*[\"'].*\\$"
+    severity: error
+    desc: "Joomla database query with string concatenation — SQL injection risk"
+
+
+  - id: SA-JOOMLA-02
+    type: regex
+    target: "**/*.php"
+    pattern: "->get\\s*\\([^,)]+\\s*,\\s*[^,)]*\\s*,\\s*['\"]RAW['\"]|\\$_GET\\s*\\[|\\$_POST\\s*\\[|\\$_REQUEST\\s*\\["
+    severity: error
+    desc: "JInput RAW filter or direct superglobal access — unvalidated input"
+
+
+  - id: SA-JOOMLA-03
+    type: regex
+    target: "**/*.php"
+    pattern: "extends\\s+BaseController[^{]*\\{[^}]*function\\s+(delete|save|publish)"
+    severity: warning
+    desc: "Controller state-changing method — verify authorise() and checkToken() are present"
+
+
+  - id: SA-JOOMLA-04
+    type: regex
+    target: "**/*.php"
+    pattern: "\\$error_reporting\\s*=\\s*['\"]maximum['\"]|\\$debug\\s*=\\s*1|\\$secret\\s*=\\s*['\"]joomla['\"]"
+    severity: error
+    desc: "Joomla configuration.php misconfiguration — debug enabled or weak secret"
+
+
+  # === ANDROID SDK SECURITY ===
+  - id: SA-ANDROID-01
+    type: regex
+    target: "**/AndroidManifest.xml"
+    pattern: "android:exported\\s*=\\s*\"true\""
+    severity: warning
+    desc: "Exported component — verify intent-filter restrictions and permission guards"
+
+
+  - id: SA-ANDROID-02
+    type: regex
+    target: "**/*.{kt,java}"
+    pattern: "rawQuery\\s*\\(\\s*\"[^\"]*\\+\\s*\\w+|rawQuery\\s*\\(\\s*\"[^\"]*\\$\\{?"
+    severity: error
+    desc: "SQL injection in ContentProvider — use parameterized selectionArgs instead of concatenation"
+
+
+  - id: SA-ANDROID-03
+    type: regex
+    target: "**/*.{kt,java}"
+    pattern: "addJavascriptInterface\\s*\\("
+    severity: error
+    desc: "WebView JavaScript interface — verify API level >= 17 and restrict to trusted origins"
+
+
+  - id: SA-ANDROID-04
+    type: regex
+    target: "**/*.{kt,java}"
+    pattern: "getSharedPreferences\\s*\\([^)]*\\)[\\s\\S]{0,80}(password|token|secret|key|credential)|MODE_WORLD_READABLE"
+    severity: error
+    desc: "Sensitive data in SharedPreferences — use EncryptedSharedPreferences"
+
+
+  - id: SA-ANDROID-05
+    type: regex
+    target: "**/AndroidManifest.xml"
+    pattern: "usesCleartextTraffic\\s*=\\s*\"true\"|cleartextTrafficPermitted\\s*=\\s*\"true\""
+    severity: error
+    desc: "Cleartext traffic allowed — enforce HTTPS via NetworkSecurityConfig"
+
+
+  - id: SA-ANDROID-06
+    type: regex
+    target: "**/AndroidManifest.xml"
+    pattern: "android:debuggable\\s*=\\s*\"true\""
+    severity: error
+    desc: "Debug mode enabled in manifest — must be false for release builds"
+
+
+  - id: SA-ANDROID-07
+    type: regex
+    target: "**/*.{kt,java}"
+    pattern: "registerReceiver\\s*\\(\\s*\\w+\\s*,\\s*\\w+\\s*\\)\\s*$"
+    severity: warning
+    desc: "Broadcast receiver registered without permission — add permission parameter"
+
+
+  - id: SA-ANDROID-08
+    type: regex
+    target: "**/*.{kt,java}"
+    pattern: "new\\s+Random\\s*\\(|java\\.util\\.Random|kotlin\\.random\\.Random"
+    severity: warning
+    desc: "Insecure random number generator — use java.security.SecureRandom for tokens"
+
+
+  - id: SA-ANDROID-09
+    type: regex
+    target: "**/*.{kt,java}"
+    pattern: "SecretKeySpec\\s*\\(\\s*\"[^\"]+\"\\.toByteArray|private\\s+(static\\s+)?final\\s+byte\\[\\]\\s+\\w*(KEY|key|SECRET|secret)"
+    severity: error
+    desc: "Hardcoded encryption key — use Android Keystore for key management"
+
+
+  - id: SA-ANDROID-10
+    type: regex
+    target: "**/*.{kt,java}"
+    pattern: "Log\\.(d|v|i)\\s*\\(\\s*\"[^\"]*\"\\s*,\\s*[^)]*?(password|token|secret|key|credential|session)"
+    severity: warning
+    desc: "Sensitive data in log output — strip debug logs in release builds"
+
+
+  # === IOS SDK SECURITY ===
+  - id: SA-IOS-01
+    type: regex
+    target: "**/*.swift"
+    pattern: "kSecAttrAccessibleAlways[^T]|kSecAttrAccessibleAlways\\b(?!ThisDeviceOnly)"
+    severity: error
+    desc: "Insecure Keychain accessibility — use kSecAttrAccessibleWhenUnlockedThisDeviceOnly"
+
+
+  - id: SA-IOS-02
+    type: regex
+    target: "**/Info.plist"
+    pattern: "NSAllowsArbitraryLoads[\\s\\S]{0,30}<true"
+    severity: error
+    desc: "App Transport Security disabled — enforce HTTPS connections"
+
+
+  - id: SA-IOS-03
+    type: regex
+    target: "**/*.{swift,m}"
+    pattern: "UIWebView"
+    severity: error
+    desc: "Deprecated UIWebView usage — migrate to WKWebView"
+
+
+  - id: SA-IOS-04
+    type: regex
+    target: "**/*.{swift,m}"
+    pattern: "UIPasteboard\\.general\\.(string|setString|setItems|setValue)[\\s\\S]{0,60}(token|password|secret|key|credential|session)"
+    severity: warning
+    desc: "Sensitive data on general pasteboard — use UIPasteboard.withUniqueName()"
+
+
+  - id: SA-IOS-05
+    type: regex
+    target: "**/*.{swift,m}"
+    pattern: "UserDefaults\\.(standard\\.)?set\\s*\\([^,]+,\\s*forKey:\\s*\"(token|password|secret|key|credential|session|auth)|NSUserDefaults.*set(Object|Value).*forKey.*@\"(token|password|secret)"
+    severity: error
+    desc: "Sensitive data in UserDefaults/NSUserDefaults — use Keychain instead"
+
+
+  - id: SA-IOS-06
+    type: regex
+    target: "**/*.{swift,m}"
+    pattern: "application\\s*\\(\\s*_\\s+app.*open\\s+url:\\s*URL|openURL:\\s*\\(NSURL\\s*\\*\\)"
+    severity: warning
+    desc: "URL scheme handler — verify source app validation and parameter sanitization"
+
+
+  - id: SA-IOS-07
+    type: regex
+    target: "**/*.{swift,m}"
+    pattern: "arc4random\\s*\\(|arc4random_uniform\\s*\\([\\s\\S]{0,80}(token|key|secret|session|nonce)"
+    severity: error
+    desc: "Insecure random for security tokens — use SecRandomCopyBytes"
+
+
+  - id: SA-IOS-08
+    type: regex
+    target: "**/*.{swift,m}"
+    pattern: "CC_MD5\\s*\\(|CC_SHA1\\s*\\(|CC_MD5_DIGEST_LENGTH"
+    severity: warning
+    desc: "Weak hash algorithm (MD5/SHA-1) — use SHA-256 via CryptoKit"
+
+
+  - id: SA-IOS-09
+    type: regex
+    target: "**/*.pbxproj"
+    pattern: "GCC_GENERATE_POSITION_DEPENDENT_CODE\\s*=\\s*YES|CLANG_ENABLE_OBJC_ARC\\s*=\\s*NO"
+    severity: error
+    desc: "Missing binary protections (PIE/ARC) — enable in Xcode build settings"
+
+
+  - id: SA-IOS-10
+    type: regex
+    target: "**/*.{swift,m}"
+    pattern: "NSLog\\s*\\(\\s*@?\"[^\"]*%([@dfs])[^\"]*\"\\s*,\\s*[^)]*?(password|token|secret|key|credential|session)"
+    severity: warning
+    desc: "Sensitive data in NSLog — use os_log with .private annotation"
+
