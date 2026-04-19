@@ -44,13 +44,13 @@ resource "aws_iam_policy" "s3_reader" {
 
 ```json
 // VULNERABLE: No conditions — any principal matching the trust can assume this role
+// Note: trust (assume-role) policies do NOT use the Resource element — it's implied by the role.
 {
   "Version": "2012-10-17",
   "Statement": [{
     "Effect": "Allow",
     "Action": "sts:AssumeRole",
-    "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
-    "Resource": "*"
+    "Principal": {"AWS": "arn:aws:iam::123456789012:root"}
   }]
 }
 
@@ -61,7 +61,6 @@ resource "aws_iam_policy" "s3_reader" {
     "Effect": "Allow",
     "Action": "sts:AssumeRole",
     "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
-    "Resource": "*",
     "Condition": {
       "Bool": {"aws:MultiFactorAuthPresent": "true"},
       "IpAddress": {"aws:SourceIp": "203.0.113.0/24"}
@@ -214,7 +213,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
 }
 ```
 
-**Detection regex:** `resource\s+"aws_s3_bucket"\s+"[^"]+"\s*\{(?![^}]*server_side_encryption)`
+**Detection guidance:** flag `aws_s3_bucket` resources that do not have a matching `aws_s3_bucket_server_side_encryption_configuration` resource (or equivalent module). Matching `server_side_encryption` inside the bucket block produces false positives because the modern Terraform pattern uses a separate resource (as shown above).
 **Severity:** warning
 
 ### S3 Public Access Block Not Enabled

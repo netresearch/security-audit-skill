@@ -474,7 +474,7 @@ resource "azurerm_monitor_diagnostic_setting" "activity_log" {
 }
 ```
 
-**Detection regex:** `azurerm_monitor_diagnostic_setting`
+**Detection guidance:** flag activity-log-capable resources that lack a companion `azurerm_monitor_diagnostic_setting`. Matching `azurerm_monitor_diagnostic_setting` directly would flag the secure pattern shown above — use absence-of-resource checks (e.g., Checkov, tfsec, or a module inventory) instead of a simple regex.
 **Severity:** warning
 
 ### Bicep: Missing Diagnostic Settings
@@ -496,7 +496,7 @@ resource diagnosticSetting 'Microsoft.Insights/diagnosticSettings@2021-05-01-pre
 }
 ```
 
-**Detection regex:** `Microsoft\.Insights/diagnosticSettings`
+**Detection guidance:** flag Bicep/ARM deployments without a `Microsoft.Insights/diagnosticSettings` resource covering the target scope. Matching the resource type directly flags the secure pattern — prefer an absence-of-resource check.
 **Severity:** warning
 
 ## Azure SQL: Public Access
@@ -572,7 +572,7 @@ resource "azurerm_mssql_server_transparent_data_encryption" "main" {
 }
 ```
 
-**Detection regex:** `resource\s+"azurerm_mssql_server"\s+"[^"]+"\s*\{(?![^}]*transparent_data_encryption)`
+**Detection guidance:** flag `azurerm_mssql_server` resources that lack a matching `azurerm_mssql_server_transparent_data_encryption`. A nested-block regex produces false positives because TDE lives in a separate resource in modern Terraform.
 **Severity:** warning
 
 ### Azure SQL Auditing Not Enabled
@@ -595,7 +595,7 @@ resource "azurerm_mssql_server_extended_auditing_policy" "main" {
 }
 ```
 
-**Detection regex:** `azurerm_mssql_server_extended_auditing_policy`
+**Detection guidance:** flag `azurerm_mssql_server` resources without a matching `azurerm_mssql_server_extended_auditing_policy`. Matching the auditing-policy resource type directly flags the secure pattern.
 **Severity:** warning
 
 ## Remediation Priority

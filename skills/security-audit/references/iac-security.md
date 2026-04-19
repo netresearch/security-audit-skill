@@ -50,16 +50,31 @@ CMD ["python", "app.py"]
 
 ### Detection Patterns
 
-```
-# Dockerfiles missing USER directive (any Dockerfile without USER before CMD/ENTRYPOINT)
-# Regex: Dockerfile without any USER line
-^FROM\s.*(?!.*USER\s)
+A pure line-based regex cannot reliably detect "no USER directive anywhere in the file" because that is a whole-file property. Prefer whole-file checks:
+
+```bash
+# Dockerfiles missing USER directive — flag any Dockerfile that never declares USER.
+# Run per file; exit status 1 (no match) means USER is missing.
+for f in $(find . -name 'Dockerfile*' -type f); do
+  grep -qE '^\s*USER\b' "$f" || echo "MISSING USER: $f"
+done
 
 # Explicit root user
-USER\s+root
+grep -rnE '^\s*USER[[:space:]]+root\b' --include='Dockerfile*' .
 
-# USER directive appearing only after CMD/ENTRYPOINT (too late)
-(CMD|ENTRYPOINT)\s.*\nUSER\s
+# USER appearing after the last CMD/ENTRYPOINT (too late to apply).
+# Use awk so we can reason line-by-line across the whole file.
+awk '
+  /^[[:space:]]*(CMD|ENTRYPOINT)\b/ { last_exec = NR }
+  /^[[:space:]]*USER\b/              { last_user = NR }
+  END { if (last_exec && last_user && last_user > last_exec) print FILENAME": USER after CMD/ENTRYPOINT" }
+' Dockerfile*
+```
+
+If you use a PCRE-capable scanner (`grep -P`, ripgrep, Semgrep), an equivalent whole-file negative-lookahead is:
+
+```
+(?ms)\A(?!.*^\s*USER\b).*^\s*FROM\b.*\z
 ```
 
 ### Secrets in Image Layers
@@ -194,10 +209,10 @@ COPY app/ /app/
 ```
 
 ```dockerfile
-# SECURE: If you need to download a remote file, use RUN with checksum verification
+# SECURE: If you need to download a remote file, use RUN with checksum verification (SHA-256)
 FROM alpine:3.19
 RUN wget -O /tmp/app.tar.gz https://example.com/app.tar.gz && \
-    echo "e3b0c44298fc1c149afbf4c8996fb924  /tmp/app.tar.gz" | md5sum -c - && \
+    echo "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /tmp/app.tar.gz" | sha256sum -c - && \
     tar -xzf /tmp/app.tar.gz -C /app/ && \
     rm /tmp/app.tar.gz
 ```
@@ -1219,15 +1234,18 @@ resource "aws_cloudwatch_log_group" "vpc_flow" {
 
 ### Detection Patterns
 
-```
-# VPC without flow logs (presence of aws_vpc without corresponding aws_flow_log)
-resource\s+"aws_vpc"
+```bash
+# VPC without flow logs — inventory aws_vpc and aws_flow_log, flag any VPC without
+# a matching aws_flow_log pointing at it. A simple resource-name regex cannot
+# decide this on its own, because flow logs live in a separate resource.
+# Use a policy tool (Checkov CKV_AWS_11, tfsec aws-vpc-no-public-egress-sgr,
+# Terrascan AC_AWS_0059) or a module inventory instead.
 
 # CloudTrail missing log file validation
-enable_log_file_validation\s*=\s*false
+grep -rnE 'enable_log_file_validation[[:space:]]*=[[:space:]]*false' --include='*.tf' .
 
 # CloudTrail not multi-region
-is_multi_region_trail\s*=\s*false
+grep -rnE 'is_multi_region_trail[[:space:]]*=[[:space:]]*false' --include='*.tf' .
 ```
 
 ### Hardcoded Credentials in .tf Files

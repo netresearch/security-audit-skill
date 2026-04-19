@@ -481,7 +481,7 @@ resource "google_project_iam_audit_config" "all_services" {
 }
 ```
 
-**Detection regex:** `google_project_iam_audit_config`
+**Detection guidance:** flag GCP projects that lack a `google_project_iam_audit_config` covering `allServices`/`DATA_READ`/`DATA_WRITE`. Matching the resource type directly flags the secure pattern — prefer an absence-of-resource check.
 **Severity:** warning
 
 ### Audit Log Exemptions for Users
