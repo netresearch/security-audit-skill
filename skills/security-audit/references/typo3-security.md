@@ -127,9 +127,17 @@ final class BackendModuleController extends ActionController
 
     public function formAction(int $recordUid): ResponseInterface
     {
-        // $this->request is an ExtbaseRequestInterface that also implements
-        // ServerRequestInterface — no positional request argument needed.
-        $formProtection = $this->formProtectionFactory->createFromRequest($this->request);
+        // TYPO3 v13: ExtbaseRequestInterface implements ServerRequestInterface,
+        // so $this->request can be passed straight to createFromRequest().
+        //
+        // TYPO3 v12 (LTS): ExtbaseRequestInterface does NOT implement
+        // ServerRequestInterface directly — unwrap the underlying request
+        // explicitly. The helper below works on both and is safe to copy
+        // verbatim when your extension supports the v12/v13 overlap window.
+        $psrRequest = method_exists($this->request, 'getRequest')
+            ? $this->request->getRequest()   // v12 Extbase\Request wraps the PSR-7
+            : $this->request;                // v13+ already-is PSR-7
+        $formProtection = $this->formProtectionFactory->createFromRequest($psrRequest);
 
         // Generate token for a specific form/action combination
         $token = $formProtection->generateToken(
@@ -146,8 +154,11 @@ final class BackendModuleController extends ActionController
 
     public function deleteAction(int $recordUid): ResponseInterface
     {
-        $formProtection = $this->formProtectionFactory->createFromRequest($this->request);
-        $token = (string)($this->request->getParsedBody()['csrfToken'] ?? '');
+        $psrRequest = method_exists($this->request, 'getRequest')
+            ? $this->request->getRequest()
+            : $this->request;
+        $formProtection = $this->formProtectionFactory->createFromRequest($psrRequest);
+        $token = (string)($psrRequest->getParsedBody()['csrfToken'] ?? '');
 
         // Validate token before processing
         if (!$formProtection->validateToken(

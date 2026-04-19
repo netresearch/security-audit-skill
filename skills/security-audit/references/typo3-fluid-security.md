@@ -55,7 +55,13 @@ Fluid's default escape passes through `htmlspecialchars`. That is correct for el
 # that opens and closes on the same line as the interpolation.
 grep -rnE '(on[a-z]+[[:space:]]*=[[:space:]]*"[^"]*\{[a-zA-Z_]|<script[^>]*>[^<]*\{[a-zA-Z_])' \
   --include='*.html' --include='*.xml' .
-# Cross-line case (grep is line-oriented; requires a multiline-capable tool):
+# Cross-line case (grep -rn is line-oriented; pick a multiline-capable tool).
+# GNU grep with -P supports PCRE and the standalone lookaround needed; ripgrep's
+# -U --multiline-dotall is equivalent. Both are shown so you can pick whichever
+# is already on the auditing host (rg is not required — grep -P ships with GNU
+# grep, which is already part of the skill's allowed-tools).
+#   grep -rnP --include='*.html' --include='*.xml' \
+#     -z '<script\b[^>]*>[\s\S]*?\{[a-zA-Z_]' .
 #   rg -U --multiline-dotall '<script\b[^>]*>[\s\S]*?\{[a-zA-Z_]' -g '*.html' -g '*.xml'
 ```
 

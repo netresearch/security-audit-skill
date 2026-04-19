@@ -108,18 +108,37 @@ lib.search {
 
 **Detection:**
 ```bash
-# Untrusted-input accessors feeding a cObject TEXT without a nearby htmlSpecialChars.
-# Note: GP is the documented merged GET+POST accessor; there is no bare POST: key.
-grep -rnE '(^|[^A-Za-z_])data[[:space:]]*=[[:space:]]*(GP|TSFE|register|field):' \
-  --include='*.typoscript' . \
-  | while IFS= read -r hit; do
-      file="${hit%%:*}"
-      lineno=$(echo "$hit" | cut -d: -f2)
-      # look for htmlSpecialChars within 10 lines of the hit
-      awk -v n="$lineno" 'NR>=n-10 && NR<=n+10' "$file" \
-        | grep -qE 'htmlSpecialChars[[:space:]]*=[[:space:]]*1' \
-        || echo "$hit  # no htmlSpecialChars nearby"
-  done
+# Untrusted-input accessors feeding a cObject TEXT without a nearby
+# htmlSpecialChars. This is a "relative order of instructions" check —
+# line-oriented grep cannot decide it alone. A single awk pass per file
+# reasons about the whole file and reports the hits that lack an
+# htmlSpecialChars within 10 lines.
+#
+# GP is the documented merged GET+POST accessor; there is no bare POST: key.
+# register:/field: can carry content that was written earlier in the pipeline
+# and should be treated as tainted for this check.
+find . -type f \( -name '*.typoscript' \) -print0 | xargs -0 awk '
+  {
+    if ($0 ~ /(^|[^A-Za-z_])data[[:space:]]*=[[:space:]]*(GP|TSFE|register|field):/) {
+      hits[FNR] = $0
+    }
+    buf[NR % 21] = $0
+  }
+  FNR == 1 && NR > 1 { for (l in buf) delete buf[l]; for (l in hits) delete hits[l] }
+  ENDFILE {
+    # Re-scan: for each hit, look at ±10 lines for htmlSpecialChars = 1.
+    n = NR
+    for (l in hits) {
+      ok = 0
+      for (k = (l > 10 ? l - 10 : 1); k <= l + 10 && k <= n; k++) {
+        if (lines[k] ~ /htmlSpecialChars[[:space:]]*=[[:space:]]*1/) { ok = 1; break }
+      }
+      if (!ok) print FILENAME ":" l ": " hits[l] "  # no htmlSpecialChars nearby"
+    }
+    delete hits; delete lines
+  }
+  { lines[FNR] = $0 }
+'
 ```
 
 ## typolink / HMENU / redirect traps

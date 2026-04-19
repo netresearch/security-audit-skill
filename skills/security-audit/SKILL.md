@@ -16,10 +16,10 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 
 ## Expertise Areas
 
-- **Vulnerabilities**: XXE, SQLi, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, SSTI, JWT
+- **Vulnerabilities**: XXE, SQLi, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, SSTI, JWT, type juggling
 - **Standards**: OWASP Top 10 / API / LLM (2025), CWE Top 25, CVSS v3.1/v4.0, OWASP ASVS
-- **Cloud & IaC**: AWS, Azure, GCP; Terraform, Kubernetes, Docker, Helm, Pulumi
-- **API & Frontend**: REST/GraphQL authZ, rate limits, mass assignment, CSP, SRI, DOM-XSS
+- **Cloud & IaC**: AWS, Azure, GCP; Terraform, Kubernetes, Docker, Helm
+- **API & Frontend**: REST/GraphQL authZ, rate limits, mass assignment, CSP, DOM-XSS
 - **AI Agents**: SKILL.md/AGENTS.md/CLAUDE.md/mcp.json/hooks.json audit; prompt injection; excessive agency
 
 ## Reference Files (in `references/`, `.md` implied)
