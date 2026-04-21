@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Use when conducting security assessments — OWASP Top 10, OWASP API Top 10, OWASP LLM Top 10, CWE Top 25, or CVSS scoring — auditing PHP/TYPO3, REST/GraphQL APIs, frontend, Terraform/Kubernetes/Docker IaC, AWS/Azure/GCP cloud, or AI agent configs (SKILL.md/AGENTS.md/CLAUDE.md/mcp.json/hooks.json) for vulnerabilities, or scanning dependencies."
+description: "Use when conducting security assessments — OWASP Top 10 / API / LLM, CWE Top 25, CVSS scoring — auditing PHP/TYPO3 (v14.3 LTS: #109585, HashService removal, Authorize/RateLimit), APIs, frontend, Terraform/K8s/Docker IaC, AWS/Azure/GCP cloud, AI agent configs, or scanning dependencies."
 license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
 compatibility: "Requires grep, jq, gh CLI."
 metadata:
@@ -12,7 +12,7 @@ allowed-tools: Bash(grep:*) Bash(jq:*) Bash(gh:*) Read Glob Grep
 
 # Security Audit Skill
 
-Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4.0), cloud/IaC checks, GitHub project security. 80+ PHP/TYPO3 checkpoints.
+Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4.0), cloud/IaC checks, GitHub security. 80+ PHP/TYPO3 checkpoints (v14.3 LTS in `typo3-security.md`).
 
 ## Expertise Areas
 
