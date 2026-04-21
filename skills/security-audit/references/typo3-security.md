@@ -501,7 +501,7 @@ v14.0 strengthened the HMAC algorithm family from SHA1 to SHA256 (Breaking [#106
 **Detection (grep):**
 ```bash
 grep -rn 'GeneralUtility::hmac(\|HashService' Classes/ --include='*.php'
-grep -rn 'Extbase\\\\Security\\\\Cryptography\\\\HashService' Classes/ --include='*.php'
+grep -rn 'Extbase\\Security\\Cryptography\\HashService' Classes/ --include='*.php'
 ```
 
 **Remediation:** migrate callers to `TYPO3\CMS\Core\Crypto\HashService`; force regeneration of any persisted HMACs.
@@ -527,7 +527,7 @@ v14.2+ ships [`#[Authorize]`](https://docs.typo3.org/c/typo3/cms-core/main/en-us
 grep -rn '#\[Authorize\|#\[RateLimit' Classes/Controller --include='*.php'
 ```
 
-Missing attributes on sensitive endpoints → **recommended finding**. For v13+v14 dual compatibility, guard with `class_exists()` — v13 safely ignores unknown attributes.
+Missing attributes on sensitive endpoints → **recommended finding** (not a vulnerability). For v13+v14 dual compatibility, runtime `class_exists()` guards don't work on attributes (attributes are declarative syntax). Ship polyfill stub classes for v13 so the `use` + `#[…]` constructs parse cleanly on both versions; see `typo3-conformance-skill` `references/v13-v14-dual-compatibility.md` for the concrete pattern.
 
 ### AUDIT-005: TypoScript `userFunc` allow-list (#108054)
 
