@@ -470,3 +470,80 @@ $typo3Patterns = [
 
 ---
 
+## TYPO3 v14.3 LTS security audit checklist
+
+v14.3 LTS (released 2026-04-21) brings several security-relevant changes that should appear on any v13→v14 audit:
+
+### AUDIT-001: Important #109585 — Serialized credential data in `be_users`
+
+**Severity:** HIGH (plaintext credentials persisted in DB)
+**Applies to:** any TYPO3 site that ran v14.2 at any point.
+
+During v14.2 runtime, backend-user password changes could persist serialized plaintext password fields into `be_users.uc` / `user_settings` columns.
+
+**Detection (SQL):**
+```sql
+SELECT uid, username FROM be_users
+WHERE uc LIKE '%password%' OR user_settings LIKE '%password%';
+```
+
+**Remediation:** Install Tool → Upgrade → Upgrade Wizards → run the v14.3-provided wizard that unserializes, strips password fields, and re-serializes. Wizard appears automatically when applicable.
+
+**Citation:** [Important #109585](https://docs.typo3.org/c/typo3/cms-core/main/en-us/Changelog/14.3/Important-109585-SerializedCredentialDataInBeUsersDatabaseTable.html)
+
+### AUDIT-002: HMAC algorithm strengthened (SHA1 → SHA256)
+
+**Severity:** MEDIUM (cryptographic hygiene)
+**Applies to:** all extensions calling `GeneralUtility::hmac()` or `HashService`.
+
+v14.0 strengthened the HMAC algorithm family from SHA1 to SHA256 (Breaking [#106307](https://forge.typo3.org/issues/106307)). Persisted HMACs minted under v13 will no longer validate.
+
+**Detection (grep):**
+```bash
+grep -rn 'GeneralUtility::hmac(\|HashService' Classes/ --include='*.php'
+grep -rn 'Extbase\\Security\\Cryptography\\HashService' Classes/ --include='*.php'
+```
+
+**Remediation:** migrate callers to `TYPO3\CMS\Core\Crypto\HashService`; force regeneration of any persisted HMACs.
+
+### AUDIT-003: Extbase `HashService` removed (for v14 targets)
+
+**Severity:** HIGH (broken code in v14)
+**Applies to:** extensions declaring `typo3/cms-core: ^14`.
+
+`TYPO3\CMS\Extbase\Security\Cryptography\HashService` is **removed in v14** (part of #105377 umbrella). Any extension claiming v14 support that still references it will crash.
+
+**Remediation:** replace with `TYPO3\CMS\Core\Crypto\HashService`. For symmetric-encryption use cases, use the new cipher service (Feature [#108002](https://docs.typo3.org/c/typo3/cms-core/main/en-us/Changelog/14.0/Feature-108002-SymmetricEncryptionAndDecryptionOfData.html)).
+
+### AUDIT-004: Recommended controls — `#[Authorize]` and `#[RateLimit]`
+
+**Severity:** MEDIUM (defense-in-depth)
+**Applies to:** Extbase controllers handling login, password reset, import/export, registration.
+
+v14.2+ ships [`#[Authorize]`](https://docs.typo3.org/c/typo3/cms-core/main/en-us/Changelog/14.2/Feature-107826-IntroduceExtbaseActionAuthorizationLogic.html) (`requireLogin`, `requireGroups`) and [`#[RateLimit]`](https://docs.typo3.org/c/typo3/cms-core/main/en-us/Changelog/14.2/Feature-108982-NewExtbaseAttributeForRateLimitingControllerActions.html) attributes, integrated with TYPO3's unified rate-limiter factory (Feature [#109080](https://docs.typo3.org/c/typo3/cms-core/main/en-us/Changelog/14.2/Feature-109080-UnifiedRateLimiterFactoryWithAdminOverrides.html)).
+
+**Audit:**
+```bash
+grep -rn '#\[Authorize\|#\[RateLimit' Classes/Controller --include='*.php'
+```
+
+Missing attributes on sensitive endpoints → **recommended finding** (not a vulnerability). For v13+v14 dual compatibility, runtime `class_exists()` guards don't work on attributes (attributes are declarative syntax). Ship polyfill stub classes for v13 so the `use` + `#[…]` constructs parse cleanly on both versions; see `typo3-conformance-skill` `references/v13-v14-dual-compatibility.md` for the concrete pattern.
+
+### AUDIT-005: TypoScript `userFunc` allow-list (#108054)
+
+**Severity:** LOW (hardening)
+**Applies to:** sites using TypoScript or TSconfig callables.
+
+Breaking #108054 requires explicit allow-listing via `$GLOBALS['TYPO3_CONF_VARS']['SYS']['allowedFunctions']['typoscript']`. Unlisted callables are silently ignored.
+
+**Detection:** cross-reference TypoScript `userFunc`/`preUserFunc`/`postUserFunc` references against `ext_localconf.php` allow-lists.
+
+### AUDIT-006: SRI + CSP preferences (v14.2+)
+
+- v14.2 adds automatic SRI hash resolution (Feature [#109187](https://docs.typo3.org/c/typo3/cms-core/main/en-us/Changelog/14.2/Feature-109187-IntegrityPropertyAndAutomaticSRIResolving.html)) and `integrity` for CSS includes.
+- `useNonce` in `f:asset:css`/`script` deprecated (Deprecation [#100887](https://docs.typo3.org/c/typo3/cms-core/main/en-us/Changelog/14.2/Deprecation-100887-DeprecateUseNonceArgumentOfAssetViewHelpers.html)) — prefer CSP hashes.
+
+**Audit:** if the project has an active CSP policy, verify migration from nonce-based allow-lists to hash-based.
+
+---
+
