@@ -5,7 +5,7 @@ license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
 compatibility: "Requires grep, jq, gh CLI."
 metadata:
   author: Netresearch DTT GmbH
-  version: "2.7.0"
+  version: "2.8.0"
   repository: https://github.com/netresearch/security-audit-skill
 allowed-tools: Bash(grep:*) Bash(jq:*) Bash(gh:*) Read Glob Grep
 ---
