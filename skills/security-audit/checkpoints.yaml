@@ -1,4 +1,14 @@
 # Checkpoints for security-audit skill
+# CHECKPOINT TYPE SEMANTICS:
+#   `regex`     — passes when pattern IS found. Use for compliance checks
+#                 ("composer audit must be in CI", "PHPStan should be present").
+#   `regex_not` — passes when pattern is ABSENT. Use for anti-pattern checks
+#                 ("$wpdb without prepare", "v-html with user input"). The
+#                 vast majority of SA-* checkpoints fall into this category.
+#   `not_contains` — passes when pattern is absent from a single file (no glob).
+# Inverted semantics caused widespread false positives on clean codebases
+# (filed as netresearch/security-audit-skill#60). When adding new checkpoints,
+# choose the type that makes a CLEAN project PASS by default.
 # Focuses on security best practices for PHP/TYPO3 extensions
 
 version: 2
@@ -451,14 +461,14 @@ mechanical:
 
   # === GITHUB ACTIONS INJECTION ===
   - id: SA-GHA-01
-    type: regex
+    type: regex_not
     target: .github/workflows/*.yml
     pattern: 'run:.*\$\{\{\s*inputs\.'
     severity: error
     desc: "Workflow run: blocks must not interpolate ${{ inputs.* }} directly (code injection). Use env: block instead. Note: only catches single-line run: — SA-GHA-03 LLM review covers multi-line blocks"
 
   - id: SA-GHA-02
-    type: regex
+    type: regex_not
     target: .github/workflows/*.yml
     pattern: 'run:.*\$\{\{\s*github\.event\.'
     severity: error
@@ -503,14 +513,14 @@ mechanical:
 
   # === CSP COMPLIANCE ===
   - id: SA-CSP-01
-    type: regex
+    type: regex_not
     target: "Resources/Private/**/*.html"
     pattern: '<script(?![^>]*\bsrc\s*=)[^>]*>'
     severity: error
     desc: "Inline <script> tags violate Content Security Policy. Move JavaScript to external files loaded via f:be.pageRenderer includeJsFiles or AssetCollector API"
 
   - id: SA-CSP-02
-    type: regex
+    type: regex_not
     target: "Resources/Private/**/*.html"
     pattern: '\son\w+\s*='
     severity: error
@@ -1393,84 +1403,84 @@ mechanical:
 
   # === RUST SECURITY CHECKS ===
   - id: SA-RS-01
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "unsafe\\s*\\{|unsafe\\s+fn\\s|unsafe\\s+impl\\s"
     severity: warning
     desc: "unsafe block/fn/impl — bypasses Rust safety guarantees, audit required"
 
   - id: SA-RS-02
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "extern\\s+\"C\"\\s*\\{|#\\[no_mangle\\]"
     severity: warning
     desc: "FFI boundary — audit for null pointers, lifetime issues, and error handling"
 
   - id: SA-RS-03
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "panic!\\s*\\(|todo!\\s*\\(|unimplemented!\\s*\\("
     severity: warning
     desc: "panic!/todo!/unimplemented! in code — can cause DoS via unwinding"
 
   - id: SA-RS-04
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "\\.unwrap\\(\\)|\\.expect\\(\\s*\""
     severity: warning
     desc: ".unwrap()/.expect() can panic — use ? or match in production paths"
 
   - id: SA-RS-05
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "as\\s+\\*const\\s|as\\s+\\*mut\\s"
     severity: warning
     desc: "Raw pointer cast — potential use-after-free or null deref in unsafe code"
 
   - id: SA-RS-06
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "sql_query\\s*\\(\\s*format!|query.*&format!"
     severity: error
     desc: "SQL query with format! string — use parameterized queries"
 
   - id: SA-RS-07
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "Command::new\\s*\\(\\s*\"(sh|bash|cmd|powershell)\""
     severity: error
     desc: "Shell invocation via Command::new — risk of command injection"
 
   - id: SA-RS-08
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "\\.join\\s*\\(.*\\b(req|input|param|query|user)"
     severity: warning
     desc: "Path join with user input — validate resolved path stays within base"
 
   - id: SA-RS-09
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "serde_json::from_(str|slice|reader)\\s*\\("
     severity: warning
     desc: "Deserialization of potentially untrusted data — enforce size limits"
 
   - id: SA-RS-10
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "==\\s*(token|secret|hmac|hash|key|password|mac|signature)"
     severity: error
     desc: "Non-constant-time comparison of secret — use constant_time_eq"
 
   - id: SA-RS-11
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "mem::forget\\s*\\(|ManuallyDrop::new\\s*\\("
     severity: warning
     desc: "mem::forget/ManuallyDrop prevents cleanup — sensitive data may persist"
 
   - id: SA-RS-12
-    type: regex
+    type: regex_not
     target: "**/*.rs"
     pattern: "(password|secret|api_key|token)\\s*[:=]\\s*\"[^\"]{8,}\""
     severity: error
@@ -1806,56 +1816,56 @@ mechanical:
 
   # === .NET SECURITY CHECKS ===
   - id: SA-DOTNET-01
-    type: regex
+    type: regex_not
     target: "**/*.cs"
     pattern: "UseAuthentication\\s*\\(\\s*\\)[\\s\\S]{0,200}UseRouting\\s*\\(\\s*\\)|MapControllers\\s*\\(\\s*\\)[\\s\\S]{0,200}UseAuthentication\\s*\\(\\s*\\)|UseAuthorization\\s*\\(\\s*\\)[\\s\\S]{0,200}UseAuthentication\\s*\\(\\s*\\)"
     severity: error
     desc: "ASP.NET Core middleware ordering wrong — auth must come before routing/endpoints"
 
   - id: SA-DOTNET-02
-    type: regex
+    type: regex_not
     target: "**/*.cs"
     pattern: "FromSqlRaw\\s*\\(\\s*\\$\"|FromSqlRaw\\s*\\(\\s*\"[^\"]*\"\\s*\\+|ExecuteSqlRaw\\s*\\(\\s*\\$\"|ExecuteSqlRaw\\s*\\(\\s*\"[^\"]*\"\\s*\\+"
     severity: error
     desc: "Entity Framework raw SQL with string interpolation/concatenation — SQL injection"
 
   - id: SA-DOTNET-03
-    type: regex
+    type: regex_not
     target: "**/*.cs"
     pattern: "\\[AllowAnonymous\\]\\s*(?:\\r?\\n\\s*)*(?:public\\s+class|\\[(?:ApiController|Route)\\])"
     severity: error
     desc: "[AllowAnonymous] on controller class — all actions are publicly accessible"
 
   - id: SA-DOTNET-04
-    type: regex
+    type: regex_not
     target: "**/*.cs"
     pattern: "Html\\.Raw\\s*\\((?!.*Sanitiz)|@\\(\\s*\\(MarkupString\\)\\s*\\w+"
     severity: error
     desc: "Razor Html.Raw or MarkupString with unsanitized input — XSS risk"
 
   - id: SA-DOTNET-05
-    type: regex
+    type: regex_not
     target: "**/*.cs"
     pattern: "AllowAnyOrigin\\s*\\(\\s*\\)|SetIsOriginAllowed\\s*\\(\\s*_?\\s*=>\\s*true\\s*\\)"
     severity: error
     desc: "CORS policy allows any origin — credential theft via cross-origin requests"
 
   - id: SA-DOTNET-06
-    type: regex
+    type: regex_not
     target: "**/*.cs"
     pattern: "IgnoreAntiforgeryTokenAttribute\\s*\\(\\s*\\)|IgnoreAntiforgeryToken\\]"
     severity: warning
     desc: "Anti-forgery token validation disabled — CSRF risk"
 
   - id: SA-DOTNET-07
-    type: regex
+    type: regex_not
     target: "**/*.cs"
     pattern: "DisableAutomaticKeyGeneration\\s*\\(\\s*\\)"
     severity: warning
     desc: "Data Protection automatic key generation disabled — keys will expire without rotation"
 
   - id: SA-DOTNET-08
-    type: regex
+    type: regex_not
     target: "**/*.cs"
     pattern: "class\\s+\\w+Hub\\s*:\\s*Hub\\b"
     severity: warning
@@ -1999,42 +2009,42 @@ mechanical:
 
   # === FASTAPI SECURITY ===
   - id: SA-FASTAPI-01
-    type: regex
+    type: regex_not
     target: "**/*.py"
     pattern: "@app\\.(get|post|put|patch|delete)\\("
     severity: warning
     desc: "FastAPI endpoint without Depends() — verify authentication is not missing"
 
   - id: SA-FASTAPI-02
-    type: regex
+    type: regex_not
     target: "**/*.py"
     pattern: "def\\s+\\w+\\s*\\([^)]*:\\s*dict\\s*[,\\)]|:\\s*Any\\s*[,\\)=]|extra\\s*=\\s*[\"']allow[\"']"
     severity: warning
     desc: "Pydantic validation bypass via dict/Any type or extra='allow'"
 
   - id: SA-FASTAPI-03
-    type: regex
+    type: regex_not
     target: "**/*.py"
     pattern: "allow_origins\\s*=\\s*\\[\\s*[\"']\\*[\"']\\s*\\]|CORSMiddleware.*allow_origins.*\\*"
     severity: error
     desc: "FastAPI CORS wildcard origin — allows any domain to make cross-origin requests"
 
   - id: SA-FASTAPI-04
-    type: regex
+    type: regex_not
     target: "**/*.py"
     pattern: "response\\.headers\\s*\\[.*\\]\\s*=\\s*f[\"']|response\\.headers\\s*\\[.*\\]\\s*=.*request\\.|.headers\\s*\\[\\s*[\"']Set-Cookie[\"']\\s*\\]\\s*="
     severity: warning
     desc: "Response header set from user input — potential header injection"
 
   - id: SA-FASTAPI-05
-    type: regex
+    type: regex_not
     target: "**/*.py"
     pattern: "UploadFile.*filename|file\\.filename|shutil\\.copyfileobj\\s*\\(\\s*file"
     severity: warning
     desc: "FastAPI file upload — verify size limit, type validation, and filename sanitization"
 
   - id: SA-FASTAPI-06
-    type: regex
+    type: regex_not
     target: "**/*.py"
     pattern: "algorithms\\s*=\\s*\\[.*none.*\\]|jwt\\.decode\\s*\\(\\s*token\\s*,\\s*[^,]+\\s*\\)\\s*$|ACCESS_TOKEN_EXPIRE.*(?:525600|86400|43200)"
     severity: error
@@ -2042,42 +2052,42 @@ mechanical:
 
   # === GIN (GO) SECURITY CHECKS ===
   - id: SA-GIN-01
-    type: regex
+    type: regex_not
     target: "**/*.go"
     pattern: "\\.Use\\(auth[A-Za-z]*\\("
     severity: error
     desc: "Auth middleware may be registered after routes — verify ordering"
 
   - id: SA-GIN-02
-    type: regex
+    type: regex_not
     target: "**/*.go"
     pattern: "c\\.(Bind|ShouldBind|ShouldBindJSON|BindJSON|ShouldBindQuery)\\s*\\("
     severity: warning
     desc: "Gin binding function — verify struct does not contain sensitive fields (mass assignment)"
 
   - id: SA-GIN-03
-    type: regex
+    type: regex_not
     target: "**/*.go"
     pattern: "template\\.HTML\\s*\\(|c\\.Data\\s*\\([^)]*\"text/html|c\\.Writer\\.WriteString\\s*\\("
     severity: error
     desc: "Raw HTML output bypassing template auto-escaping — potential XSS"
 
   - id: SA-GIN-04
-    type: regex
+    type: regex_not
     target: "**/*.go"
     pattern: "AllowAllOrigins\\s*:\\s*true|AllowOrigins\\s*:\\s*\\[\\s*\"\\*\"\\s*\\]|AllowOriginFunc\\s*:.*return\\s+true"
     severity: error
     desc: "CORS misconfiguration — wildcard or permissive origin policy"
 
   - id: SA-GIN-05
-    type: regex
+    type: regex_not
     target: "**/*.go"
     pattern: "c\\.(File|FileAttachment)\\s*\\([^)]*c\\.(Param|Query|PostForm)\\s*\\("
     severity: error
     desc: "User-controlled path in c.File/c.FileAttachment — path traversal risk"
 
   - id: SA-GIN-06
-    type: regex
+    type: regex_not
     target: "**/*.go"
     pattern: "gin\\.New\\s*\\(\\s*\\)"
     severity: warning
@@ -2440,7 +2450,7 @@ mechanical:
     desc: "Key Vault using access policies instead of RBAC — harder to audit"
 
   - id: SA-AZURE-09
-    type: regex_not
+    type: regex
     target: "**/*.{tf,json,bicep,yaml,yml}"
     pattern: "azurerm_monitor_diagnostic_setting"
     severity: warning
