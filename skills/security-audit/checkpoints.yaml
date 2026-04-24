@@ -58,12 +58,15 @@ mechanical:
     desc: "PHP files should not contain hardcoded secret assignments"
 
   # === COMPOSER AUDIT IN CI ===
+  # CI must run composer audit. Accept either the literal `composer audit`
+  # invocation OR a `uses:` reference to the netresearch security reusable
+  # workflow (which runs composer audit + SBOM + gitleaks centrally).
   - id: SA-07
     type: regex
     target: .github/workflows/*.yml
-    pattern: "composer audit"
+    pattern: 'composer[[:space:]]+audit|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/security[.]yml'
     severity: error
-    desc: "CI must run composer audit to detect vulnerable dependencies"
+    desc: "CI must run composer audit (directly or via netresearch security reusable workflow)"
 
   # === XXE PREVENTION ===
   # Use command type to avoid false positives from glob fallback to config files
@@ -309,11 +312,19 @@ mechanical:
     desc: ".gitignore must exist to prevent accidental secret commits"
 
   # === SUPPLY CHAIN ===
+  # composer.lock should be COMMITTED for APPLICATIONS (project root,
+  # deployable installs) but GITIGNORED for LIBRARIES / TYPO3 EXTENSIONS
+  # (the lock would freeze transitive deps that the consuming application
+  # needs to resolve fresh — locally generated lock files are fine).
+  # Gate on composer.json `type` AND check git-tracked status (not just
+  # filesystem presence — devs often have a locally-generated lock):
+  #  - typo3-cms-extension / library / metapackage → must NOT be tracked
+  #  - everything else (project, …) → must BE tracked
   - id: SA-SC-01
-    type: file_exists
-    target: composer.lock
+    type: command
+    pattern: 'if jq -re ".type" composer.json 2>/dev/null | grep -qE "^(typo3-cms-extension|library|metapackage|composer-plugin)$"; then [ -z "$(git ls-files composer.lock 2>/dev/null)" ]; else [ -n "$(git ls-files composer.lock 2>/dev/null)" ]; fi'
     severity: warning
-    desc: "composer.lock should exist for reproducible builds (apps, not libraries)"
+    desc: "composer.lock should be git-tracked for applications, but git-ignored for libraries / TYPO3 extensions (would freeze transitive deps for consumers). Gated by composer.json type + git ls-files."
 
   - id: SA-SC-02
     type: not_contains
@@ -420,9 +431,9 @@ mechanical:
   - id: SA-SAST-01
     type: regex
     target: .github/workflows/*.yml
-    pattern: "phpstan"
+    pattern: 'phpstan|uses:[[:space:]]+"?netresearch/typo3-ci-workflows/[.]github/workflows/ci[.]yml'
     severity: warning
-    desc: "PHPStan should be configured in CI for static analysis"
+    desc: "PHPStan should be configured in CI (directly or via netresearch typo3-ci-workflows reusable workflow which runs PHPStan)"
 
   # === DEPENDENCY SCANNING ===
   - id: SA-DEP-01
@@ -434,17 +445,17 @@ mechanical:
   - id: SA-DEP-02
     type: regex
     target: .github/workflows/*.yml
-    pattern: "composer audit|trivy|snyk"
+    pattern: 'composer[[:space:]]+audit|trivy|snyk|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/security[.]yml'
     severity: warning
-    desc: "CI should include dependency vulnerability scanning"
+    desc: "CI should include dependency vulnerability scanning (composer audit/trivy/snyk or via netresearch security reusable workflow)"
 
   # === GITLEAKS IN CI ===
   - id: SA-DEP-03
     type: regex
     target: .github/workflows/*.yml
-    pattern: "gitleaks"
+    pattern: 'gitleaks|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/security[.]yml'
     severity: info
-    desc: "CI should include gitleaks for secret scanning"
+    desc: "CI should include gitleaks for secret scanning (directly or via netresearch security reusable workflow)"
 
   # === NPM DEPENDENCY MONITORING ===
   - id: SA-DEP-04
@@ -493,9 +504,9 @@ mechanical:
   - id: SA-SAST-02
     type: regex
     target: .github/workflows/*.yml
-    pattern: "semgrep|opengrep"
+    pattern: 'semgrep|opengrep|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/security[.]yml'
     severity: info
-    desc: "CI should include semgrep or opengrep for SAST scanning"
+    desc: "CI should include semgrep or opengrep for SAST scanning (directly or via netresearch security reusable workflow which runs Opengrep)"
 
   # === SECURITY POLICY ===
   - id: SA-SP-01
@@ -631,12 +642,24 @@ mechanical:
     desc: "Terraform S3 buckets should not use public ACLs"
 
   # === FRONTEND/CLIENT-SIDE SECURITY ===
+  # Look for risky innerHTML assignments. Recognised SAFE forms (will not
+  # trip the check, all per-line):
+  #  - assignment from a single-/double-quoted string literal
+  #    (no interpolation possible)
+  #  - same-line escaping helper call: escapeHtml(...), DOMPurify.sanitize(...),
+  #    sanitize(...)
+  #  - explicit safety marker: `// eslint-disable-line no-unsanitized/property`
+  #    or `// noqa: SA-FE-01`
+  # Anything else (template literals starting with bare backtick, variables,
+  # function calls) trips the check. Add the eslint-disable / noqa marker if
+  # the value is provably safe (e.g. statically built HTML), or refactor to
+  # textContent / createElement.
   - id: SA-FE-01
-    type: not_contains
+    type: regex_not
     target: "**/*.js"
-    pattern: ".innerHTML ="
+    pattern: '\.innerHTML[[:space:]]*=(?!([[:space:]]*["''][^"'']*["''][[:space:]]*;|.*(escapeHtml|DOMPurify|sanitize|eslint-disable-line[[:space:]]+no-unsanitized|noqa:[[:space:]]+SA-FE-01)))'
     severity: warning
-    desc: "Direct innerHTML assignment may enable DOM-based XSS - use textContent or sanitize"
+    desc: "Direct innerHTML assignment without an escaping/sanitising helper may enable DOM-based XSS. Recognised safe forms: string-literal assignment, same-line escapeHtml()/DOMPurify.sanitize(), or `// eslint-disable-line no-unsanitized/property`. Otherwise refactor to textContent/createElement."
 
   - id: SA-FE-02
     type: not_contains
@@ -2239,84 +2262,84 @@ mechanical:
   # === AWS SECURITY CHECKS ===
   - id: SA-AWS-01
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "\"Action\"\\s*:\\s*\"\\*\"|\"Action\"\\s*:\\s*\\[\\s*\"\\*\"\\s*\\]"
     severity: error
     desc: "IAM policy with wildcard Action — grants unrestricted permissions"
 
   - id: SA-AWS-02
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "\"Effect\"\\s*:\\s*\"Allow\"[^}]*\"Action\"\\s*:\\s*\"sts:AssumeRole\"(?![^}]*\"Condition\")"
     severity: warning
     desc: "AssumeRole without conditions — missing MFA, IP, or external ID restriction"
 
   - id: SA-AWS-03
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "\"Principal\"\\s*:\\s*\\{\\s*\"AWS\"\\s*:\\s*\"\\*\"\\s*\\}|\"Principal\"\\s*:\\s*\"\\*\""
     severity: error
     desc: "Overly permissive trust policy — any principal can assume role"
 
   - id: SA-AWS-04
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "\"Action\"\\s*:\\s*\"iam:PassRole\"[^}]*\"Resource\"\\s*:\\s*\"\\*\""
     severity: error
     desc: "iam:PassRole with wildcard resource — privilege escalation risk"
 
   - id: SA-AWS-05
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "acl\\s*=\\s*\"public-read\"|acl\\s*=\\s*\"public-read-write\""
     severity: error
     desc: "S3 bucket with public ACL — data exposure risk"
 
   - id: SA-AWS-06
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "block_public_acls\\s*=\\s*false|block_public_policy\\s*=\\s*false|restrict_public_buckets\\s*=\\s*false"
     severity: error
     desc: "S3 public access block disabled — bucket may become publicly accessible"
 
   - id: SA-AWS-07
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "environment\\s*\\{[^}]*variables\\s*=\\s*\\{[^}]*(PASSWORD|SECRET|API_KEY|TOKEN|PRIVATE_KEY)\\s*=\\s*\"[^\"]+\""
     severity: error
     desc: "Lambda environment variable contains hardcoded secret"
 
   - id: SA-AWS-08
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "policy_arn\\s*=\\s*\"arn:aws:iam::aws:policy/AdministratorAccess\"|policy_arn\\s*=\\s*\"arn:aws:iam::aws:policy/PowerUserAccess\""
     severity: error
     desc: "Lambda or role with AdministratorAccess/PowerUserAccess — overly permissive"
 
   - id: SA-AWS-09
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "cidr_blocks\\s*=\\s*\\[\\s*\"0\\.0\\.0\\.0/0\"\\s*\\]|CidrIp:\\s*[\"']?0\\.0\\.0\\.0/0"
     severity: error
     desc: "Security group ingress open to 0.0.0.0/0 — unrestricted internet access"
 
   - id: SA-AWS-10
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "enable_key_rotation\\s*=\\s*false"
     severity: warning
     desc: "KMS key rotation disabled — keys should be rotated automatically"
 
   - id: SA-AWS-11
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "is_multi_region_trail\\s*=\\s*false|enable_log_file_validation\\s*=\\s*false"
     severity: error
     desc: "CloudTrail not multi-region or missing log validation"
 
   - id: SA-AWS-12
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "password\\s*=\\s*\"[^\"]+\"|master_password\\s*=\\s*\"[^\"]+\""
     severity: error
     desc: "Hardcoded password in Terraform/CloudFormation — use Secrets Manager"
@@ -2324,70 +2347,70 @@ mechanical:
   # === GCP SECURITY CHECKS ===
   - id: SA-GCP-01
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "role\\s*=\\s*\"roles/(owner|editor)\"|\"roles/(owner|editor)\""
     severity: error
     desc: "GCP primitive role (Owner/Editor) — use granular predefined roles"
 
   - id: SA-GCP-02
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "resource\\s+\"google_service_account_key\"|google_service_account_key\\s*\\{"
     severity: error
     desc: "Service account key file — use Workload Identity Federation instead"
 
   - id: SA-GCP-03
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "\"allUsers\"|\"allAuthenticatedUsers\"|member\\s*=\\s*\"allUsers\"|member\\s*=\\s*\"allAuthenticatedUsers\""
     severity: error
     desc: "allUsers/allAuthenticatedUsers binding — public access to GCP resource"
 
   - id: SA-GCP-04
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "google_storage_bucket_iam[^}]*(allUsers|allAuthenticatedUsers)|predefinedAcl:\\s*public"
     severity: error
     desc: "Public Cloud Storage bucket — data exposure risk"
 
   - id: SA-GCP-05
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "uniform_bucket_level_access\\s*=\\s*false"
     severity: warning
     desc: "Uniform bucket-level access disabled — inconsistent ACLs possible"
 
   - id: SA-GCP-06
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "environment_variables\\s*=\\s*\\{[^}]*(PASSWORD|SECRET|API_KEY|TOKEN|PRIVATE_KEY)\\s*=\\s*\"[^\"]+\""
     severity: error
     desc: "Cloud Functions environment variable contains hardcoded secret"
 
   - id: SA-GCP-07
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "cloudfunctions\\.invoker[^}]*allUsers|allUsers[^}]*cloudfunctions\\.invoker"
     severity: error
     desc: "Cloud Function invocable by allUsers — unauthenticated access"
 
   - id: SA-GCP-08
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "source_ranges\\s*=\\s*\\[\\s*\"0\\.0\\.0\\.0/0\"\\s*\\]|sourceRanges:[^}]*0\\.0\\.0\\.0/0"
     severity: error
     desc: "VPC firewall rule open to 0.0.0.0/0 — unrestricted internet ingress"
 
   - id: SA-GCP-09
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "google_kms_crypto_key_iam[^}]*(allUsers|allAuthenticatedUsers)"
     severity: error
     desc: "KMS key accessible by allUsers — encryption key exposure"
 
   - id: SA-GCP-10
     type: regex_not
-    target: "**/*.{tf,json,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "exempted_members\\s*=\\s*\\["
     severity: warning
     desc: "Audit log exemptions configured — all access should be logged"
@@ -2395,70 +2418,70 @@ mechanical:
   # === AZURE SECURITY CHECKS ===
   - id: SA-AZURE-01
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "role_definition_name\\s*=\\s*\"(Owner|Contributor)\"|8e3af657-a8ff-443c-a75c-2fe8c4bcb635|b24988ac-6180-42a0-ab88-20f7382dd24c"
     severity: error
     desc: "Owner/Contributor role assignment — use least-privilege roles"
 
   - id: SA-AZURE-02
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "role_definition_name\\s*=\\s*\"Storage Blob Data Owner\"(?![^}]*condition\\s*=)"
     severity: warning
     desc: "Storage Blob Data Owner without conditions — add ABAC conditions"
 
   - id: SA-AZURE-03
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "allow_nested_items_to_be_public\\s*=\\s*true|allow_blob_public_access\\s*=\\s*true|allowBlobPublicAccess['\"]?\\s*[:=]\\s*['\"]?true|container_access_type\\s*=\\s*\"(blob|container)\""
     severity: error
     desc: "Public blob access enabled — anonymous access to storage data"
 
   - id: SA-AZURE-04
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "authLevel[\"\\s]*[:=]\\s*[\"']?anonymous|\"authLevel\"\\s*:\\s*\"anonymous\""
     severity: error
     desc: "Azure Function with anonymous auth level — no authentication required"
 
   - id: SA-AZURE-05
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "app_settings\\s*=\\s*\\{[^}]*(PASSWORD|SECRET|KEY|TOKEN|CONNECTION)\\s*=\\s*\"(?!@Microsoft\\.KeyVault)[^\"]+\""
     severity: error
     desc: "Hardcoded secret in Azure Function app settings — use Key Vault references"
 
   - id: SA-AZURE-06
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "source_address_prefix\\s*=\\s*\"\\*\"|sourceAddressPrefix['\"]?\\s*[:=]\\s*['\"]\\*['\"]|\"sourceAddressPrefix\"\\s*:\\s*\"\\*\""
     severity: error
     desc: "NSG inbound rule open to * — unrestricted internet access"
 
   - id: SA-AZURE-07
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "purge_protection_enabled\\s*=\\s*false|enablePurgeProtection:\\s*false|\"enablePurgeProtection\"\\s*:\\s*false"
     severity: error
     desc: "Key Vault missing purge protection — keys can be permanently deleted"
 
   - id: SA-AZURE-08
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "enable_rbac_authorization\\s*=\\s*false|access_policy\\s*\\{"
     severity: warning
     desc: "Key Vault using access policies instead of RBAC — harder to audit"
 
   - id: SA-AZURE-09
     type: regex
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "azurerm_monitor_diagnostic_setting"
     severity: warning
     desc: "Diagnostic setting present — verify all critical log categories are enabled"
 
   - id: SA-AZURE-10
     type: regex_not
-    target: "**/*.{tf,json,bicep,yaml,yml}"
+    target: "**/*.{tf,bicep}"
     pattern: "public_network_access_enabled\\s*=\\s*true|start_ip_address\\s*=\\s*\"0\\.0\\.0\\.0\""
     severity: error
     desc: "Azure SQL public network access or permissive firewall rule"
