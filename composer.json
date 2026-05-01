@@ -11,7 +11,7 @@
         }
     ],
     "require": {
-        "netresearch/composer-agent-skill-plugin": "^1.0"
+        "netresearch/composer-agent-skill-plugin": "^2.0"
     },
     "replace": {
         "netresearch/agent-security-audit": "self.version"
