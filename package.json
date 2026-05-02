@@ -1,0 +1,37 @@
+{
+  "name": "@netresearch/security-audit-skill",
+  "version": "0.0.0-source",
+  "description": "Netresearch AI skill for security audits (OWASP, CWE, CVSS). Universal patterns + deep PHP/TYPO3 scanning with 80+ checkpoints.",
+  "license": "(MIT AND CC-BY-SA-4.0)",
+  "author": "Netresearch DTT GmbH (https://www.netresearch.de/)",
+  "homepage": "https://github.com/netresearch/security-audit-skill",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/netresearch/security-audit-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/netresearch/security-audit-skill/issues"
+  },
+  "keywords": [
+    "ai-agent-skill",
+    "security",
+    "owasp",
+    "cwe",
+    "cvss",
+    "audit",
+    "anthropic",
+    "claude-code"
+  ],
+  "aiAgentSkill": "skills/security-audit/SKILL.md",
+  "files": [
+    "skills/security-audit/",
+    "hooks/",
+    "scripts/",
+    "LICENSE-MIT",
+    "LICENSE-CC-BY-SA-4.0",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@netresearch/agent-skill-coordinator": "^0.1"
+  }
+}
