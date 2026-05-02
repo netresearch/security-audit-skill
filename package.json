@@ -25,6 +25,8 @@
   "aiAgentSkill": "skills/security-audit/SKILL.md",
   "files": [
     "skills/security-audit/",
+    "hooks/",
+    "scripts/",
     "LICENSE-MIT",
     "LICENSE-CC-BY-SA-4.0",
     "README.md"
