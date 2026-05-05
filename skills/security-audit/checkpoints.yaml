@@ -19,8 +19,9 @@ mechanical:
   - id: SA-01
     type: file_exists
     target: "{SECURITY.md,.github/SECURITY.md,docs/SECURITY.md}"
+    org_provides: SECURITY.md
     severity: info
-    desc: "SECURITY.md should exist for vulnerability reporting (satisfied org-wide if the GitHub owner has a `.github` repo providing this file)"
+    desc: "SECURITY.md should exist for vulnerability reporting. Satisfied org-wide via {owner}/.github/SECURITY.md when present."
 
   # === SECRETS NOT IN VCS ===
   - id: SA-02
@@ -511,8 +512,9 @@ mechanical:
   - id: SA-SP-01
     type: file_exists
     target: "{SECURITY.md,.github/SECURITY.md,docs/SECURITY.md}"
+    org_provides: SECURITY.md
     severity: warning
-    desc: "SECURITY.md must exist with vulnerability reporting instructions (satisfied org-wide if the GitHub owner has a `.github` repo providing this file)"
+    desc: "SECURITY.md must exist with vulnerability reporting instructions. Satisfied org-wide via {owner}/.github/SECURITY.md when present."
 
   - id: SA-SP-02
     type: contains
