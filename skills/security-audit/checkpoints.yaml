@@ -15,13 +15,9 @@ version: 2
 skill_id: security-audit
 
 mechanical:
-  # === SECURITY DOCUMENTATION ===
-  - id: SA-01
-    type: file_exists
-    target: "{SECURITY.md,.github/SECURITY.md,docs/SECURITY.md}"
-    org_provides: SECURITY.md
-    severity: info
-    desc: "SECURITY.md should exist for vulnerability reporting. Satisfied org-wide via {owner}/.github/SECURITY.md when present."
+  # SECURITY.md existence is covered by SA-SP-01 (warning severity, with
+  # org_provides fallback). The previous SA-01 duplicated that check at info
+  # severity and was removed.
 
   # === SECRETS NOT IN VCS ===
   - id: SA-02
@@ -327,9 +323,15 @@ mechanical:
     severity: warning
     desc: "composer.lock should be git-tracked for applications, but git-ignored for libraries / TYPO3 extensions (would freeze transitive deps for consumers). Gated by composer.json type + git ls-files."
 
+  # Use single-quoted YAML so the runner (which captures inner-quote content
+  # verbatim via regex without YAML unescape) sees a usable bash string. The
+  # jq filter is wrapped in bash double-quotes with `\"` for jq string
+  # literals — the runner regex preserves backslashes, and bash unescapes
+  # them on `<<<` invocation. Empty input (no composer.json) → jq exits
+  # non-zero → `!` makes the checkpoint pass (skip).
   - id: SA-SC-02
     type: command
-    pattern: "! jq -r '[.require // {}, .\"require-dev\" // {}] | add | to_entries[] | select(.value == \"*\") | .key' composer.json 2>/dev/null | sed '/^netresearch\\//d' | head -1 | grep -q ."
+    target: '! jq -e "([.require // {}, .[\"require-dev\"] // {}] | add | to_entries[] | select(.value == \"*\" and (.key | startswith(\"netresearch/\") | not)))" composer.json >/dev/null 2>&1'
     severity: error
     desc: "Wildcard (*) version constraints are insecure for external packages. Internal netresearch/* packages may use '*' (intentional intra-org versioning)."
 
