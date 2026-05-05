@@ -18,9 +18,9 @@ mechanical:
   # === SECURITY DOCUMENTATION ===
   - id: SA-01
     type: file_exists
-    target: SECURITY.md
-    severity: warning
-    desc: "SECURITY.md should exist for vulnerability reporting"
+    target: "{SECURITY.md,.github/SECURITY.md,docs/SECURITY.md}"
+    severity: info
+    desc: "SECURITY.md should exist for vulnerability reporting (satisfied org-wide if the GitHub owner has a `.github` repo providing this file)"
 
   # === SECRETS NOT IN VCS ===
   - id: SA-02
@@ -327,11 +327,10 @@ mechanical:
     desc: "composer.lock should be git-tracked for applications, but git-ignored for libraries / TYPO3 extensions (would freeze transitive deps for consumers). Gated by composer.json type + git ls-files."
 
   - id: SA-SC-02
-    type: not_contains
-    target: "composer.json"
-    pattern: '"*"'
+    type: command
+    pattern: "! jq -r '[.require // {}, .\"require-dev\" // {}] | add | to_entries[] | select(.value == \"*\") | .key' composer.json 2>/dev/null | sed '/^netresearch\\//d' | head -1 | grep -q ."
     severity: error
-    desc: "Wildcard (*) version constraints in composer.json are insecure"
+    desc: "Wildcard (*) version constraints are insecure for external packages. Internal netresearch/* packages may use '*' (intentional intra-org versioning)."
 
   # === TYPE JUGGLING (CWE-843) ===
   - id: SA-41
@@ -511,13 +510,13 @@ mechanical:
   # === SECURITY POLICY ===
   - id: SA-SP-01
     type: file_exists
-    target: SECURITY.md
+    target: "{SECURITY.md,.github/SECURITY.md,docs/SECURITY.md}"
     severity: warning
-    desc: "SECURITY.md must exist with vulnerability reporting instructions"
+    desc: "SECURITY.md must exist with vulnerability reporting instructions (satisfied org-wide if the GitHub owner has a `.github` repo providing this file)"
 
   - id: SA-SP-02
     type: contains
-    target: SECURITY.md
+    target: "{SECURITY.md,.github/SECURITY.md,docs/SECURITY.md}"
     pattern: "Reporting"
     severity: warning
     desc: "SECURITY.md should contain reporting instructions"
