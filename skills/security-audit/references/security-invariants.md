@@ -1,6 +1,6 @@
 # Security Invariants as Runtime Assertions
 
-Encode security guarantees as runtime checks in the code path, not only in tests. A test proves the guarantee held during the test run; an inline assertion proves it holds in production — and fails loudly when it doesn't.
+Encode security guarantees as runtime checks in the code path, not only in tests. A test proves the guarantee held during the test run; an **always-on** inline check proves it holds in production and fails loudly when it doesn't. For security invariants specifically, prefer mechanisms that cannot be stripped at deploy time (a thrown `InvariantViolation`, not a strippable `assert()` / `assert` statement) — see the language-idioms table below.
 
 ## Why
 
@@ -20,9 +20,9 @@ If any one is missing, you want input validation, authorization middleware, or a
 |--------|-----------|-----------------|
 | Authorization boundary | "this branch only runs for principals with capability X" | First line of the sensitive function |
 | Tenant isolation | "every row this query touches belongs to tenant T" | Before executing, after fetching |
-| Principal binding | "the resource identified by id Y is owned by the current actor" | Between authorisation check and mutation |
+| Principal binding | "the resource identified by id Y is owned by the current actor" | Between authorization check and mutation |
 | Capability checks | "this code path is unreachable for anonymous sessions" | Inside the branch |
-| Redaction | "this response body contains no PII when the requester is unauthenticated" | Just before the response is serialised |
+| Redaction | "this response body contains no PII when the requester is unauthenticated" | Just before the response is serialized |
 | Crypto state | "this key is only ever used with the cipher mode it was generated for" | At the use site, not at construction |
 | Audit logging | "every mutation reaches the audit sink" | Postcondition on the service method |
 
@@ -49,17 +49,20 @@ public function deleteInvoice(int $invoiceId, User $actor): void
         throw new ForbiddenException();              // validation: caller's mistake
     }
 
-    // From here on, authorisation is established. State the invariant.
-    \assert(
-        $this->authz->can($actor, 'invoice.delete', $invoiceId),
-        sprintf('authz invariant violated: actor=%d invoice=%d', $actor->id, $invoiceId)
-    );
+    // From here on, authorization is established. State the invariant —
+    // always-on, because `\assert()` is stripped under zend.assertions=-1
+    // in production and we cannot let a security guarantee evaporate.
+    if (!$this->authz->can($actor, 'invoice.delete', $invoiceId)) {
+        throw new InvariantViolation(
+            sprintf('authz invariant violated: actor=%d invoice=%d', $actor->id, $invoiceId)
+        );
+    }
 
     $this->repository->delete($invoiceId);
 }
 ```
 
-Why the assertion when the check is one line up: refactors split functions. The assertion at the mutation site keeps the guarantee local to the dangerous operation, so a later refactor that moves the authz check cannot silently weaken it.
+Why the second check when one is one line up: refactors split functions. The check at the mutation site keeps the guarantee local to the dangerous operation, so a later refactor that moves the authz check cannot silently weaken it.
 
 ### Tenant isolation
 
@@ -128,14 +131,17 @@ The duplicated check is intentional. The first is validation (user-facing error)
 
 ```python
 def serialize_for(viewer: Viewer, doc: Document) -> dict:
-    body = _serialise(doc)
+    body = _serialize(doc)
     if not viewer.is_authenticated:
         body = _redact(body)
 
     # Postcondition: anonymous viewers never see PII fields.
+    # Always-on: `assert` is stripped under `python -O`, which would
+    # silently disable this guarantee in production.
     if not viewer.is_authenticated:
-        assert "ssn" not in body and "email" not in body, \
-            f"redaction invariant violated: leaked fields = {set(body) & {'ssn', 'email'}}"
+        leaked = set(body) & {"ssn", "email"}
+        if leaked:
+            raise InvariantViolation(f"redaction invariant violated: leaked={leaked}")
     return body
 ```
 
@@ -147,15 +153,15 @@ A failing security invariant must crash the request, not log-and-continue. Catch
 
 ### Language idioms
 
-| Language | Mechanism | Production behaviour |
-|----------|-----------|----------------------|
-| PHP | `assert()` with `zend.assertions=1` (dev/CI), `-1` (prod). For always-on: throw a custom `InvariantViolation` | Compile-out optional |
-| Go | `if !cond { panic(...) }` or a helper; panic crosses goroutine boundary | Always-on; recover only at supervisor root |
-| TypeScript/Node | `throw new InvariantViolation(...)` from a small helper | Always-on; surface as 500 with no detail |
-| Python | `assert` (stripped with `-O`); for always-on use `if not cond: raise InvariantViolation` | Compile-out optional |
-| Rust | `assert!`/`debug_assert!`; prefer the former for security invariants | Always-on (release builds keep `assert!`) |
+| Language | Always-on mechanism (use this for security) | Strippable mechanism (do NOT use for security) |
+|----------|---------------------------------------------|-------------------------------------------------|
+| PHP | `throw new InvariantViolation(...)` | `assert(...)` — stripped under `zend.assertions=-1` |
+| Go | `if !cond { panic(...) }` — panic unwinds the goroutine; an unrecovered panic crashes the whole process. Only recover at the supervisor root (HTTP server, worker pool) — never around a security invariant | (No strippable form in Go) |
+| TypeScript / Node | `throw new InvariantViolation(...)` from a small helper; surface as 500 with no detail | (No strippable form) |
+| Python | `if not cond: raise InvariantViolation(...)` | `assert ...` — stripped under `python -O` |
+| Rust | `assert!(...)` — kept in release builds | `debug_assert!(...)` — compiled out in release |
 
-For security invariants specifically, prefer **always-on** over compile-strip. The cost of a check is negligible compared to the cost of a missed breach.
+The cost of a security check is negligible compared to the cost of a missed breach. Always-on every time.
 
 ### Sensitive-data hygiene in the message
 
@@ -166,7 +172,7 @@ Assertion messages reach logs. Do not log secrets, tokens, full PII, or session 
 - **Input validation** (`references/input-validation.md`) — handles the boundary; invariants protect the interior
 - **Authentication patterns** (`references/authentication-patterns.md`) — session/JWT establish identity; invariants encode what that identity is allowed to touch
 - **Security logging** (`references/security-logging.md`) — assertion failures should reach the security-event sink
-- **Error message sanitisation** (`references/error-message-sanitization.md`) — invariant violations must not leak detail to the user
+- **Error message sanitization** (`references/error-message-sanitization.md`) — invariant violations must not leak detail to the user
 - **OWASP Top 10** (`references/owasp-top10.md`) — A01 Broken Access Control, A04 Insecure Design, A09 Logging Failures are the primary fits
 
 ## Anti-Patterns
