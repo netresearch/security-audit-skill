@@ -12,7 +12,7 @@ allowed-tools: Bash(grep:*) Bash(jq:*) Bash(gh:*) Read Glob Grep
 
 # Security Audit Skill
 
-Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4.0), cloud/IaC checks, GitHub security. 80+ PHP/TYPO3 checkpoints (v14.3 LTS in `typo3-security.md`).
+Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4.0), cloud/IaC, GitHub security. 80+ PHP/TYPO3 checkpoints (v14.3 LTS in `typo3-security.md`).
 
 ## Expertise Areas
 
@@ -35,7 +35,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **AI Agent**: llm-security (OWASP LLM Top 10 2025)
 - **Shared**: framework-security
 - **Threats**: modern-attacks, cve-patterns, cve-database
-- **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security, git-history-secrets (pre-publication history scrub)
+- **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security, git-history-secrets
 - **Incident**: supply-chain-incident-response
 
 ## Quick Patterns
