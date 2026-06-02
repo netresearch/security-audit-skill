@@ -2,13 +2,16 @@
 
 Auditing a repository **before it goes public** — or before pushing a local/private repo to a new remote — is a distinct check from scanning the working tree. A clean `HEAD` does not mean a clean history: secrets and internal notes that were committed and later "deleted" remain in every clone of the history, and flipping a repo to public (or mirroring it) exposes all of it.
 
-This complements the live-tree scanners (`scripts/scanners/secrets.sh`, [`ci-security-pipeline.md`](ci-security-pipeline.md) § Gitleaks) — those find what is *currently* committed. This reference covers what *used to be* committed, and how to remove it.
+`scripts/scanners/secrets.sh` and the Gitleaks job in [`ci-security-pipeline.md`](ci-security-pipeline.md) already scan history for *secrets* (the script runs `trufflehog git` when a `.git` directory is present). This reference adds what they don't cover: **AI-context-file** leak detection in history, the **removal/scrub** recipe, and the pre-publication workflow that ties scanning and remediation together.
 
 ## 1. Scan the full history for secrets
 
-A shallow clone or a `HEAD`-only scan misses secrets introduced and later removed. Walk the entire commit graph:
+A shallow clone or a `HEAD`-only scan misses secrets introduced and later removed. First make sure the clone has full history, then walk the entire commit graph:
 
 ```bash
+# A shallow clone has no history to scan — deepen it first
+[ "$(git rev-parse --is-shallow-repository)" = true ] && git fetch --unshallow
+
 # TruffleHog — git mode walks every commit, not just the working tree
 trufflehog git "file://$(pwd)" --only-verified --json
 
