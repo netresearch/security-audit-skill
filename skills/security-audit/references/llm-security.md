@@ -689,6 +689,8 @@ grep -rLE "ask.*user|confirm|approval|human.*review|MUST NOT" skills/*/SKILL.md
 
 System prompt leakage occurs when the content of SKILL.md, AGENTS.md, CLAUDE.md, or other configuration files is exposed to unauthorized parties. This is particularly dangerous when these files contain credentials, internal URLs, security control logic, or business-sensitive filtering criteria.
 
+> A sanitized working-tree copy still leaks through **git history**: an earlier revision of `CLAUDE.md`/`AGENTS.md`/`.cursorrules` may retain what `HEAD` no longer shows. Before a repo goes public, scan and scrub history — see [`git-history-secrets.md`](git-history-secrets.md).
+
 ### Detection Patterns
 
 **Credentials in system prompts:**

@@ -35,7 +35,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **AI Agent**: llm-security (OWASP LLM Top 10 2025)
 - **Shared**: framework-security
 - **Threats**: modern-attacks, cve-patterns, cve-database
-- **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security
+- **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security, git-history-secrets (pre-publication history scrub)
 - **Incident**: supply-chain-incident-response
 
 ## Quick Patterns
