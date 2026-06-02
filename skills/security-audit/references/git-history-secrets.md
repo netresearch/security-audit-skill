@@ -33,7 +33,7 @@ Find any path that existed in *any* commit, even if it is gone from the working 
 
 ```bash
 for p in CLAUDE.md AGENTS.md .cursorrules .github/copilot-instructions.md .cursor; do
-  if git log --all --full-history --oneline -- "$p" | grep -q .; then
+  if git log --all --full-history --oneline -- "$p" | grep -q '.'; then
     echo "PRESENT IN HISTORY: $p"
   fi
 done
@@ -51,14 +51,15 @@ Use [`git filter-repo`](https://github.com/newren/git-filter-repo) (the maintain
 
 ```bash
 git filter-repo --invert-paths \
-  --path CLAUDE.md --path AGENTS.md --path .cursorrules
+  --path CLAUDE.md --path AGENTS.md --path .cursorrules \
+  --path .github/copilot-instructions.md --path .cursor
 ```
 
 If `filter-repo` cannot be installed, the git built-in `filter-branch` works for the same job (slower, fewer guardrails):
 
 ```bash
 git filter-branch --force --index-filter \
-  'git rm --cached --ignore-unmatch -r CLAUDE.md AGENTS.md .cursorrules' \
+  'git rm --cached --ignore-unmatch -r CLAUDE.md AGENTS.md .cursorrules .github/copilot-instructions.md .cursor' \
   --prune-empty --tag-name-filter cat -- --all
 ```
 
