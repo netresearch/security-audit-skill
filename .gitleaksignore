@@ -1,0 +1,30 @@
+# betterleaks/gitleaks fingerprint allowlist.
+#
+# Every entry below is a FALSE POSITIVE: an illustrative, fake credential that
+# lives inside a documentation code block in this skill's own reference
+# material. Each example is explicitly headed "# VULNERABLE:" and exists to
+# teach auditors what an insecure pattern looks like. None of these are real
+# secrets, and none grant access to anything. The justification comments
+# deliberately do NOT reproduce the literal example values, so this file does
+# not itself trip the scanner.
+#
+# Format: <commit>:<path>:<rule-id>:<line>
+
+# Pedagogical "# VULNERABLE: .env file with secrets exposed to client" example:
+# a fake AWS-style key on a NEXT_PUBLIC_* var, demonstrating Next.js
+# environment-variable leakage to the client bundle (not a real AWS key).
+6bb86c77fe4e9c70803aead6c76cc39e16413df4:skills/security-audit/references/nextjs-security.md:generic-api-key:180
+
+# Pedagogical Kubernetes Secret example: a base64-encoded "db-password" value
+# shown to illustrate that base64 is encoding, not encryption (not a real
+# secret).
+ea2b49e79c7261853132d8e07fdf52c31317291d:skills/security-audit/references/iac-security.md:generic-api-key:850
+
+# Pedagogical Kubernetes Secret example: a base64-encoded "api-key" value in
+# the same illustrative manifest (not a real secret).
+ea2b49e79c7261853132d8e07fdf52c31317291d:skills/security-audit/references/iac-security.md:generic-api-key:851
+
+# Pedagogical "# VULNERABLE: Secret in RUN command" example: a fake bearer
+# Authorization header baked into a Dockerfile RUN curl, demonstrating
+# secret-in-layer leakage (not a real token).
+ea2b49e79c7261853132d8e07fdf52c31317291d:skills/security-audit/references/iac-security.md:curl-auth-header:94
