@@ -749,6 +749,10 @@ An advisory version range is a *candidate*, not a verdict. Before reporting a co
 
 This routinely shrinks a long advisory-range list to a much smaller, accurate exposure set — and can reverse wrong conclusions.
 
+## Remediation when you can't (or won't) upgrade
+
+"Upgrade the product" / "migrate off it" is not the only remediation, and is not always available or wanted. For an EOL/frozen product an org has *deliberately decided to keep*, the maintenance model can be **in-place dependency patching** — replace the vulnerable bundled library with a patched, binary-compatible version (verified against the shipped artifact + a boot test, pinned by checksum) plus compensating controls at the edge (rate limits, request normalisation, WAF). Do not reflexively recommend migration/upgrade as "the real fix": confirm the org's strategic stance first, and record a deliberate "stay-frozen" decision so it is not re-litigated every cycle.
+
 ## Related References
 
 - `ci-security-pipeline.md` - CI tools that implement these practices
