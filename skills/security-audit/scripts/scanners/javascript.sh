@@ -202,6 +202,18 @@ else
     echo "OK: No wildcard postMessage targets detected"
 fi
 
+# === Check for naive </script> escaping of a JSON data island (SA-JS-21) ===
+echo ""
+echo "=== Checking for Naive </script> Escaping ==="
+SCRIPT_ESCAPE_HITS=$(scan_js "replace(All)?\(\s*['\"\\x60]</script" 10)
+if [[ -n "$SCRIPT_ESCAPE_HITS" ]]; then
+    echo "WARNING: naive </script> escaping of a data island (stored XSS via \$-patterns / case bypass); use replaceAll('<','\\u003c') + a function replacer:"
+    echo "$SCRIPT_ESCAPE_HITS" | head -5
+    WARNINGS=$((WARNINGS + 1))
+else
+    echo "OK: No naive </script> escaping detected"
+fi
+
 # === Check for npm audit vulnerabilities ===
 echo ""
 echo "=== Checking Dependencies ==="

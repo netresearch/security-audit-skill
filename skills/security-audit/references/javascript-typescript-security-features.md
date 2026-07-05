@@ -152,9 +152,10 @@ interpolates the JSON, not in a browser API. Three footguns compound:
 //  3. Escaping only lowercase `</script>` is bypassable: </ScRiPt>, </script >, <!--
 
 // GOOD:
-if (!template.includes('__DATA_JSON__')) throw new Error('placeholder missing');
+const n = template.split('__DATA_JSON__').length - 1;
+if (n !== 1) throw new Error(`template must contain exactly one __DATA_JSON__ placeholder (found ${n})`);
 const payload = JSON.stringify(data).replaceAll('<', '\\u003c'); // still valid JSON; neutralizes every </script> casing, <script, and <!--
-const html = template.replace('__DATA_JSON__', () => payload);   // function replacement disables $-pattern interpretation
+const html = template.replace('__DATA_JSON__', () => payload);   // exactly one match (asserted above); function replacement disables $-pattern interpretation
 ```
 
 - Escaping `<` to its unicode form yields valid JSON (`JSON.parse` restores it)
@@ -163,7 +164,9 @@ const html = template.replace('__DATA_JSON__', () => payload);   // function rep
 - Use a **function** replacement (`() => payload`) so `$`-sequences in the data are
   never interpreted.
 - Use a placeholder token **distinct** from the JS variable name (`__DATA_JSON__`,
-  not `__DATA__`) to avoid the first-match substitution trap.
+  not `__DATA__`), and **assert it occurs exactly once** — `String.replace`
+  substitutes only the first match, so a duplicated placeholder would silently
+  ship partially-substituted, broken output.
 
 When rendering those values back into the DOM as markup, escape at every sink
 through one centralized helper so no call site is missed:
@@ -809,7 +812,7 @@ class AuthService {
 | Nested regex quantifiers | `(\+\)\+|\*\)\*|\+\)\*)` | warning | SA-JS-18 |
 | strict mode disabled | `"strict"\s*:\s*false` | warning | SA-JS-19 |
 | Unvalidated JSON.parse reviver | `JSON\.parse\([^)]+,\s*\(` | warning | SA-JS-20 |
-| Naive `</script>` escaping of a JSON data island | `replaceAll\(\s*['"]<\/script` | warning | SA-JS-21 |
+| Naive `</script>` escaping of a JSON data island | `replace(All)?\(\s*['"\x60]</script` | warning | SA-JS-21 |
 
 ## Version Adoption Security Checklist
 
