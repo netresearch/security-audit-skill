@@ -134,6 +134,57 @@ element.innerHTML = DOMPurify.sanitize(userHtml);
 
 **Security implication:** DOM XSS (CWE-79) bypasses server-side sanitization because the payload never reaches the server. The `innerHTML`, `outerHTML`, and `document.write` sinks interpret HTML markup, while `location.href` can execute `javascript:` URIs. Always use `textContent` for text output.
 
+### 3a. Embedding Untrusted JSON into an Inline `<script>` (build-time / SSR data island)
+
+Serializing data (some of it third-party — API descriptions, user profiles) into
+an inline `<script>` data island is a stored-XSS sink distinct from the DOM sinks
+above: the injection happens at **build/render time**, in the string that
+interpolates the JSON, not in a browser API. Three footguns compound:
+
+```javascript
+// BAD: template.replace('__DATA__', JSON.stringify(data).replaceAll('</script>', '<\\/script>'))
+//  1. String.prototype.replace(str, replacement) treats $' $& $` $$ in the REPLACEMENT
+//     as substitution patterns -> a $' inside any data value splices the template's
+//     suffix (including a literal </script>) back into the emitted JSON -> breakout.
+//  2. replace(str, ...) replaces only the FIRST match. If the template holds two
+//     identical tokens (`window.__DATA__ = __DATA__;`) it substitutes the variable
+//     name, shipping a blank page -- a correctness bug that masks the security one.
+//  3. Escaping only lowercase `</script>` is bypassable: </ScRiPt>, </script >, <!--
+
+// GOOD:
+const n = template.split('__DATA_JSON__').length - 1;
+if (n !== 1) throw new Error(`template must contain exactly one __DATA_JSON__ placeholder (found ${n})`);
+const payload = JSON.stringify(data).replaceAll('<', '\\u003c'); // still valid JSON; neutralizes every </script> casing, <script, and <!--
+const html = template.replace('__DATA_JSON__', () => payload);   // exactly one match (asserted above); function replacement disables $-pattern interpretation
+```
+
+- Escaping `<` to its unicode form yields valid JSON (`JSON.parse` restores it)
+  while making it impossible to close the `<script>` element or open a new
+  tag/comment.
+- Use a **function** replacement (`() => payload`) so `$`-sequences in the data are
+  never interpreted.
+- Use a placeholder token **distinct** from the JS variable name (`__DATA_JSON__`,
+  not `__DATA__`), and **assert it occurs exactly once** — `String.replace`
+  substitutes only the first match, so a duplicated placeholder would silently
+  ship partially-substituted, broken output.
+
+When rendering those values back into the DOM as markup, escape at every sink
+through one centralized helper so no call site is missed:
+
+```javascript
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+```
+
+**Verify with a poison test:** inject `</script>`, `$'`, and `onerror=` payloads
+into the data, render headless, and assert the page is inert and non-blank —
+escaping bugs and the blank-page substitution trap both surface only at render.
+
+**Security implication:** Stored XSS (CWE-79). Naive `String.replace` templating
+of a JSON data island is exploitable even when no dynamic-HTML DOM sink is used,
+and the safe form costs one `replaceAll('<', '\\u003c')` plus a function
+replacement.
+
 ### 4. `postMessage` Origin Validation
 
 The `postMessage` API enables cross-origin communication. Without origin validation, any page can send messages to your application.
@@ -761,6 +812,7 @@ class AuthService {
 | Nested regex quantifiers | `(\+\)\+|\*\)\*|\+\)\*)` | warning | SA-JS-18 |
 | strict mode disabled | `"strict"\s*:\s*false` | warning | SA-JS-19 |
 | Unvalidated JSON.parse reviver | `JSON\.parse\([^)]+,\s*\(` | warning | SA-JS-20 |
+| Naive `</script>` escaping of a JSON data island | `replace(All)?\(\s*['"\x60]</script` | warning | SA-JS-21 |
 
 ## Version Adoption Security Checklist
 
@@ -790,3 +842,4 @@ class AuthService {
 | Date | Change | Reason |
 |------|--------|--------|
 | 2026-03-31 | Initial release | Phase 3 |
+| 2026-07-05 | Add §3a inline-`<script>` JSON data-island XSS + SA-JS-21 | Real stored-XSS class found building a data dashboard |

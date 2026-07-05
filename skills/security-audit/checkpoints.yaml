@@ -833,6 +833,13 @@ mechanical:
     severity: error
     desc: "postMessage with wildcard origin - data exposed to any frame"
 
+  - id: SA-JS-21
+    type: regex_not
+    target: "**/*.{js,ts,jsx,tsx,mjs,cjs}"
+    pattern: "replace(All)?\\(\\s*['\"\\x60]</script"
+    severity: warning
+    desc: "naive </script> escaping of a JSON data island - use replaceAll('<','\\u003c') + function replacer"
+
   # === NODE.JS SERVER-SIDE SECURITY (Phase 3) ===
   - id: SA-NODE-01
     type: regex_not
