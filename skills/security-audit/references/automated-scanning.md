@@ -1,6 +1,6 @@
 # Automated Scanning Tools Reference
 
-Configuration, custom rules, CI integration, and best practices for semgrep / opengrep, trivy, and gitleaks.
+Configuration, custom rules, CI integration, and best practices for semgrep / opengrep, trivy, and gitleaks, plus false-positive handling for SonarCloud / SonarQube quality gates (SonarCloud is hosted; SonarQube is self-hosted).
 
 ## Tool Comparison
 
@@ -315,6 +315,78 @@ repos:
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+---
+
+## SonarCloud / SonarQube Quality Gate
+
+SonarCloud runs its own SAST engine (including AI-authored taint rules) and gates a PR
+via a **quality gate**. Sonar's inline suppression is `# NOSONAR` (or
+`# NOSONAR(ruleKey)`), but it leaves a marker in the code and suppresses *every* issue on
+the line. For a genuine false positive, prefer clearing it through the SonarCloud **API**
+(or UI): it records an auditable review decision, keeps the source clean, and the gate
+then recomputes.
+
+### AI taint rules over-flag safe patterns
+
+Sonar's AI taint rules match a **call pattern**, not the actual exploitability, so they
+raise false positives on code that is already safe:
+
+| Rule | Flags | Why it is often a false positive |
+|------|-------|----------------------------------|
+| `pythonsecurity:S8705` | `subprocess.run([...])` reaching a variable argument (framed as "an LLM could pass faulty CLI arguments and escape a shell sandbox") | Fires even in **array form** (`[cmd, "-x", var]`), which is immune to shell injection because no shell parses the arguments. Adding inline **or** cross-function argument validation does not clear it — the rule matches the shape of the call. |
+| `python:S5443` | String literals under publicly writable directories (`/tmp/...`) | Fires on `/tmp/...` **string literals even inside test fixtures**, where no untrusted process shares the path. |
+
+Practical consequences:
+
+- For **S8705** on an array-form `subprocess` call, two source-side sanitization attempts
+  (inline validation and a cross-function validator) will typically **not** clear the
+  finding. If the call is genuinely safe, mark it a false positive via the API rather than
+  contorting the code.
+- For **S5443** in test data, prefer a non-writable placeholder such as `/opt/...` instead
+  of `/tmp/...` so the literal never trips the rule in the first place.
+
+### Marking a false positive via the API
+
+Requires a token with **Administer Issues** on the project. Use an `Authorization: Bearer`
+header rather than `curl -u` basic auth — the `-u user:pass` form trips secret scanners
+(and reviewers). Note that a token passed as *any* curl argument (header included) is
+still visible to other users via `ps`; to keep it off the process list entirely, load it
+from a file with `curl --config <file>` or a `~/.netrc`.
+
+```bash
+AUTH="Authorization: Bearer $SONAR_TOKEN"
+
+# 1. Find the open issue keys for this PR
+curl -H "$AUTH" \
+  "https://sonarcloud.io/api/issues/search?components=<projectKey>&pullRequest=<N>&types=VULNERABILITY&resolved=false"
+
+# 2. (Optional) attach context explaining why it is a false positive
+curl -H "$AUTH" -X POST \
+  "https://sonarcloud.io/api/issues/add_comment" \
+  --data-urlencode "issue=<issueKey>" \
+  --data-urlencode "text=Array-form subprocess call; args never reach a shell. FP."
+
+# 3. Transition the issue to false-positive
+curl -H "$AUTH" -X POST \
+  "https://sonarcloud.io/api/issues/do_transition" \
+  --data-urlencode "issue=<issueKey>" \
+  --data-urlencode "transition=falsepositive"
+
+# 4. Confirm the gate recomputed green (status: OK)
+curl -H "$AUTH" \
+  "https://sonarcloud.io/api/qualitygates/project_status?projectKey=<projectKey>&pullRequest=<N>"
+```
+
+> **Always document the rationale** (step 2) before resolving — a bare `falsepositive`
+> transition with no comment is indistinguishable from suppressing a real finding.
+
+### Confirm the gate actually blocks merge
+
+SonarCloud's check is frequently **not a required status check**. Before treating a red
+SonarCloud gate as a merge blocker, verify the branch ruleset / protection rules actually
+require it. If it is advisory, fix genuine findings but do not let an over-flagging AI
+taint rule stall the PR.
 
 ---
 
