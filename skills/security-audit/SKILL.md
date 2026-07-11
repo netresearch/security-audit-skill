@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Use when conducting security assessments — OWASP Top 10 / API / LLM, CWE Top 25, CVSS scoring — auditing PHP/TYPO3 (v14.3 LTS: #109585, HashService removal, Authorize/RateLimit), APIs, frontend, Terraform/K8s/Docker IaC, AWS/Azure/GCP cloud, AI agent configs, or scanning dependencies."
+description: "Use when conducting security assessments — OWASP Top 10 / API / LLM, CWE Top 25, CVSS scoring — auditing PHP/TYPO3, APIs, frontend, Terraform/K8s/Docker IaC, AWS/Azure/GCP cloud, AI agent configs, or scanning dependencies."
 license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
 compatibility: "Requires grep, jq, gh CLI."
 metadata:
