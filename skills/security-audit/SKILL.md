@@ -32,7 +32,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **Cloud & IaC**: aws-security, azure-security, gcp-security, iac-security
 - **API & Frontend**: api-security, frontend-security
 - **AI Agent**: llm-security (OWASP LLM Top 10 2025)
-- **Threats**: modern-attacks, cve-patterns, cve-database
+- **Threats**: modern-attacks, cve-patterns
 - **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security, git-history-secrets
 - **Incident**: supply-chain-incident-response
 
