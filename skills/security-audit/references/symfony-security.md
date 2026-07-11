@@ -1,6 +1,6 @@
 # Symfony Security Patterns
 
-Security patterns specific to Symfony — voters, firewalls, CSRF, Security Bundle, Rate Limiter. Cross-framework patterns (middleware, input validation, output encoding) live in `framework-security.md`.
+Security patterns specific to Symfony — voters, firewalls, CSRF, Security Bundle, Rate Limiter.
 
 ## Security Voters for Authorization
 
@@ -312,4 +312,3 @@ $symfonyPatterns = [
 ```
 
 ---
-

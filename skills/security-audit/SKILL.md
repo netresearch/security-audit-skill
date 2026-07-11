@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Use when conducting security assessments — OWASP Top 10 / API / LLM, CWE Top 25, CVSS scoring — auditing PHP/TYPO3 (v14.3 LTS: #109585, HashService removal, Authorize/RateLimit), APIs, frontend, Terraform/K8s/Docker IaC, AWS/Azure/GCP cloud, AI agent configs, or scanning dependencies."
+description: "Use when conducting security assessments — OWASP Top 10 / API / LLM, CWE Top 25, CVSS scoring — auditing PHP/TYPO3, APIs, frontend, Terraform/K8s/Docker IaC, AWS/Azure/GCP cloud, AI agent configs, or scanning dependencies."
 license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
 compatibility: "Requires grep, jq, gh CLI."
 metadata:
@@ -27,44 +27,14 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **Core**: owasp-top10, cwe-top25, xxe-prevention, cvss-scoring, api-key-encryption
 - **Prevention**: deserialization-prevention, path-traversal-prevention, file-upload-security, input-validation, error-message-sanitization
 - **Architecture**: authentication-patterns, security-headers, security-logging, cryptography-guide, security-invariants
-- **Language features** (`*-security-features`): php, python, javascript-typescript, nodejs, java, csharp, go, rust, ruby
-- **Frameworks** (`*-security`): typo3, typo3-fluid, typo3-typoscript, symfony, laravel, django, flask, fastapi, spring, dotnet, blazor, rails, gin, react, vue, angular, nextjs, nuxt, express, nestjs
-- **Mobile**: android-sdk-security, ios-sdk-security
+- **Language features** (`*-security-features`): php, python, javascript-typescript, nodejs, go, rust, ruby
+- **Frameworks** (`*-security`): typo3, typo3-fluid, typo3-typoscript, symfony, spring, react, vue, nuxt
 - **Cloud & IaC**: aws-security, azure-security, gcp-security, iac-security
 - **API & Frontend**: api-security, frontend-security
 - **AI Agent**: llm-security (OWASP LLM Top 10 2025)
-- **Shared**: framework-security
-- **Threats**: modern-attacks, cve-patterns, cve-database
+- **Threats**: modern-attacks, cve-patterns
 - **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security, git-history-secrets
 - **Incident**: supply-chain-incident-response
-
-## Quick Patterns
-
-**XML parsing (prevent XXE):**
-```php
-$doc->loadXML($input, LIBXML_NONET);
-```
-
-**SQL (prevent injection):**
-```php
-$stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
-$stmt->execute([$id]);
-```
-
-**Output (prevent XSS):**
-```php
-echo htmlspecialchars($input, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-```
-
-**API keys, passwords, randomness:**
-```php
-$n = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
-$enc = 'enc:' . base64_encode($n . sodium_crypto_secretbox($apiKey, $n, $key));
-password_hash($pw, PASSWORD_ARGON2ID);
-bin2hex(random_bytes(32));   // never mt_rand/rand
-```
-
-Automated scanners: `references/automated-scanning.md`.
 
 ## Security Checklist
 

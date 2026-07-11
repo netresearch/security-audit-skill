@@ -281,5 +281,4 @@ Not a direct vulnerability, but flag during audit: does disabling advanced UI hi
 
 - `typo3-security.md` — PHP-level TYPO3 patterns
 - `typo3-fluid-security.md` — Fluid template escaping + ViewHelper pitfalls
-- `framework-security.md` — cross-framework middleware / validation patterns
 - External: `netresearch/typo3-ckeditor5-skill` — CKEditor 5 preset authoring (separate skill repo)
