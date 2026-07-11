@@ -564,8 +564,6 @@ String[] springPatterns = {
 ## Related References
 
 - `owasp-top10.md` — OWASP Top 10 mapping
-- `java-security-features.md` — Java language-level patterns (deserialization, JNDI)
-- `dotnet-security.md` — Comparison with ASP.NET Core patterns
 
 ## Changelog
 

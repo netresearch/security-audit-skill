@@ -10,11 +10,6 @@
 #
 # Format: <commit>:<path>:<rule-id>:<line>
 
-# Pedagogical "# VULNERABLE: .env file with secrets exposed to client" example:
-# a fake AWS-style key on a NEXT_PUBLIC_* var, demonstrating Next.js
-# environment-variable leakage to the client bundle (not a real AWS key).
-6bb86c77fe4e9c70803aead6c76cc39e16413df4:skills/security-audit/references/nextjs-security.md:generic-api-key:180
-
 # Pedagogical Kubernetes Secret example: a base64-encoded "db-password" value
 # shown to illustrate that base64 is encoding, not encryption (not a real
 # secret).

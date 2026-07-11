@@ -27,13 +27,11 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **Core**: owasp-top10, cwe-top25, xxe-prevention, cvss-scoring, api-key-encryption
 - **Prevention**: deserialization-prevention, path-traversal-prevention, file-upload-security, input-validation, error-message-sanitization
 - **Architecture**: authentication-patterns, security-headers, security-logging, cryptography-guide, security-invariants
-- **Language features** (`*-security-features`): php, python, javascript-typescript, nodejs, java, csharp, go, rust, ruby
-- **Frameworks** (`*-security`): typo3, typo3-fluid, typo3-typoscript, symfony, laravel, django, flask, fastapi, spring, dotnet, blazor, rails, gin, react, vue, angular, nextjs, nuxt, express, nestjs
-- **Mobile**: android-sdk-security, ios-sdk-security
+- **Language features** (`*-security-features`): php, python, javascript-typescript, nodejs, go, rust, ruby
+- **Frameworks** (`*-security`): typo3, typo3-fluid, typo3-typoscript, symfony, spring, react, vue, nuxt
 - **Cloud & IaC**: aws-security, azure-security, gcp-security, iac-security
 - **API & Frontend**: api-security, frontend-security
 - **AI Agent**: llm-security (OWASP LLM Top 10 2025)
-- **Shared**: framework-security
 - **Threats**: modern-attacks, cve-patterns, cve-database
 - **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security, git-history-secrets
 - **Incident**: supply-chain-incident-response

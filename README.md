@@ -129,7 +129,6 @@ security-audit-skill/
 │       ├── security-logging.md           # Security logging & monitoring
 │       ├── input-validation.md           # Input validation & encoding
 │       ├── cryptography-guide.md         # Cryptographic best practices
-│       ├── framework-security.md         # TYPO3/Symfony/Laravel security
 │       ├── modern-attacks.md             # SSRF, mass assignment, race conditions
 │       ├── cve-patterns.md              # CVE-derived patterns (15 vulnerability types)
 │       ├── php-security-features.md      # PHP 8.x security features

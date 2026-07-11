@@ -244,5 +244,4 @@ A template-audit checklist for the 3 → 4 jump:
 
 - `typo3-security.md` — PHP-level TYPO3 patterns (QueryBuilder, FAL, FormProtection)
 - `typo3-typoscript-security.md` — TypoScript and TSconfig security
-- `framework-security.md` — cross-framework middleware / validation patterns
 - `owasp-top10.md` — XSS category (A03:2021)

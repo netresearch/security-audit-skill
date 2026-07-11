@@ -632,7 +632,6 @@ function TodoList({ todos }) {
 - `javascript-typescript-security-features.md` — Language-level patterns
 - `frontend-security.md` — General frontend security patterns
 - `supply-chain-security.md` — npm supply chain risks
-- `nextjs-security.md` — Next.js-specific patterns (builds on React)
 
 ## Changelog
 

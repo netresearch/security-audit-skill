@@ -297,7 +297,7 @@
         "Recommends TYPO3 QueryBuilder or Extbase Repository pattern",
         "Mentions createNamedParameter() for parameter binding",
         "Warns against direct SQL concatenation or deprecated $GLOBALS['TYPO3_DB']",
-        "References TYPO3 security best practices or framework-security.md"
+        "References TYPO3 security best practices or typo3-security.md"
       ]
     },
     {
