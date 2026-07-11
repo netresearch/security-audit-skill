@@ -36,34 +36,6 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security, git-history-secrets
 - **Incident**: supply-chain-incident-response
 
-## Quick Patterns
-
-**XML parsing (prevent XXE):**
-```php
-$doc->loadXML($input, LIBXML_NONET);
-```
-
-**SQL (prevent injection):**
-```php
-$stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
-$stmt->execute([$id]);
-```
-
-**Output (prevent XSS):**
-```php
-echo htmlspecialchars($input, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-```
-
-**API keys, passwords, randomness:**
-```php
-$n = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
-$enc = 'enc:' . base64_encode($n . sodium_crypto_secretbox($apiKey, $n, $key));
-password_hash($pw, PASSWORD_ARGON2ID);
-bin2hex(random_bytes(32));   // never mt_rand/rand
-```
-
-Automated scanners: `references/automated-scanning.md`.
-
 ## Security Checklist
 
 - [ ] `semgrep`/`opengrep`, `trivy fs --severity HIGH,CRITICAL`, `gitleaks` clean
