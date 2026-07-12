@@ -69,16 +69,6 @@ if [[ -f "$PROJECT_DIR/go.mod" ]]; then
     DETECTED_SCANNERS+=("go")
 fi
 
-# Rust: Cargo.toml
-if [[ -f "$PROJECT_DIR/Cargo.toml" ]]; then
-    DETECTED_SCANNERS+=("rust")
-fi
-
-# Ruby: Gemfile
-if [[ -f "$PROJECT_DIR/Gemfile" ]]; then
-    DETECTED_SCANNERS+=("ruby")
-fi
-
 # Android: AndroidManifest.xml or build.gradle with android plugin
 if find "$PROJECT_DIR" -maxdepth 4 -name "AndroidManifest.xml" -print -quit 2>/dev/null | grep -q .; then
     DETECTED_SCANNERS+=("android")
@@ -93,8 +83,6 @@ fi
 # Terraform / IaC: *.tf anywhere
 if find "$PROJECT_DIR" -maxdepth 4 -name "*.tf" -print -quit 2>/dev/null | grep -q .; then
     DETECTED_SCANNERS+=("aws")     # aws.sh also scans Terraform for AWS resources
-    DETECTED_SCANNERS+=("azure")   # same for Azure
-    DETECTED_SCANNERS+=("gcp")     # same for GCP
 fi
 
 # WordPress: wp-config.php or wp-content/ (themes / plugins with WordPress stack)
@@ -120,7 +108,7 @@ fi
 if [[ ${#DETECTED_SCANNERS[@]} -eq 0 ]]; then
     echo "No supported languages/frameworks detected."
     echo "Dispatcher recognises: composer.json, package.json, requirements.txt,"
-    echo "  pyproject.toml, go.mod, Cargo.toml, Gemfile, pom.xml, build.gradle,"
+    echo "  pyproject.toml, go.mod, pom.xml, build.gradle,"
     echo "  *.csproj / *.sln, AndroidManifest.xml, *.xcodeproj, *.tf, wp-config.php,"
     echo "  drupal/core in composer.json, Joomla configuration.php + administrator/."
     exit 0
