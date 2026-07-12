@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Use when conducting security assessments — OWASP Top 10 / API / LLM, CWE Top 25, CVSS scoring — auditing PHP/TYPO3, APIs, frontend, Terraform/K8s/Docker IaC, AWS/Azure/GCP cloud, AI agent configs, or scanning dependencies."
+description: "Use when conducting security assessments — OWASP Top 10 / API / LLM, CWE Top 25, CVSS scoring — auditing PHP/TYPO3, APIs, frontend, Terraform/K8s/Docker IaC, AWS cloud, AI agent configs, or scanning dependencies."
 license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
 compatibility: "Requires grep, jq, gh CLI."
 metadata:
@@ -18,7 +18,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 
 - **Vulnerabilities**: XXE, SQLi, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, SSTI, JWT, type juggling
 - **Standards**: OWASP Top 10 / API / LLM (2025), CWE Top 25, CVSS v3.1/v4.0, OWASP ASVS
-- **Cloud & IaC**: AWS, Azure, GCP; Terraform, Kubernetes, Docker, Helm
+- **Cloud & IaC**: AWS; Terraform, Kubernetes, Docker, Helm
 - **API & Frontend**: REST/GraphQL authZ, rate limits, mass assignment, CSP, DOM-XSS
 - **AI Agents**: SKILL.md/AGENTS.md/CLAUDE.md/mcp.json/hooks.json audit; prompt injection; excessive agency
 
@@ -27,9 +27,9 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **Core**: owasp-top10, cwe-top25, xxe-prevention, cvss-scoring, api-key-encryption
 - **Prevention**: deserialization-prevention, path-traversal-prevention, file-upload-security, input-validation, error-message-sanitization
 - **Architecture**: authentication-patterns, security-headers, security-logging, cryptography-guide, security-invariants
-- **Language features** (`*-security-features`): php, python, javascript-typescript, nodejs, go, rust, ruby
-- **Frameworks** (`*-security`): typo3, typo3-fluid, typo3-typoscript, symfony, spring, react, vue, nuxt
-- **Cloud & IaC**: aws-security, azure-security, gcp-security, iac-security
+- **Language features** (`*-security-features`): php, python, javascript-typescript, nodejs, go
+- **Frameworks** (`*-security`): typo3, typo3-fluid, typo3-typoscript, symfony, react, vue
+- **Cloud & IaC**: aws-security, iac-security
 - **API & Frontend**: api-security, frontend-security
 - **AI Agent**: llm-security (OWASP LLM Top 10 2025)
 - **Threats**: modern-attacks, cve-patterns
@@ -60,7 +60,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 ./scripts/github-security-audit.sh owner/repo            # GH repo
 ```
 
-Dispatcher detects the stack from indicator files and runs matching `scripts/scanners/*.sh` (17 ecosystems; see `references/` index).
+Dispatcher detects the stack from indicator files and runs matching `scripts/scanners/*.sh` (13 ecosystems; see `references/` index).
 
 ---
 
