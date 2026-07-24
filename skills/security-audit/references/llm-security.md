@@ -623,8 +623,10 @@ except json.JSONDecodeError:
 # PreToolUse hook payload: {"tool_name": "Bash", "tool_input": {"command": "..."}, ...}
 cmd = (data.get("tool_input") or {}).get("command") or data.get("command", "")
 if DANGEROUS.search(cmd):
-    print("Destructive command blocked — request manual execution from the user.",
-          file=sys.stderr)
+    print(
+        "Destructive command blocked — request manual execution from the user.",
+        file=sys.stderr,
+    )
     sys.exit(2)
 sys.exit(0)
 ```
