@@ -14,19 +14,24 @@ The `pickle` module can execute arbitrary code during deserialization. Any data 
 # VULNERABLE: Deserializing untrusted data with pickle
 import pickle
 
+
 def load_user_session(session_data: bytes):
     # An attacker can craft a pickle payload that executes os.system("rm -rf /")
     return pickle.loads(session_data)
 
+
 # VULNERABLE: shelve uses pickle internally
 import shelve
+
 
 def load_cache(cache_path: str):
     db = shelve.open(cache_path)  # If cache_path is user-controlled, RCE is possible
     return db["settings"]
 
+
 # VULNERABLE: marshal is not safe for untrusted data
 import marshal
+
 
 def load_bytecode(data: bytes):
     return marshal.loads(data)
@@ -37,8 +42,10 @@ def load_bytecode(data: bytes):
 import json
 from typing import Any
 
+
 def load_user_session(session_data: str) -> dict[str, Any]:
     return json.loads(session_data)
+
 
 # SECURE: Sign a JSON payload if you must round-trip server-to-server data.
 # Signing a pickle does NOT make it safe — the signature only stops third-
@@ -51,15 +58,18 @@ import os
 
 SIGNING_KEY = os.environb[b"APP_SIGNING_KEY"]  # fail hard if unset
 
+
 def load_verified_json(signed_data: bytes, signature: bytes) -> Any:
     expected = hmac.new(SIGNING_KEY, signed_data, hashlib.sha256).digest()
     if not hmac.compare_digest(signature, expected):
         raise ValueError("Data integrity check failed")
     return json.loads(signed_data)
 
+
 # SECURE: Use RestrictedUnpickler to whitelist allowed classes
 import pickle
 import io
+
 
 class RestrictedUnpickler(pickle.Unpickler):
     ALLOWED_CLASSES = {("builtins", "dict"), ("builtins", "list")}
@@ -68,6 +78,7 @@ class RestrictedUnpickler(pickle.Unpickler):
         if (module, name) not in self.ALLOWED_CLASSES:
             raise pickle.UnpicklingError(f"Forbidden: {module}.{name}")
         return super().find_class(module, name)
+
 
 def safe_unpickle(data: bytes):
     return RestrictedUnpickler(io.BytesIO(data)).load()
@@ -84,9 +95,11 @@ The `eval()` and `exec()` builtins execute arbitrary Python code. When user inpu
 def calculate(expression: str) -> float:
     return eval(expression)  # User sends: __import__('os').system('id')
 
+
 # VULNERABLE: exec with user input
 def run_user_script(code: str):
     exec(code)  # Full arbitrary code execution
+
 
 # VULNERABLE: compile + exec
 def execute_template(template_code: str):
@@ -98,8 +111,12 @@ def execute_template(template_code: str):
 # SECURE: Use ast.literal_eval for safe evaluation of literals
 import ast
 
+
 def parse_value(user_input: str):
-    return ast.literal_eval(user_input)  # Only allows literals: strings, numbers, tuples, lists, dicts, bools, None
+    return ast.literal_eval(
+        user_input
+    )  # Only allows literals: strings, numbers, tuples, lists, dicts, bools, None
+
 
 # SECURE: Use a math expression parser for calculations
 from decimal import Decimal
@@ -111,6 +128,7 @@ SAFE_OPS = {
     "*": operator.mul,
     "/": operator.truediv,
 }
+
 
 def safe_calculate(left: str, op: str, right: str) -> Decimal:
     if op not in SAFE_OPS:
@@ -128,9 +146,13 @@ When user input is passed directly as a template string rather than as a templat
 # VULNERABLE: User input used as Jinja2 template source
 from jinja2 import Template
 
+
 def render_greeting(user_input: str) -> str:
-    template = Template(user_input)  # SSTI! User sends: {{ config.__class__.__init__.__globals__['os'].popen('id').read() }}
+    template = Template(
+        user_input
+    )  # SSTI! User sends: {{ config.__class__.__init__.__globals__['os'].popen('id').read() }}
     return template.render()
+
 
 # VULNERABLE: Jinja2 Environment without sandboxing
 from jinja2 import Environment
@@ -140,6 +162,7 @@ template = env.from_string(user_input)  # Same SSTI risk
 
 # VULNERABLE: Mako template injection
 from mako.template import Template as MakoTemplate
+
 
 def render_mako(user_input: str) -> str:
     return MakoTemplate(user_input).render()  # RCE via ${__import__('os').system('id')}
@@ -154,14 +177,17 @@ env = Environment(
     autoescape=select_autoescape(["html", "xml"]),
 )
 
+
 def render_greeting(username: str) -> str:
     template = env.get_template("greeting.html")
     return template.render(username=username)
+
 
 # SECURE: Use Jinja2 SandboxedEnvironment if dynamic templates are required
 from jinja2.sandbox import SandboxedEnvironment
 
 sandbox_env = SandboxedEnvironment()
+
 
 def render_sandboxed(template_str: str, variables: dict) -> str:
     # SandboxedEnvironment restricts attribute access and method calls
@@ -179,15 +205,19 @@ Passing user input to shell commands without proper sanitization leads to comman
 # VULNERABLE: subprocess with shell=True
 import subprocess
 
+
 def ping_host(hostname: str):
     subprocess.call(f"ping -c 1 {hostname}", shell=True)
     # User sends: "127.0.0.1; cat /etc/passwd"
 
+
 # VULNERABLE: os.system always uses the shell
 import os
 
+
 def list_directory(path: str):
     os.system(f"ls -la {path}")  # User sends: "/tmp; rm -rf /"
+
 
 # VULNERABLE: os.popen uses the shell
 def get_disk_usage(path: str) -> str:
@@ -198,6 +228,7 @@ def get_disk_usage(path: str) -> str:
 # SECURE: Use subprocess with shell=False (the default) and argument list
 import subprocess
 import shlex
+
 
 def ping_host(hostname: str):
     # Validate hostname format first
@@ -211,8 +242,10 @@ def ping_host(hostname: str):
     )
     return result.stdout
 
+
 # SECURE: Use pathlib for filesystem operations instead of shell commands
 from pathlib import Path
+
 
 def list_directory(path: str) -> list[str]:
     target = Path(path).resolve()
@@ -232,8 +265,12 @@ def list_directory(path: str) -> list[str]:
 # VULNERABLE: yaml.load without Loader argument
 import yaml
 
+
 def parse_config(config_str: str) -> dict:
-    return yaml.load(config_str)  # Default Loader can instantiate arbitrary Python objects
+    return yaml.load(
+        config_str
+    )  # Default Loader can instantiate arbitrary Python objects
+
 
 # VULNERABLE: yaml.load with FullLoader (still allows some dangerous tags)
 def parse_data(data: str) -> dict:
@@ -244,8 +281,10 @@ def parse_data(data: str) -> dict:
 # SECURE: Use yaml.safe_load (or SafeLoader)
 import yaml
 
+
 def parse_config(config_str: str) -> dict:
     return yaml.safe_load(config_str)  # Only allows basic Python types
+
 
 # SECURE: Use yaml.safe_load_all for multi-document YAML
 def parse_multi_doc(data: str) -> list:
@@ -262,21 +301,26 @@ Building SQL queries with f-strings, `.format()`, or `%` string formatting with 
 # VULNERABLE: f-string in SQL query
 import sqlite3
 
+
 def get_user(db: sqlite3.Connection, username: str):
     cursor = db.execute(f"SELECT * FROM users WHERE name = '{username}'")
     return cursor.fetchone()
+
 
 # VULNERABLE: .format() in SQL query
 def search_users(db, query: str):
     sql = "SELECT * FROM users WHERE name LIKE '%{}%'".format(query)
     return db.execute(sql).fetchall()
 
+
 # VULNERABLE: % formatting in SQL query
 def get_order(db, order_id: str):
     return db.execute("SELECT * FROM orders WHERE id = %s" % order_id).fetchone()
 
+
 # VULNERABLE: String concatenation in Django raw query
 from django.db import connection
+
 
 def get_user_django(name: str):
     with connection.cursor() as cursor:
@@ -288,22 +332,30 @@ def get_user_django(name: str):
 # SECURE: Parameterized queries
 import sqlite3
 
+
 def get_user(db: sqlite3.Connection, username: str):
     cursor = db.execute("SELECT * FROM users WHERE name = ?", (username,))
     return cursor.fetchone()
 
+
 # SECURE: Django ORM (parameterized by default)
 from myapp.models import User
+
 
 def get_user_django(name: str):
     return User.objects.filter(name=name).first()
 
+
 # SECURE: SQLAlchemy parameterized query
 from sqlalchemy import text
 
+
 def get_user_alchemy(session, username: str):
-    result = session.execute(text("SELECT * FROM users WHERE name = :name"), {"name": username})
+    result = session.execute(
+        text("SELECT * FROM users WHERE name = :name"), {"name": username}
+    )
     return result.fetchone()
+
 
 # SECURE: psycopg2 parameterized query
 def get_user_pg(conn, username: str):
@@ -322,19 +374,24 @@ Python's `xml.etree.ElementTree` and other XML parsers are vulnerable to XXE and
 # VULNERABLE: ElementTree with untrusted XML
 import xml.etree.ElementTree as ET
 
+
 def parse_xml(xml_string: str):
     return ET.fromstring(xml_string)
     # Vulnerable to billion laughs (exponential entity expansion)
     # Limited XXE in ElementTree but still risky with other parsers
 
+
 # VULNERABLE: xml.dom.minidom
 from xml.dom.minidom import parseString
+
 
 def parse_dom(xml_data: str):
     return parseString(xml_data)
 
+
 # VULNERABLE: lxml without disabling entities
 from lxml import etree
+
 
 def parse_lxml(xml_data: bytes):
     return etree.fromstring(xml_data)  # XXE enabled by default in older lxml
@@ -344,11 +401,14 @@ def parse_lxml(xml_data: bytes):
 # SECURE: Use defusedxml which blocks all XML attacks
 import defusedxml.ElementTree as ET
 
+
 def parse_xml(xml_string: str):
     return ET.fromstring(xml_string)  # XXE and entity expansion blocked
 
+
 # SECURE: lxml with safe parser settings
 from lxml import etree
+
 
 def parse_lxml(xml_data: bytes):
     parser = etree.XMLParser(
@@ -372,9 +432,11 @@ import os
 
 UPLOAD_DIR = "/var/uploads"
 
+
 def get_upload(filename: str) -> str:
     # If filename is "/etc/passwd", os.path.join returns "/etc/passwd"
     return os.path.join(UPLOAD_DIR, filename)
+
 
 # VULNERABLE: Relative path traversal
 def read_document(doc_name: str) -> bytes:
@@ -390,6 +452,7 @@ from pathlib import Path
 
 UPLOAD_DIR = Path("/var/uploads").resolve()
 
+
 def get_upload(filename: str) -> Path:
     # Strip leading slashes and resolve to prevent traversal
     safe_name = Path(filename).name  # Takes only the filename component
@@ -398,8 +461,10 @@ def get_upload(filename: str) -> Path:
         raise ValueError("Path traversal detected")
     return resolved
 
+
 # SECURE: os.path.realpath with validation
 import os
+
 
 def read_document(doc_name: str) -> bytes:
     base = os.path.realpath(UPLOAD_DIR)
@@ -420,18 +485,22 @@ Common JWT library misconfigurations allow token forgery and algorithm confusion
 # VULNERABLE: Not specifying algorithms parameter
 import jwt
 
+
 def verify_token(token: str, secret: str) -> dict:
     return jwt.decode(token, secret)
     # Attacker can set alg: "none" in header to bypass verification
+
 
 # VULNERABLE: Accepting "none" algorithm
 def verify_token_weak(token: str, secret: str) -> dict:
     return jwt.decode(token, secret, algorithms=["HS256", "none"])
 
+
 # VULNERABLE: Using symmetric secret to verify RS256 token
 # If the server expects RS256 but accepts HS256, an attacker can sign
 # with the public key (which is often public) using HS256
 PUBLIC_KEY = open("public.pem").read()
+
 
 def verify_token_confused(token: str) -> dict:
     return jwt.decode(token, PUBLIC_KEY, algorithms=["RS256", "HS256"])
@@ -441,6 +510,7 @@ def verify_token_confused(token: str) -> dict:
 # SECURE: Explicit algorithm list, no "none"
 import jwt
 
+
 def verify_token(token: str, secret: str) -> dict:
     return jwt.decode(
         token,
@@ -448,6 +518,7 @@ def verify_token(token: str, secret: str) -> dict:
         algorithms=["HS256"],  # Explicit, single algorithm
         options={"require": ["exp", "iat", "sub"]},
     )
+
 
 # SECURE: Asymmetric verification with strict algorithm
 def verify_token_rsa(token: str, public_key: str) -> dict:
@@ -469,8 +540,10 @@ Using MD5 or SHA1 for security-sensitive operations (password hashing, integrity
 # VULNERABLE: MD5 for password hashing
 import hashlib
 
+
 def hash_password(password: str) -> str:
     return hashlib.md5(password.encode()).hexdigest()
+
 
 # VULNERABLE: SHA1 for integrity checking
 def verify_integrity(data: bytes, expected_hash: str) -> bool:
@@ -483,8 +556,10 @@ from argon2 import PasswordHasher
 
 ph = PasswordHasher()
 
+
 def hash_password(password: str) -> str:
     return ph.hash(password)
+
 
 def verify_password(stored_hash: str, password: str) -> bool:
     try:
@@ -492,12 +567,15 @@ def verify_password(stored_hash: str, password: str) -> bool:
     except Exception:
         return False
 
+
 # SECURE: Use SHA-256 or SHA-3 for integrity, with HMAC for authentication
 import hashlib
 import hmac
 
+
 def compute_integrity(data: bytes, key: bytes) -> str:
     return hmac.new(key, data, hashlib.sha256).hexdigest()
+
 
 def verify_integrity(data: bytes, key: bytes, expected: str) -> bool:
     computed = hmac.new(key, data, hashlib.sha256).hexdigest()
@@ -516,8 +594,10 @@ def load_plugin(plugin_name: str):
     module = __import__(plugin_name)  # User sends: "os" -> access to os.system
     return module
 
+
 # VULNERABLE: importlib with user input
 import importlib
+
 
 def load_handler(handler_name: str):
     module = importlib.import_module(handler_name)
@@ -528,14 +608,17 @@ def load_handler(handler_name: str):
 # SECURE: Whitelist allowed modules
 ALLOWED_PLUGINS = {"analytics", "reporting", "notifications"}
 
+
 def load_plugin(plugin_name: str):
     if plugin_name not in ALLOWED_PLUGINS:
         raise ValueError(f"Unknown plugin: {plugin_name}")
     module = importlib.import_module(f"app.plugins.{plugin_name}")
     return module
 
+
 # SECURE: Use entry_points for plugin discovery
 from importlib.metadata import entry_points
+
 
 def load_plugins():
     discovered = entry_points(group="myapp.plugins")
@@ -553,6 +636,7 @@ def load_plugins():
 import tempfile
 import os
 
+
 def write_temp_data(data: bytes):
     path = tempfile.mktemp()  # Returns a name, but file doesn't exist yet
     # Another process could create a symlink at this path before we write
@@ -565,6 +649,7 @@ def write_temp_data(data: bytes):
 import tempfile
 import os
 
+
 def write_temp_data(data: bytes) -> str:
     fd, path = tempfile.mkstemp(prefix="app_", suffix=".tmp")
     try:
@@ -572,6 +657,7 @@ def write_temp_data(data: bytes) -> str:
     finally:
         os.close(fd)
     return path
+
 
 # SECURE: Use NamedTemporaryFile or TemporaryDirectory
 def write_temp_managed(data: bytes) -> str:
@@ -593,8 +679,10 @@ import re
 # This regex takes exponential time on inputs like "aaaaaaaaaaaaaaaaaaaaa!"
 EMAIL_REGEX = re.compile(r"^([a-zA-Z0-9]+)*@[a-zA-Z0-9]+\.[a-zA-Z]+$")
 
+
 def validate_email(email: str) -> bool:
     return bool(EMAIL_REGEX.match(email))
+
 
 # VULNERABLE: Nested quantifiers
 URL_REGEX = re.compile(r"^(https?://)?([a-z0-9-]+\.)+[a-z]{2,}(/.*)*$")
@@ -607,13 +695,16 @@ import re
 # Flattened regex without nested quantifiers
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
+
 def validate_email(email: str) -> bool:
     if len(email) > 254:  # RFC 5321 maximum
         return False
     return bool(EMAIL_REGEX.match(email))
 
+
 # SECURE: Use a dedicated validation library
 from email_validator import validate_email as ev_validate
+
 
 def validate_email_safe(email: str) -> bool:
     try:
@@ -621,6 +712,7 @@ def validate_email_safe(email: str) -> bool:
         return True
     except Exception:
         return False
+
 
 # SECURE: Set a timeout with re2 (Google's linear-time regex engine)
 # pip install google-re2
@@ -642,8 +734,10 @@ def get_config(user_prefs: dict) -> dict:
     defaults = {"debug": False, "allow_admin": False, "max_retries": 3}
     return {**defaults, **user_prefs}  # user_prefs can override "allow_admin"!
 
+
 # SECURE: Whitelist allowed overrides with 3.9 union operator
 ALLOWED_USER_KEYS = {"theme", "language", "max_retries"}
+
 
 def get_config(user_prefs: dict) -> dict:
     defaults = {"debug": False, "allow_admin": False, "max_retries": 3}
@@ -662,6 +756,7 @@ Python 3.9 allows `list[int]`, `dict[str, Any]` in annotations without importing
 def validate_allowed_ips(ip_list: list[str]) -> list[str]:
     """Type hints make it clear this expects a list of strings, not raw bytes."""
     import ipaddress
+
     validated = []
     for ip in ip_list:
         addr = ipaddress.ip_address(ip)  # Raises ValueError on invalid IP
@@ -687,12 +782,15 @@ def handle_request(action: str, payload: dict):
     # Forgot to handle "delete" -> silently does nothing
     # Forgot to validate payload structure
 
+
 # SECURE: Structural pattern matching with exhaustive handling
 def handle_request(request: dict):
     match request:
         case {"action": "read", "path": str(path)} if path.startswith("/allowed/"):
             return read_file(path)
-        case {"action": "write", "path": str(path), "data": str(data)} if path.startswith("/allowed/"):
+        case {"action": "write", "path": str(path), "data": str(data)} if (
+            path.startswith("/allowed/")
+        ):
             return write_file(path, data)
         case {"action": action}:
             raise ValueError(f"Unknown or unauthorized action: {action}")
@@ -710,6 +808,7 @@ Python 3.10 allows parenthesized context managers, improving readability for mul
 # SECURE: Multiple security-critical resources managed together
 from pathlib import Path
 import tempfile
+
 
 def secure_file_copy(src: Path, dst: Path):
     with (
@@ -739,9 +838,11 @@ config = toml.load("config.toml")  # Depends on third-party library security
 # SECURE: Use stdlib tomllib (Python 3.11+)
 import tomllib
 
+
 def load_config(path: str) -> dict:
     with open(path, "rb") as f:
         return tomllib.load(f)
+
 
 # tomllib only parses — no code execution possible
 # It reads bytes, preventing encoding-related attacks
@@ -758,6 +859,7 @@ Exception groups allow handling multiple exceptions simultaneously, which is val
 class ValidationError(Exception):
     pass
 
+
 def validate_input(data: dict) -> dict:
     errors = []
     if not isinstance(data.get("email"), str):
@@ -769,6 +871,7 @@ def validate_input(data: dict) -> dict:
     if errors:
         raise ExceptionGroup("Validation failed", errors)
     return data
+
 
 # Caller handles with except*
 try:
@@ -801,9 +904,12 @@ type SessionToken = str
 type SanitizedHTML = str
 type RawUserInput = str
 
+
 def sanitize(raw: RawUserInput) -> SanitizedHTML:
     import html
+
     return html.escape(raw)
+
 
 # Generic validator with new syntax
 def validate_bounded[T: (int, float)](value: T, min_val: T, max_val: T) -> T:
@@ -837,14 +943,21 @@ Python 3.13 introduces a `@warnings.deprecated` decorator that can mark security
 # SECURE: Mark insecure functions as deprecated
 import warnings
 
-@warnings.deprecated("Use hash_password_argon2() instead — MD5 is cryptographically broken")
+
+@warnings.deprecated(
+    "Use hash_password_argon2() instead — MD5 is cryptographically broken"
+)
 def hash_password_md5(password: str) -> str:
     import hashlib
+
     return hashlib.md5(password.encode()).hexdigest()
+
 
 def hash_password_argon2(password: str) -> str:
     from argon2 import PasswordHasher
+
     return PasswordHasher().hash(password)
+
 
 # Type checkers and linters will flag calls to hash_password_md5()
 ```
@@ -868,13 +981,16 @@ import threading
 # VULNERABLE in free-threaded mode: unsynchronized shared state
 rate_limit_counts: dict[str, int] = {}
 
+
 def check_rate_limit(ip: str) -> bool:
     count = rate_limit_counts.get(ip, 0)  # TOCTOU race
     rate_limit_counts[ip] = count + 1
     return count < 100
 
+
 # SECURE: Use threading.Lock for shared security state
 rate_lock = threading.Lock()
+
 
 def check_rate_limit_safe(ip: str) -> bool:
     with rate_lock:

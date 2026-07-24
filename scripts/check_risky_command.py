@@ -4,9 +4,9 @@ PreToolUse hook to detect potentially risky command patterns before execution.
 Warns about dangerous operations without blocking (informational only).
 """
 
-import sys
-import re
 import json
+import re
+import sys
 
 # Risky patterns with severity and explanation
 RISKY_PATTERNS = [
@@ -193,7 +193,7 @@ def main():
     # Read tool input from stdin (Claude Code passes tool parameters)
     try:
         input_data = sys.stdin.read()
-    except Exception:
+    except Exception:  # noqa: BLE001 - informational hook fails open on any stdin read error
         return
 
     if not input_data:
