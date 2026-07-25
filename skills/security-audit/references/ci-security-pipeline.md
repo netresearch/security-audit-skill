@@ -84,8 +84,9 @@ release supporting your minimum PHP version, for example):
 }
 ```
 
-`report` lists them without failing; `ignore` hides them; `fail` is the
-per-run `--abandoned=fail` behavior.
+`report` lists them without failing; `ignore` hides them; `fail` — the
+behavior observed with no config set on Composer 2.10.2 — makes an abandoned
+package fail the audit.
 
 The abandonment marker is written **into `composer.lock`** at `composer
 update` time, not looked up live at audit time. Two consequences:
