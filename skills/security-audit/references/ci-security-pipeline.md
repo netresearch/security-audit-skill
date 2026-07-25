@@ -63,7 +63,39 @@ jobs:
 - `composer audit` - Check for known vulnerabilities
 - `composer audit --format=json` - Machine-readable output
 - `composer audit --locked` - Check against lock file (faster, no install needed)
-- `composer audit --abandoned` - Also report abandoned packages
+- `composer audit --abandoned=ignore|report|fail` - How abandoned packages affect the exit code
+
+#### Abandoned packages fail the audit too
+
+`composer audit` exits non-zero for an **abandoned** package even when no
+advisory matches — verified on Composer 2.10.2, where a lock containing one
+abandoned package produced `Found 1 abandoned package` and exit 1 with zero
+vulnerabilities. Set the repo-level default in `composer.json` when the
+abandoned dependency is unavoidable (a transitive dependency of the last
+release supporting your minimum PHP version, for example):
+
+```json
+{
+    "config": {
+        "audit": {
+            "abandoned": "report"
+        }
+    }
+}
+```
+
+`report` lists them without failing; `ignore` hides them; `fail` is the
+per-run `--abandoned=fail` behavior.
+
+The abandonment marker is written **into `composer.lock`** at `composer
+update` time, not looked up live at audit time. Two consequences:
+
+- A stale lock hides an abandonment that Packagist already records — the audit
+  stays green until someone refreshes the lock.
+- Refreshing the lock can therefore turn a green audit red with no new CVE.
+  When updating a lock to clear an advisory, re-run `composer audit --locked`
+  against the **new** lock before pushing, or CI trades one red audit for
+  another.
 
 ### Trivy (Multi-Purpose Scanner)
 
