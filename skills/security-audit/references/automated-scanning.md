@@ -515,3 +515,43 @@ echo "PASS: No security findings"
 echo ""
 echo "All security checks passed."
 ```
+
+---
+
+## Read the Scanner's Coverage Claim Before Reading Its Findings
+
+Every scoped scanner reports two things: what it *found*, and what it *looked
+at*. The second one is the load-bearing half of a clean result, and it is the
+one nobody reads. "No findings" means "clean" only if the scanner examined what
+you think it examined.
+
+Scoping goes wrong quietly:
+
+- **A tool resolving paths against the wrong working tree.** In a bare-repo /
+  worktree layout (`.bare/`, `main/`, several short-lived feature worktrees), a
+  scan of a 22-file range reported its target as "adds only the `.gitattributes`
+  file" — a file that was not in the range at all, but *was* the entire diff of a
+  sibling worktree. Its component list named one file; the range had 22.
+- **A path filter that silently matches nothing** — a renamed directory, a typo
+  in an `include:` glob, an `--exclude` that swallows the target.
+- **A cap that truncates** — max files, max findings, per-rule limits — dropping
+  the tail of the target without failing.
+- **An expired or missing upload** in the reporting backend, so the *metric* is
+  computed from a subset while the run itself was complete.
+
+Before acting on a low count, diff the claim against the target:
+
+```bash
+# What the scan says it covered vs. what the range actually contains
+git diff --numstat <base>..<head> | wc -l      # real file count
+# then compare against the tool's own coverage/inventory output
+```
+
+**A non-empty result does not prove the scoping was right.** In the case above
+the researchers did read real code and did report a genuine defect — while the
+inventory was still wrong, so nothing could be concluded about the other 21
+files. Findings validate themselves; they never validate coverage.
+
+When the coverage claim and the target disagree, say so in the report rather
+than passing the finding count on unqualified. "Partial review of the range" and
+"clean" are different results, and only one of them is safe to act on.

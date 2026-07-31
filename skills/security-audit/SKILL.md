@@ -26,7 +26,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 
 - **Core**: owasp-top10, cwe-top25, xxe-prevention, cvss-scoring, api-key-encryption
 - **Prevention**: deserialization-prevention, path-traversal-prevention, file-upload-security, input-validation, error-message-sanitization
-- **Architecture**: authentication-patterns, security-headers, security-logging, cryptography-guide, security-invariants
+- **Architecture**: authentication-patterns, security-headers, security-logging, cryptography-guide, security-invariants, indistinguishability-defences
 - **Language features** (`*-security-features`): php, python, javascript-typescript, nodejs, go
 - **Frameworks** (`*-security`): typo3, typo3-fluid, typo3-typoscript, symfony, react, vue
 - **Cloud & IaC**: aws-security, iac-security
