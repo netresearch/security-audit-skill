@@ -279,6 +279,50 @@ useDefault = true
   keywords = ["NR-"]
 ```
 
+### Two traps when writing an allowlist
+
+**1. The repo may already ship a tuned config — do not measure against your
+own.** Before concluding anything about an allowlist's effect, check for an
+existing `.gitleaks.toml` / `.betterleaks.toml` at the repo root. Overwriting a
+config that already names the exact fixture files with a generic one makes the
+finding count jump, and the jump looks like the new config *caused* findings
+rather than that it *stopped suppressing* known ones. Measured on a real repo:
+119 findings with no config, 2 with the repo's own tuned config, 110 with a
+generic two-path config dropped on top — the 2 → 110 move was the tuned config
+being replaced, not a syntax effect.
+
+For the same reason, test config changes on a copy of the tree **outside any
+repo**: gitleaks auto-discovers `(target)/.gitleaks.toml` (betterleaks also
+`.betterleaks.toml`) and walks up the tree, so a "with vs without" comparison
+run inside a clone silently picks up a config you did not intend to include.
+
+**2. The scan covers git history, so deleting the file does not clear the
+finding.** `gitleaks git` / `betterleaks git` walk every commit. A secret
+committed once stays reported after it is deleted or the file is moved, and the
+alert cites the **historical** path at the **old** commit. Consequences:
+
+- A path allowlist must match where the file *was*, not only where it is now —
+  e.g. `'''^Tests/(Unit|Functional)/Service/Tool/AgentStateCodecTest\.php'''`
+  for a fixture that moved between the two directories.
+- "Just delete the file" is not a fix. The real choices are an allowlist entry
+  or history rewriting; for synthetic fixtures and local dev material, rewriting
+  public history is disproportionate.
+
+**Prefer concrete paths over value regexes.** A repo-wide regex on the secret
+shape masks a genuine leak of the same shape elsewhere. Verify the allowlist is
+still sharp by planting a fresh synthetic secret outside the allowlisted paths
+and confirming it is still reported:
+
+```bash
+# Control probe — must still report a finding.
+printf 'const T = "ghp_%s";\n' "$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 36)" \
+  > ./probe.tmp
+gitleaks dir --redact .
+status=$?
+rm -f ./probe.tmp
+exit $status   # preserve the scan's exit code; rm must not mask it
+```
+
 ### Pre-commit Hook Setup
 
 ```bash
