@@ -279,6 +279,45 @@ useDefault = true
   keywords = ["NR-"]
 ```
 
+### Two traps when writing an allowlist
+
+**1. `[[allowlists]]` (plural) replaces the built-in allowlists.** The singular
+`[allowlist]` table above merges with the defaults that `[extend] useDefault`
+pulls in. The plural array-of-tables form overrides them, so every false
+positive the default config used to suppress comes back. Observed on a real
+repo: a config that added two path entries took the finding count from **2 to
+110**, because the default allowlists disappeared. Use the singular `[allowlist]`
+unless you deliberately want to replace the defaults.
+
+**2. The scan covers git history, so deleting the file does not clear the
+finding.** `gitleaks git` / `betterleaks git` walk every commit. A secret
+committed once stays reported after it is deleted or the file is moved, and the
+alert cites the **historical** path at the **old** commit. Consequences:
+
+- A path allowlist must match where the file *was*, not only where it is now —
+  e.g. `'''^Tests/(Unit|Functional)/Service/Tool/AgentStateCodecTest\.php'''`
+  for a fixture that moved between the two directories.
+- "Just delete the file" is not a fix. The real choices are an allowlist entry
+  or history rewriting; for synthetic fixtures and local dev material, rewriting
+  public history is disproportionate.
+
+**Prefer concrete paths over value regexes.** A repo-wide regex on the secret
+shape masks a genuine leak of the same shape elsewhere. Verify the allowlist is
+still sharp by planting a fresh synthetic secret outside the allowlisted paths
+and confirming it is still reported:
+
+```bash
+# Control probe — must still report a finding.
+printf 'const T = "ghp_%s";\n' "$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 36)" \
+  > src/probe.tmp
+gitleaks dir --redact . ; rm src/probe.tmp
+```
+
+Test config changes in a copy of the tree **outside any repo**: gitleaks
+auto-discovers `(target)/.gitleaks.toml` (betterleaks also `.betterleaks.toml`),
+so a "with vs without" comparison run inside the clone silently picks up the
+repo's own committed config and measures the wrong pair.
+
 ### Pre-commit Hook Setup
 
 ```bash
