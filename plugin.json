@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "security-audit",
-  "version": "2.11.0",
+  "version": "2.11.1",
   "description": "Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for any project. Deep automated PHP/TYPO3 scanning with 80+ checkpoints, 19 reference guides, PreToolUse warnings. By Netresearch.",
   "author": {
     "name": "Netresearch DTT GmbH",
