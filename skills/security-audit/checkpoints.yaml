@@ -69,19 +69,19 @@ mechanical:
   # Use command type to avoid false positives from glob fallback to config files
   - id: SA-08
     type: command
-    target: "! grep -rqF 'LIBXML_NOENT' --include='*.php' Classes/ 2>/dev/null"
+    pattern: "! grep -rqF 'LIBXML_NOENT' --include='*.php' Classes/ 2>/dev/null"
     severity: error
     desc: "PHP files must not use LIBXML_NOENT flag that enables XXE"
 
   - id: SA-08b
     type: command
-    target: "! grep -rqF 'LIBXML_DTDLOAD' --include='*.php' Classes/ 2>/dev/null"
+    pattern: "! grep -rqF 'LIBXML_DTDLOAD' --include='*.php' Classes/ 2>/dev/null"
     severity: error
     desc: "PHP files must not use LIBXML_DTDLOAD flag that enables XXE"
 
   - id: SA-09
     type: command
-    target: "! grep -rqF 'libxml_disable_entity_loader(false)' --include='*.php' Classes/ 2>/dev/null"
+    pattern: "! grep -rqF 'libxml_disable_entity_loader(false)' --include='*.php' Classes/ 2>/dev/null"
     severity: error
     desc: "Must not explicitly enable XML entity loading (XXE vulnerability)"
 
@@ -111,7 +111,7 @@ mechanical:
   # Use command type to avoid false positives from glob fallback to config files
   - id: SA-13
     type: command
-    target: "! grep -rqF 'echo $' --include='*.php' Classes/ 2>/dev/null"
+    pattern: "! grep -rqF 'echo $' --include='*.php' Classes/ 2>/dev/null"
     severity: warning
     desc: "Direct echo of variables may be XSS vulnerable - use htmlspecialchars()"
 
@@ -122,10 +122,18 @@ mechanical:
     severity: warning
     desc: "Dependabot should be enabled for security updates"
 
+  # `contains` is a literal grep -F, so the previous pattern demanded the
+  # double-quoted spelling `package-ecosystem: "composer"` and failed a
+  # perfectly valid unquoted `package-ecosystem: composer`. YAML does not
+  # require quoting a plain scalar, so both spellings — and the
+  # single-quoted one — are correct configuration. Matched as a regex
+  # instead, with the quote characters optional. `[[:space:]]` rather than
+  # `\s`: the runner picks grep -P or grep -E at run time and a POSIX
+  # bracket expression is the one spelling both accept.
   - id: SA-15
-    type: contains
+    type: regex
     target: .github/dependabot.yml
-    pattern: 'package-ecosystem: "composer"'
+    pattern: "package-ecosystem:[[:space:]]*[\"']?composer[\"']?"
     severity: warning
     desc: "Dependabot should monitor composer for security vulnerabilities"
 
@@ -317,9 +325,19 @@ mechanical:
   # filesystem presence — devs often have a locally-generated lock):
   #  - typo3-cms-extension / library / metapackage → must NOT be tracked
   #  - everything else (project, …) → must BE tracked
+  # Was an `if ... then ... else ... fi` one-liner. The runner rejects `;`
+  # and `$()` outright, so that spelling never executed — the checkpoint
+  # reported "Command rejected" on every project. The same truth table is
+  # expressed as one pipeline: jq emits the type, awk sets `lib` for the
+  # library-ish types and reads git's answer through its own command pipe
+  # (`|` inside the awk program is quoted, so it is not a shell pipe).
+  # `lib + tracked == 1` is the exclusive-or the rule needs. NR == 0 means
+  # jq produced nothing — no composer.json, so the rule does not apply and
+  # the checkpoint passes rather than demanding a lock file from a repo
+  # that is not a Composer project.
   - id: SA-SC-01
     type: command
-    pattern: 'if jq -re ".type" composer.json 2>/dev/null | grep -qE "^(typo3-cms-extension|library|metapackage|composer-plugin)$"; then [ -z "$(git ls-files composer.lock 2>/dev/null)" ]; else [ -n "$(git ls-files composer.lock 2>/dev/null)" ]; fi'
+    pattern: "jq -r '.type // \"\"' composer.json 2>/dev/null | awk '$0 ~ /^(typo3-cms-extension|library|metapackage|composer-plugin)$/{lib=1} END{exit (NR == 0 ? 0 : ((lib + ((\"git ls-files composer.lock 2>/dev/null\" | getline t) > 0)) == 1 ? 0 : 1))}'"
     severity: warning
     desc: "composer.lock should be git-tracked for applications, but git-ignored for libraries / TYPO3 extensions (would freeze transitive deps for consumers). Gated by composer.json type + git ls-files."
 
@@ -331,7 +349,7 @@ mechanical:
   # non-zero → `!` makes the checkpoint pass (skip).
   - id: SA-SC-02
     type: command
-    target: '! jq -e "([.require // {}, .[\"require-dev\"] // {}] | add | to_entries[] | select(.value == \"*\" and (.key | startswith(\"netresearch/\") | not)))" composer.json >/dev/null 2>&1'
+    pattern: '! jq -e "([.require // {}, .[\"require-dev\"] // {}] | add | to_entries[] | select(.value == \"*\" and (.key | startswith(\"netresearch/\") | not)))" composer.json >/dev/null 2>&1'
     severity: error
     desc: "Wildcard (*) version constraints are insecure for external packages. Internal netresearch/* packages may use '*' (intentional intra-org versioning)."
 
@@ -459,18 +477,11 @@ mechanical:
     severity: info
     desc: "CI should include gitleaks for secret scanning (directly or via netresearch security reusable workflow)"
 
-  # === NPM DEPENDENCY MONITORING ===
-  - id: SA-DEP-04
-    type: file_exists_conditional
-    condition_file: package.json
-    severity: warning
-    desc: "npm dependencies monitored when package.json exists"
-    check: |
-      If package.json exists, verify that:
-      1. .github/dependabot.yml is configured to monitor the "npm" package-ecosystem.
-      2. CI runs `npm audit` and is configured to fail the build on vulnerabilities (e.g., using `--audit-level=high`).
-      3. CI runs `npm audit signatures` to verify package integrity.
-    tags: [dependencies, npm, supply-chain]
+  # SA-DEP-04 (npm dependency monitoring) moved to llm_reviews. It declared
+  # `type: file_exists_conditional`, which the runner does not implement —
+  # it reported "Unknown checkpoint type" and skipped, so the check never
+  # ran. Its `check:` body was already prose for a reviewer rather than
+  # anything mechanically decidable, so llm_reviews is where it belongs.
 
   # === GITHUB ACTIONS INJECTION ===
   - id: SA-GHA-01
@@ -586,61 +597,71 @@ mechanical:
   # === INFRASTRUCTURE-AS-CODE SECURITY ===
   - id: SA-IAC-01
     type: command
-    target: "for f in Dockerfile*; do [ -f \"$f\" ] || continue; grep -qE '^\\s*USER\\s' \"$f\" || exit 1; ! grep -qE '^\\s*USER\\s+root\\b' \"$f\" || exit 1; done"
+    # Was a `for ... do ... done` one-liner. The runner rejects any command
+    # containing `;`, `&&` or `||`, so that spelling never executed — the
+    # checkpoint reported "Command rejected" on every project regardless of
+    # its Dockerfiles. Re-expressed as a single pipeline whose exit status
+    # comes from awk: `bad` counts USER root lines, `withuser` counts files
+    # that declare any USER, and a file short of one fails the check.
+    # `find -maxdepth 1` keeps the original top-level-only scope, so a
+    # Dockerfile vendored under .Build/ or node_modules/ is not picked up,
+    # and `xargs -r` means a repo with no Dockerfile at all runs nothing
+    # and passes rather than erroring.
+    pattern: "find . -maxdepth 1 -name 'Dockerfile*' -print0 | xargs -0 -r awk 'FNR==1{files++} /^[[:space:]]*USER[[:space:]]/{ if (!seen[FILENAME]++) withuser++ } /^[[:space:]]*USER[[:space:]]+root([[:space:]]|$)/{bad++} END{exit ((bad > 0) + (withuser < files) > 0)}'"
     severity: warning
     desc: "Dockerfile must declare a non-root USER directive (missing USER means container runs as root)"
 
   - id: SA-IAC-02
     type: command
-    target: "! grep -rqE '(COPY|ADD).*\\.env' Dockerfile* 2>/dev/null"
+    pattern: "! grep -rqE '(COPY|ADD).*\\.env' Dockerfile* 2>/dev/null"
     severity: error
     desc: "Dockerfile must not copy .env files into image layers (secrets leak)"
 
   - id: SA-IAC-03
     type: command
-    target: "! grep -rqE 'ARG.*(PASSWORD|SECRET|TOKEN|API_KEY)' Dockerfile* 2>/dev/null"
+    pattern: "! grep -rqE 'ARG.*(PASSWORD|SECRET|TOKEN|API_KEY)' Dockerfile* 2>/dev/null"
     severity: error
     desc: "Dockerfile ARG must not contain secrets (visible in image history)"
 
   - id: SA-IAC-04
     type: command
-    target: "! grep -rqE '^FROM\\s+\\w+\\s*$' Dockerfile* 2>/dev/null"
+    pattern: "! grep -rqE '^FROM\\s+\\w+\\s*$' Dockerfile* 2>/dev/null"
     severity: warning
     desc: "Dockerfile base images should be pinned to specific tags or digests, not latest"
 
   - id: SA-IAC-05
     type: command
-    target: "! grep -rqE 'privileged:\\s*true' docker-compose*.yml 2>/dev/null"
+    pattern: "! grep -rqE 'privileged:\\s*true' docker-compose*.yml 2>/dev/null"
     severity: error
     desc: "Docker Compose must not use privileged mode (container escape risk)"
 
   - id: SA-IAC-06
     type: command
-    target: "! grep -rqE '/var/run/docker\\.sock' docker-compose*.yml 2>/dev/null"
+    pattern: "! grep -rqE '/var/run/docker\\.sock' docker-compose*.yml 2>/dev/null"
     severity: error
     desc: "Docker Compose must not mount Docker socket (container escape risk)"
 
   - id: SA-IAC-07
     type: command
-    target: "! grep -rqE 'runAsUser:\\s*0' k8s/ kubernetes/ deploy/ manifests/ charts/ 2>/dev/null"
+    pattern: "! grep -rqE 'runAsUser:\\s*0' k8s/ kubernetes/ deploy/ manifests/ charts/ 2>/dev/null"
     severity: error
     desc: "Kubernetes pods must not run as root (runAsUser: 0)"
 
   - id: SA-IAC-08
     type: command
-    target: "! grep -rqE 'hostNetwork:\\s*true' k8s/ kubernetes/ deploy/ manifests/ charts/ 2>/dev/null"
+    pattern: "! grep -rqE 'hostNetwork:\\s*true' k8s/ kubernetes/ deploy/ manifests/ charts/ 2>/dev/null"
     severity: error
     desc: "Kubernetes pods should not use host networking"
 
   - id: SA-IAC-09
     type: command
-    target: "! grep -rqE 'cidr_blocks.*0\\.0\\.0\\.0/0' --include='*.tf' . 2>/dev/null"
+    pattern: "! grep -rqE 'cidr_blocks.*0\\.0\\.0\\.0/0' --include='*.tf' --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=.Build . 2>/dev/null"
     severity: warning
     desc: "Terraform security groups should not allow unrestricted ingress (0.0.0.0/0)"
 
   - id: SA-IAC-10
     type: command
-    target: "! grep -rqE 'acl.*public' --include='*.tf' . 2>/dev/null"
+    pattern: "! grep -rqE 'acl.*public' --include='*.tf' --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=.Build . 2>/dev/null"
     severity: warning
     desc: "Terraform S3 buckets should not use public ACLs"
 
@@ -673,50 +694,50 @@ mechanical:
 
   - id: SA-FE-03
     type: command
-    target: "! grep -rqE 'eval\\s*\\(' --include='*.js' --include='*.ts' . 2>/dev/null"
+    pattern: "! grep -rqE 'eval\\s*\\(' --include='*.js' --include='*.ts' --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=.Build . 2>/dev/null"
     severity: warning
     desc: "eval() in JavaScript enables code injection - use safer alternatives"
 
   - id: SA-FE-04
     type: command
-    target: "! grep -rqE 'localStorage\\.(set|get)Item.*(token|password|secret|key|credential|session)' --include='*.js' --include='*.ts' . 2>/dev/null"
+    pattern: "! grep -rqE 'localStorage\\.(set|get)Item.*(token|password|secret|key|credential|session)' --include='*.js' --include='*.ts' --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=.Build . 2>/dev/null"
     severity: error
     desc: "Sensitive data (tokens, passwords, secrets) must not be stored in localStorage"
 
   - id: SA-FE-05
     type: command
-    target: "! grep -rqE 'Access-Control-Allow-Origin.*\\*' --include='*.php' --include='*.js' --include='*.conf' --include='*.yaml' --include='*.yml' . 2>/dev/null"
+    pattern: "! grep -rqE 'Access-Control-Allow-Origin.*\\*' --include='*.php' --include='*.js' --include='*.conf' --include='*.yaml' --include='*.yml' --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=.Build . 2>/dev/null"
     severity: warning
     desc: "CORS wildcard (*) origin should be avoided - use specific allowed origins"
 
   - id: SA-FE-06
     type: command
-    target: "! grep -rqE 'new Function\\s*\\(' --include='*.js' --include='*.ts' . 2>/dev/null"
+    pattern: "! grep -rqE 'new Function\\s*\\(' --include='*.js' --include='*.ts' --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=.Build . 2>/dev/null"
     severity: warning
     desc: "new Function() enables dynamic code execution - use safer alternatives"
 
   # === AI/LLM AGENT SECURITY ===
   - id: SA-AI-01
     type: command
-    target: "! grep -rqE '(api_key|apiKey|API_KEY|secret|password|token)\\s*[:=]\\s*[\"'\\''](sk-|AKIA|ghp_|ghs_)' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
+    pattern: "! grep -rqE '(api_key|apiKey|API_KEY|secret|password|token)\\s*[:=]\\s*[\"'\\''](sk-|AKIA|ghp_|ghs_)' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
     severity: error
     desc: "AI agent config files must not contain hardcoded API keys or secrets"
 
   - id: SA-AI-02
     type: command
-    target: "! grep -rqE 'dangerouslyDisableSandbox|--no-verify|--force' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
+    pattern: "! grep -rqE 'dangerouslyDisableSandbox|--no-verify|--force' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
     severity: error
     desc: "AI agent configs must not disable safety mechanisms (sandbox, hooks, verification)"
 
   - id: SA-AI-03
     type: command
-    target: "! grep -rqE 'Bash\\(\\*\\)|allowed-tools:.*Bash\\b[^(]' SKILL.md skills/*/SKILL.md 2>/dev/null"
+    pattern: "! grep -rqE 'Bash\\(\\*\\)|allowed-tools:.*Bash\\b[^(]' SKILL.md skills/*/SKILL.md 2>/dev/null"
     severity: warning
     desc: "AI skills should not grant unrestricted Bash access - scope to specific commands"
 
   - id: SA-AI-04
     type: command
-    target: "! grep -rqE '\"version\"\\s*:\\s*\"latest\"' .claude/mcp*.json mcp.json 2>/dev/null"
+    pattern: "! grep -rqE '\"version\"\\s*:\\s*\"latest\"' .claude/mcp*.json mcp.json 2>/dev/null"
     severity: warning
     desc: "MCP server versions should be pinned, not 'latest' (supply chain risk)"
 
@@ -3647,3 +3668,18 @@ llm_reviews:
       Report specific injection vectors and their remediation.
     severity: error
     desc: "Review GitHub Actions for injection vectors, permission scope, and secret exposure"
+
+  # === NPM DEPENDENCY MONITORING ===
+  # Moved here from `mechanical:`, where it declared the non-existent type
+  # `file_exists_conditional` and was skipped as unknown on every run.
+  - id: SA-DEP-04
+    domain: supply-chain
+    prompt: |
+      Only applies when package.json exists at the repository root; report
+      "not applicable" otherwise. When it does exist, verify that:
+      1. .github/dependabot.yml is configured to monitor the "npm" package-ecosystem.
+      2. CI runs `npm audit` and is configured to fail the build on vulnerabilities (e.g., using `--audit-level=high`).
+      3. CI runs `npm audit signatures` to verify package integrity.
+    severity: warning
+    desc: "npm dependencies monitored when package.json exists"
+    tags: [dependencies, npm, supply-chain]
