@@ -133,7 +133,9 @@ mechanical:
   - id: SA-15
     type: regex
     target: .github/dependabot.yml
-    pattern: "package-ecosystem:[[:space:]]*[\"']?composer[\"']?"
+    # The value must END here: without the boundary, `composer-custom` — which
+    # Dependabot does not monitor Composer for — satisfies the check.
+    pattern: "package-ecosystem:[[:space:]]*[\"']?composer[\"']?[[:space:]]*(#.*)?$"
     severity: warning
     desc: "Dependabot should monitor composer for security vulnerabilities"
 
@@ -607,7 +609,10 @@ mechanical:
     # Dockerfile vendored under .Build/ or node_modules/ is not picked up,
     # and `xargs -r` means a repo with no Dockerfile at all runs nothing
     # and passes rather than erroring.
-    pattern: "find . -maxdepth 1 -name 'Dockerfile*' -print0 | xargs -0 -r awk 'FNR==1{files++} /^[[:space:]]*USER[[:space:]]/{ if (!seen[FILENAME]++) withuser++ } /^[[:space:]]*USER[[:space:]]+root([[:space:]]|$)/{bad++} END{exit ((bad > 0) + (withuser < files) > 0)}'"
+    # Root has four spellings, not one: `USER root`, `USER root:root`, `USER 0`
+    # and `USER 0:0` all leave the container running as uid 0. Matching only the
+    # first passed a Dockerfile that is just as root as the one it rejects.
+    pattern: "find . -maxdepth 1 -name 'Dockerfile*' -print0 | xargs -0 -r awk 'FNR==1{files++} /^[[:space:]]*USER[[:space:]]/{ if (!seen[FILENAME]++) withuser++ } /^[[:space:]]*USER[[:space:]]+(root|0)([[:space:]]*:[^[:space:]]*)?([[:space:]]|$)/{bad++} END{exit ((bad > 0) + (withuser < files) > 0)}'"
     severity: warning
     desc: "Dockerfile must declare a non-root USER directive (missing USER means container runs as root)"
 
