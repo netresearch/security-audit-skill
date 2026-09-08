@@ -38,14 +38,15 @@ Add the [Netresearch marketplace](https://github.com/netresearch/claude-code-mar
 
 ### Without a marketplace
 
-Since Claude Code 2.1.157 a plugin directory under your personal skills directory loads on its own, hooks and commands included:
+Since Claude Code 2.1.157 a plugin directory under your personal skills directory loads on its own, including the hooks this repo ships:
 
 ```bash
+mkdir -p ~/.claude/skills
 git clone https://github.com/netresearch/security-audit-skill.git \
   ~/.claude/skills/security-audit
 ```
 
-It loads as `security-audit@skills-dir` on the next session. Update with `git pull`; remove it by deleting the directory. This route has no `claude plugin update`.
+It loads as `security-audit@skills-dir` on the next session. Update with `git -C ~/.claude/skills/security-audit pull` and start a new session; remove it by deleting the directory. This route has no `claude plugin update`.
 
 ### npx ([skills.sh](https://skills.sh))
 
@@ -55,6 +56,8 @@ Install with any [Agent Skills](https://agentskills.io)-compatible agent:
 npx skills add https://github.com/netresearch/security-audit-skill --skill security-audit
 ```
 
+> **Limitation:** `npx skills` installs `SKILL.md`-based skills only. This repo also ships `hooks`, which it does not install — use the marketplace or the skills directory for those.
+
 ### Download Release
 
 Download the [latest release](https://github.com/netresearch/security-audit-skill/releases/latest) and extract to your agent's skills directory.
@@ -62,8 +65,6 @@ Download the [latest release](https://github.com/netresearch/security-audit-skil
 ### Git Clone
 
 ```bash
-
-> **Limitation:** `npx skills` installs `SKILL.md`-based skills only. This repo also ships `hooks`, which it does not install — use the marketplace or the skills directory for those.
 git clone https://github.com/netresearch/security-audit-skill.git
 ```
 
