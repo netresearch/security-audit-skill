@@ -126,10 +126,20 @@ mechanical:
   # === DEPENDABOT FOR SECURITY ===
   # Same target as SA-DEP-01: Renovate raises vulnerability-fix PRs too
   # (vulnerabilityAlerts), so a Renovate-only repository is not missing
-  # security updates.
+  # security updates. A script rather than file_exists so a Renovate config
+  # with a top-level `"enabled": false` (Renovate skips the repository) does
+  # not count; that is detected for strict-JSON files, which jq can parse —
+  # JSON5/JSONC files are counted on presence.
   - id: SA-14
-    type: file_exists
-    target: "{.github/dependabot.yml,renovate.json,renovate.json5,.renovaterc,.renovaterc.json,.github/renovate.json,.github/renovate.json5}"
+    type: script
+    command: |
+      [ -f .github/dependabot.yml ] && exit 0
+      for f in renovate.json renovate.jsonc renovate.json5 .renovaterc .renovaterc.json .renovaterc.jsonc .renovaterc.json5 .github/renovate.json .github/renovate.jsonc .github/renovate.json5; do
+        [ -f "$f" ] || continue
+        jq -e '.enabled == false' "$f" >/dev/null 2>&1 && continue
+        exit 0
+      done
+      exit 1
     severity: warning
     desc: "Dependabot or Renovate should be enabled for security updates"
 
@@ -155,12 +165,16 @@ mechanical:
       if [ -f .github/dependabot.yml ] && grep -qE "package-ecosystem:[[:space:]]*[\"']?composer[\"']?[[:space:]]*(#.*)?\$" .github/dependabot.yml; then
         exit 0
       fi
-      for f in renovate.json renovate.json5 .renovaterc .renovaterc.json .github/renovate.json .github/renovate.json5; do
+      for f in renovate.json renovate.jsonc renovate.json5 .renovaterc .renovaterc.json .renovaterc.jsonc .renovaterc.json5 .github/renovate.json .github/renovate.jsonc .github/renovate.json5; do
         [ -f "$f" ] || continue
+        # A disabled config monitors nothing (strict JSON only, see SA-14).
+        jq -e '.enabled == false' "$f" >/dev/null 2>&1 && continue
         if ! grep -q enabledManagers "$f"; then
           exit 0
         fi
-        if tr -d '\n' < "$f" | grep -qE 'enabledManagers[^]]*composer'; then
+        # The quotes make `composer` an exact manager name: `composer-custom`
+        # in enabledManagers does not enable the composer manager.
+        if tr -d '\n' < "$f" | grep -qE "enabledManagers[^]]*[\"']composer[\"']"; then
           exit 0
         fi
       done
@@ -493,9 +507,17 @@ mechanical:
     desc: "PHPStan should be configured in CI (directly or via netresearch typo3-ci-workflows reusable workflow which runs PHPStan; Composer projects only)"
 
   # === DEPENDENCY SCANNING ===
+  # Same logic as SA-14: a disabled strict-JSON Renovate config does not count.
   - id: SA-DEP-01
-    type: file_exists
-    target: "{.github/dependabot.yml,renovate.json,renovate.json5,.renovaterc,.renovaterc.json,.github/renovate.json,.github/renovate.json5}"
+    type: script
+    command: |
+      [ -f .github/dependabot.yml ] && exit 0
+      for f in renovate.json renovate.jsonc renovate.json5 .renovaterc .renovaterc.json .renovaterc.jsonc .renovaterc.json5 .github/renovate.json .github/renovate.jsonc .github/renovate.json5; do
+        [ -f "$f" ] || continue
+        jq -e '.enabled == false' "$f" >/dev/null 2>&1 && continue
+        exit 0
+      done
+      exit 1
     severity: warning
     desc: "Dependabot or Renovate should be configured for dependency updates"
 
@@ -503,12 +525,13 @@ mechanical:
   # check recognises the other ecosystems' scanners instead of gating on
   # composer.json. GitHub's dependency review (the action, or the netresearch
   # reusable wrapping it) fails a PR that adds a vulnerable dependency in any
-  # supported ecosystem. No bare `audit`: harden-runner's
-  # `egress-policy: audit` would match it.
+  # supported ecosystem; it is matched as a `uses:` reference so a job or step
+  # merely named dependency-review does not count. No bare `audit`:
+  # harden-runner's `egress-policy: audit` would match it.
   - id: SA-DEP-02
     type: regex
     target: .github/workflows/*.yml
-    pattern: 'composer[[:space:]]+audit|(npm|pnpm|yarn|cargo)[[:space:]]+audit|pip-audit|govulncheck|osv-scanner|grype|trivy|snyk|dependency-review|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/(security|python-audit|node-audit|security-container)[.]yml'
+    pattern: 'composer[[:space:]]+audit|(npm|pnpm|yarn|cargo)[[:space:]]+audit|pip-audit|govulncheck|osv-scanner|grype|trivy|snyk|uses:[[:space:]]+"?actions/dependency-review-action@|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/(security|python-audit|node-audit|security-container|dependency-review)[.]yml'
     severity: warning
     desc: "CI should include dependency vulnerability scanning (composer/npm/pnpm/yarn/cargo audit, pip-audit, govulncheck, osv-scanner, grype, trivy, snyk, dependency review, or a netresearch security/audit reusable workflow)"
 
