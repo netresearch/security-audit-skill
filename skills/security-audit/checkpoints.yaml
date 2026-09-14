@@ -58,12 +58,20 @@ mechanical:
   # CI must run composer audit. Accept either the literal `composer audit`
   # invocation OR a `uses:` reference to the netresearch security reusable
   # workflow (which runs composer audit + SBOM + gitleaks centrally).
+  # A script so the check only applies where there is a composer.json: the
+  # schema has no per-checkpoint precondition, and a repository without
+  # Composer has nothing for composer audit to audit. No workflow files at
+  # all stays a pass, as the former glob target's "no match" skip did.
   - id: SA-07
-    type: regex
-    target: .github/workflows/*.yml
-    pattern: 'composer[[:space:]]+audit|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/security[.]yml'
+    type: script
+    command: |
+      [ -f composer.json ] || exit 0
+      shopt -s nullglob
+      workflows=(.github/workflows/*.yml)
+      [ "${#workflows[@]}" -gt 0 ] || exit 0
+      grep -qE 'composer[[:space:]]+audit|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/security[.]yml' "${workflows[@]}"
     severity: error
-    desc: "CI must run composer audit (directly or via netresearch security reusable workflow)"
+    desc: "CI must run composer audit (directly or via netresearch security reusable workflow; Composer projects only)"
 
   # === XXE PREVENTION ===
   # Use command type to avoid false positives from glob fallback to config files
@@ -116,11 +124,24 @@ mechanical:
     desc: "Direct echo of variables may be XSS vulnerable - use htmlspecialchars()"
 
   # === DEPENDABOT FOR SECURITY ===
+  # Same target as SA-DEP-01: Renovate raises vulnerability-fix PRs too
+  # (vulnerabilityAlerts), so a Renovate-only repository is not missing
+  # security updates. A script rather than file_exists so a Renovate config
+  # with a top-level `"enabled": false` (Renovate skips the repository) does
+  # not count; that is detected for strict-JSON files, which jq can parse —
+  # JSON5/JSONC files are counted on presence.
   - id: SA-14
-    type: file_exists
-    target: .github/dependabot.yml
+    type: script
+    command: |
+      [ -f .github/dependabot.yml ] && exit 0
+      for f in renovate.json renovate.jsonc renovate.json5 .renovaterc .renovaterc.json .renovaterc.jsonc .renovaterc.json5 .github/renovate.json .github/renovate.jsonc .github/renovate.json5; do
+        [ -f "$f" ] || continue
+        jq -e '.enabled == false' "$f" >/dev/null 2>&1 && continue
+        exit 0
+      done
+      exit 1
     severity: warning
-    desc: "Dependabot should be enabled for security updates"
+    desc: "Dependabot or Renovate should be enabled for security updates"
 
   # `contains` is a literal grep -F, so the previous pattern demanded the
   # double-quoted spelling `package-ecosystem: "composer"` and failed a
@@ -130,14 +151,36 @@ mechanical:
   # instead, with the quote characters optional. `[[:space:]]` rather than
   # `\s`: the runner picks grep -P or grep -E at run time and a POSIX
   # bracket expression is the one spelling both accept.
+  #
+  # A script so the check only applies where there is a composer.json, and
+  # so a Renovate config counts: Renovate's composer manager is on by
+  # default, and only an `enabledManagers` list without composer turns it
+  # off (the list is read with newlines removed, since it often spans lines).
   - id: SA-15
-    type: regex
-    target: .github/dependabot.yml
+    type: script
     # The value must END here: without the boundary, `composer-custom` — which
     # Dependabot does not monitor Composer for — satisfies the check.
-    pattern: "package-ecosystem:[[:space:]]*[\"']?composer[\"']?[[:space:]]*(#.*)?$"
+    command: |
+      [ -f composer.json ] || exit 0
+      if [ -f .github/dependabot.yml ] && grep -qE "package-ecosystem:[[:space:]]*[\"']?composer[\"']?[[:space:]]*(#.*)?\$" .github/dependabot.yml; then
+        exit 0
+      fi
+      for f in renovate.json renovate.jsonc renovate.json5 .renovaterc .renovaterc.json .renovaterc.jsonc .renovaterc.json5 .github/renovate.json .github/renovate.jsonc .github/renovate.json5; do
+        [ -f "$f" ] || continue
+        # A disabled config monitors nothing (strict JSON only, see SA-14).
+        jq -e '.enabled == false' "$f" >/dev/null 2>&1 && continue
+        if ! grep -q enabledManagers "$f"; then
+          exit 0
+        fi
+        # The quotes make `composer` an exact manager name: `composer-custom`
+        # in enabledManagers does not enable the composer manager.
+        if tr -d '\n' < "$f" | grep -qE "enabledManagers[^]]*[\"']composer[\"']"; then
+          exit 0
+        fi
+      done
+      exit 1
     severity: warning
-    desc: "Dependabot should monitor composer for security vulnerabilities"
+    desc: "Dependabot or Renovate should monitor composer for security vulnerabilities (Composer projects only)"
 
   # === DESERIALIZATION PREVENTION ===
   - id: SA-21
@@ -450,26 +493,47 @@ mechanical:
     desc: "allowAllProperties() disables TYPO3 Extbase mass assignment protection (CWE-915)"
 
   # === SAST TOOLING ===
+  # A script so the check only applies where there is a composer.json (see
+  # SA-07); no workflow files at all stays a pass.
   - id: SA-SAST-01
-    type: regex
-    target: .github/workflows/*.yml
-    pattern: 'phpstan|uses:[[:space:]]+"?netresearch/typo3-ci-workflows/[.]github/workflows/ci[.]yml'
+    type: script
+    command: |
+      [ -f composer.json ] || exit 0
+      shopt -s nullglob
+      workflows=(.github/workflows/*.yml)
+      [ "${#workflows[@]}" -gt 0 ] || exit 0
+      grep -qE 'phpstan|uses:[[:space:]]+"?netresearch/typo3-ci-workflows/[.]github/workflows/ci[.]yml' "${workflows[@]}"
     severity: warning
-    desc: "PHPStan should be configured in CI (directly or via netresearch typo3-ci-workflows reusable workflow which runs PHPStan)"
+    desc: "PHPStan should be configured in CI (directly or via netresearch typo3-ci-workflows reusable workflow which runs PHPStan; Composer projects only)"
 
   # === DEPENDENCY SCANNING ===
+  # Same logic as SA-14: a disabled strict-JSON Renovate config does not count.
   - id: SA-DEP-01
-    type: file_exists
-    target: .github/dependabot.yml
+    type: script
+    command: |
+      [ -f .github/dependabot.yml ] && exit 0
+      for f in renovate.json renovate.jsonc renovate.json5 .renovaterc .renovaterc.json .renovaterc.jsonc .renovaterc.json5 .github/renovate.json .github/renovate.jsonc .github/renovate.json5; do
+        [ -f "$f" ] || continue
+        jq -e '.enabled == false' "$f" >/dev/null 2>&1 && continue
+        exit 0
+      done
+      exit 1
     severity: warning
     desc: "Dependabot or Renovate should be configured for dependency updates"
 
+  # Not PHP-specific: trivy and snyk were always ecosystem-neutral, so the
+  # check recognises the other ecosystems' scanners instead of gating on
+  # composer.json. GitHub's dependency review (the action, or the netresearch
+  # reusable wrapping it) fails a PR that adds a vulnerable dependency in any
+  # supported ecosystem; it is matched as a `uses:` reference so a job or step
+  # merely named dependency-review does not count. No bare `audit`:
+  # harden-runner's `egress-policy: audit` would match it.
   - id: SA-DEP-02
     type: regex
     target: .github/workflows/*.yml
-    pattern: 'composer[[:space:]]+audit|trivy|snyk|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/security[.]yml'
+    pattern: 'composer[[:space:]]+audit|(npm|pnpm|yarn|cargo)[[:space:]]+audit|pip-audit|govulncheck|osv-scanner|grype|trivy|snyk|uses:[[:space:]]+"?actions/dependency-review-action@|uses:[[:space:]]+"?netresearch/(typo3-ci-workflows|[.]github)/[.]github/workflows/(security|python-audit|node-audit|security-container|dependency-review)[.]yml'
     severity: warning
-    desc: "CI should include dependency vulnerability scanning (composer audit/trivy/snyk or via netresearch security reusable workflow)"
+    desc: "CI should include dependency vulnerability scanning (composer/npm/pnpm/yarn/cargo audit, pip-audit, govulncheck, osv-scanner, grype, trivy, snyk, dependency review, or a netresearch security/audit reusable workflow)"
 
   # === GITLEAKS IN CI ===
   - id: SA-DEP-03
@@ -2077,12 +2141,28 @@ mechanical:
     severity: warning
     desc: "FastAPI endpoint without Depends() — verify authentication is not missing"
 
+  # A script so only files importing pydantic or fastapi are inspected: a
+  # plain `dict` or `Any` hint elsewhere bypasses no Pydantic validation.
+  # POSIX grep -E, because a script body gets no grep -P fallback. The prune
+  # list mirrors the runner's auto-excludes plus virtualenvs, whose copy of
+  # pydantic itself would otherwise fail the check. The indented
+  # `name: dict` alternative covers a model field, which the former
+  # regex (parameters and `Any` only) never matched.
   - id: SA-FASTAPI-02
-    type: regex_not
-    target: "**/*.py"
-    pattern: "def\\s+\\w+\\s*\\([^)]*:\\s*dict\\s*[,\\)]|:\\s*Any\\s*[,\\)=]|extra\\s*=\\s*[\"']allow[\"']"
+    type: script
+    command: |
+      imports='^[[:space:]]*(from|import)[[:space:]]+(fastapi|pydantic)[[:alnum:]_.]*([[:space:],]|$)'
+      bypass="def[[:space:]]+[[:alnum:]_]+[[:space:]]*\([^)]*:[[:space:]]*dict[[:space:]]*[,)]|^[[:space:]]+[[:alnum:]_]+[[:space:]]*:[[:space:]]*dict[[:space:]]*(=|#|$)|:[[:space:]]*Any[[:space:]]*[,)=]|extra[[:space:]]*=[[:space:]]*[\"']allow[\"']"
+      status=0
+      while IFS= read -r -d '' f; do
+        if grep -qE "$imports" "$f" && grep -qE "$bypass" "$f"; then
+          echo "Pydantic validation bypass in $f"
+          status=1
+        fi
+      done < <(find . \( -name .git -o -name vendor -o -name node_modules -o -name .venv -o -name venv -o -name site-packages -o -name .tox -o -name __pycache__ -o -name .Build -o -name build -o -name dist \) -prune -o -type f -name '*.py' -print0)
+      exit "$status"
     severity: warning
-    desc: "Pydantic validation bypass via dict/Any type or extra='allow'"
+    desc: "Pydantic validation bypass via dict/Any type or extra='allow' (files importing pydantic or fastapi)"
 
   - id: SA-FASTAPI-03
     type: regex_not
