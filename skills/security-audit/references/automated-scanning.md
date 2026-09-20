@@ -383,10 +383,21 @@ raise false positives on code that is already safe:
 
 Practical consequences:
 
-- For **S8705** on an array-form `subprocess` call, two source-side sanitization attempts
-  (inline validation and a cross-function validator) will typically **not** clear the
-  finding. If the call is genuinely safe, mark it a false positive via the API rather than
-  contorting the code.
+- For **S8705** on an array-form `subprocess` call, three source-side sanitization
+  attempts are now recorded as **not** clearing the finding: inline validation, a
+  cross-function validator, and — measured 2026-09-20 on `netresearch/retro-skill#119` —
+  an anchored allowlist rejecting an option-shaped value *plus* `--end-of-options` before
+  the operand. The rule matches the shape of the call, so a fourth attempt is not worth
+  the round trip. If the call is genuinely safe, mark it a false positive via the API
+  rather than contorting the code.
+- **Establish that the finding is a false positive before marking it one.** The rule
+  over-flags, which is not the same as never being right: in the case above the original
+  report was real. Without `--end-of-options`, git read a revision of the form
+  `--output=<path>` as its own option and created that file — reproduced before the fix,
+  and reproduced as refused afterwards. The cheap check is a probe in both directions: the
+  hostile value returns empty and writes nothing, an ordinary value still works. Mark the
+  issue only once that passes, and put the two results in the comment — the next reader
+  then has the evidence instead of the assertion.
 - For **S5443** in test data, prefer a non-writable placeholder such as `/opt/...` instead
   of `/tmp/...` so the literal never trips the rule in the first place.
 
