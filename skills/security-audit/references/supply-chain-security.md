@@ -108,7 +108,28 @@ jobs:
       compile-generator: true  # Build from source to avoid binary fetch issues
 ```
 
-> **Not under a SHA-pinning ruleset.** `generator_generic_slsa3.yml` calls four nested actions by tag (`detect-workflow-js`, `generate-builder`, `secure-download-artifact`, `secure-builder-checkout`, all `@v2.1.0`, the latest release), so a repository or organisation with `sha_pinning_required` on rejects the run at the first of them. Pinning the `uses:` line above to a SHA does not help — the rejected references are inside the generator — and it refuses to run from a SHA anyway. Upstream [#4440](https://github.com/slsa-framework/slsa-github-generator/issues/4440) is open. Use `actions/attest-build-provenance` there, and claim the level you actually reach rather than Level 3.
+> **Cannot run under a SHA-pinning ruleset.** `generator_generic_slsa3.yml` calls four nested actions by tag — `detect-workflow-js`, `generate-builder`, `secure-download-artifact` and `secure-builder-checkout` — in `@v2.0.0` as used above and in `@v2.1.0`, the latest release. A repository or organisation with `sha_pinning_required` on rejects the run at the first of them. Pinning the `uses:` line above to a SHA does not help: the rejected references are inside the generator, and it refuses to run from a SHA anyway. Upstream [slsa-github-generator#4440](https://github.com/slsa-framework/slsa-github-generator/issues/4440) is open.
+
+The fallback is `actions/attest-build-provenance`. It is a step action, not a reusable workflow, so it replaces the whole job above rather than its `uses:` line: it takes one of `subject-path`, `subject-digest` or `subject-checksums` (there is no `base64-subjects`), and it needs `attestations: write`, which the Level 3 permissions above do not grant.
+
+```yaml
+  provenance:
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@<full-40-char-sha> # vX.Y.Z
+        with:
+          path: dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+```
+
+Verify with `gh attestation verify <artifact> --repo <owner>/<repo>` rather than `slsa-verifier`. What this does not give you is the isolated builder that Level 3 denotes, so state the level you reach rather than the one the replaced job was named after.
 
 **Important: base64-subjects format:**
 
