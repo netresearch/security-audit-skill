@@ -108,6 +108,8 @@ jobs:
       compile-generator: true  # Build from source to avoid binary fetch issues
 ```
 
+> **Not under a SHA-pinning ruleset.** `generator_generic_slsa3.yml` calls four nested actions by tag (`detect-workflow-js`, `generate-builder`, `secure-download-artifact`, `secure-builder-checkout`, all `@v2.1.0`, the latest release), so a repository or organisation with `sha_pinning_required` on rejects the run at the first of them. Pinning the `uses:` line above to a SHA does not help — the rejected references are inside the generator — and it refuses to run from a SHA anyway. Upstream [#4440](https://github.com/slsa-framework/slsa-github-generator/issues/4440) is open. Use `actions/attest-build-provenance` there, and claim the level you actually reach rather than Level 3.
+
 **Important: base64-subjects format:**
 
 ```bash
