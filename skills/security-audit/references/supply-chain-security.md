@@ -112,7 +112,16 @@ jobs:
 
 The fallback is `actions/attest-build-provenance`. It is a step action, not a reusable workflow, so it replaces the whole job above rather than its `uses:` line: it takes one of `subject-path`, `subject-digest` or `subject-checksums` (there is no `base64-subjects`), and it needs `attestations: write`, which the Level 3 permissions above do not grant.
 
+The `provenance` job runs on its own runner and cannot see the build's workspace, so the archive has to travel as an artifact under a name both jobs agree on:
+
 ```yaml
+  # in the build job above, after "Create release archive":
+      - uses: actions/upload-artifact@<full-40-char-sha> # vX.Y.Z
+        with:
+          name: release-archive
+          path: myapp-${{ github.ref_name }}.tar.gz
+          if-no-files-found: error
+
   provenance:
     needs: [build]
     runs-on: ubuntu-latest
@@ -121,8 +130,11 @@ The fallback is `actions/attest-build-provenance`. It is a step action, not a re
       id-token: write
       attestations: write
     steps:
+      # Without "name" each artifact lands in a directory of its own, and
+      # subject-path would then point at directories rather than the archive.
       - uses: actions/download-artifact@<full-40-char-sha> # vX.Y.Z
         with:
+          name: release-archive
           path: dist
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
