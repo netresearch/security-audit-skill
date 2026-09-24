@@ -191,7 +191,7 @@ $process = new Process(['ping', '-c', '4', $host]);
 ```
 
 **Coverage:**
-- Reference: `owasp-top10.md`
+- Reference: `owasp-top10.md`; `ssh-forced-command-hardening.md` (CWE-88 argument injection in command wrappers)
 - Checkpoints: SA-25 (exec), SA-26 (system), SA-27 (shell_exec), SA-28 (passthru)
 - Script: Command injection check in `security-audit.sh`
 
