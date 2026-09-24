@@ -158,8 +158,12 @@ destructive payload on a live target.
    — is visible.
    ```sh
    #!/bin/sh
-   i=0; for a in "$@"; do printf '$%d=[%s]\n' "$i" "$a"; i=$((i+1)); done
+   printf 'argv[0]=[%s]\n' "$0"
+   i=1; for a in "$@"; do printf 'argv[%d]=[%s]\n' "$i" "$a"; i=$((i+1)); done
    ```
+
+   `"$@"` does not contain the program name, so the loop starts at 1 and `$0` is printed
+   separately — otherwise the stub's numbering is offset by one against §4.
 3. **Optional — test the sshd integration, not just the script.** Run a throwaway `sshd` in
    a container with the real forced command in `authorized_keys`, then drive it over a real
    SSH connection. This catches how sshd itself hands `$SSH_ORIGINAL_COMMAND` to the wrapper.
