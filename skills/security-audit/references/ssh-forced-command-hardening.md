@@ -79,15 +79,19 @@ Validation "saw" one long string. After `exec sh -c "$CMD"` the shell strips the
 hands `docker` these arguments:
 
 ```text
-$0 = docker
-$1 = exec
-$2 = -e
-$3 = MYSQL_PWD=X <container> mysqldump --no-data --routines --events --single-transaction --quick --no-tablespaces -u
-$4 = -u      $5 = 0      $6 = <container>
-$7 = rm      $8 = -rf    $9 = /var/lib/mysql
+argv[0] = docker
+argv[1] = exec
+argv[2] = -e
+argv[3] = MYSQL_PWD=X <container> mysqldump --no-data --routines --events --single-transaction --quick --no-tablespaces -u
+argv[4] = -u      argv[5] = 0      argv[6] = <container>
+argv[7] = rm      argv[8] = -rf    argv[9] = /var/lib/mysql
 ```
 
-The dump fragments are inert — they sit inside the value of `$3`. The operative arguments
+This is `docker`'s own argument vector, not shell positional parameters: under
+`exec sh -c "$CMD"` the `$n` would belong to the shell, whose `$0` names the shell
+invocation rather than `docker`.
+
+The dump fragments are inert — they sit inside the value of `argv[3]`. The operative arguments
 are `-u 0 <container> rm -rf /var/lib/mysql`: run `rm -rf` as uid 0 inside the target
 container, **with no database credential required**. Any command runs this way; data
 destruction is only one example.
