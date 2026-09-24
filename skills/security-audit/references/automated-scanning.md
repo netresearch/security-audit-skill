@@ -68,6 +68,8 @@ rules:
 some_safe_code()
 ```
 
+An inline `nosemgrep` comment does not reliably close an existing GitHub code-scanning alert. Observed with Opengrep's `php.lang.security.injection.tainted-filename.tainted-filename` rule: after the suppression comment was added, the alert on the suppressed line stayed open, and a sibling alert switched to "fixed" only because its fingerprint changed when the added comment shifted the line numbers. After suppressing, check the full list of open alerts, not one alert id. When the flagged flow is real — for example a request path reaching `is_file()` — fix the code instead: confine the path with `realpath()` against the base directory (see [path-traversal-prevention.md](path-traversal-prevention.md), "realpath() Validation"), then confirm with the scanner version CI pins that the finding fires before the fix and is gone after it.
+
 Or use `.semgrepignore` (follows .gitignore syntax):
 
 ```
