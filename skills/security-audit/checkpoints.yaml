@@ -47,12 +47,15 @@ mechanical:
     severity: warning
     desc: "PHP files should not contain hardcoded API key assignments"
 
+  # A hardcoded secret is a string literal on the right-hand side. The former
+  # literal `secret = ` also matched `$secret = $this->setting(...)`, which
+  # reads the secret from configuration and is the recommended pattern.
   - id: SA-06
-    type: not_contains
+    type: regex_not
     target: "Classes/**/*.php"
-    pattern: "secret = "
+    pattern: '[Ss](ecret|ECRET)[[:space:]]*=[[:space:]]*[''"][^''"]+[''"]'
     severity: warning
-    desc: "PHP files should not contain hardcoded secret assignments"
+    desc: "PHP files should not assign a string literal to a secret variable"
 
   # === COMPOSER AUDIT IN CI ===
   # CI must run composer audit. Accept either the literal `composer audit`
@@ -394,9 +397,12 @@ mechanical:
   # non-zero → `!` makes the checkpoint pass (skip).
   - id: SA-SC-02
     type: command
-    pattern: '! jq -e "([.require // {}, .[\"require-dev\"] // {}] | add | to_entries[] | select(.value == \"*\" and (.key | startswith(\"netresearch/\") | not)))" composer.json >/dev/null 2>&1'
+    # Platform requirements (php, ext-*, lib-*, composer-*-api, hhvm) are
+    # provided by the runtime, not installed from a repository, so a `*` there
+    # pulls in no untrusted code and is excluded.
+    pattern: '! jq -e "([.require // {}, .[\"require-dev\"] // {}] | add | to_entries[] | select(.value == \"*\" and (.key | startswith(\"netresearch/\") | not) and (.key | test(\"^(php(-[a-z0-9]+)?|hhvm|ext-.+|lib-.+|composer(-plugin-api|-runtime-api)?)$\") | not)))" composer.json >/dev/null 2>&1'
     severity: error
-    desc: "Wildcard (*) version constraints are insecure for external packages. Internal netresearch/* packages may use '*' (intentional intra-org versioning)."
+    desc: "Wildcard (*) version constraints are insecure for external packages. Internal netresearch/* packages may use '*' (intentional intra-org versioning); platform requirements (php, ext-*, lib-*) are not packages and are exempt."
 
   # === TYPE JUGGLING (CWE-843) ===
   - id: SA-41
@@ -797,7 +803,9 @@ mechanical:
 
   - id: SA-AI-02
     type: command
-    pattern: "! grep -rqE 'dangerouslyDisableSandbox|--no-verify|--force' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
+    # `--force` must end at a non-option character, so `--force-with-lease`
+    # (and `--force-if-includes`), the safe variants, do not match.
+    pattern: "! grep -rqE 'dangerouslyDisableSandbox|--no-verify|--force([^-[:alnum:]]|$)' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
     severity: error
     desc: "AI agent configs must not disable safety mechanisms (sandbox, hooks, verification)"
 
