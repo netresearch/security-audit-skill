@@ -801,13 +801,53 @@ mechanical:
     severity: error
     desc: "AI agent config files must not contain hardcoded API keys or secrets"
 
+  # SA-AI-02 reads only what Claude Code executes: the project settings files.
+  # It used to grep SKILL.md, AGENTS.md, CLAUDE.md and .claude/ for the flag
+  # names, which cannot tell an instruction to use a flag from a sentence that
+  # forbids it. Across 197 local checkouts that grep matched 6 lines and all 6
+  # were false: 4 were `/assess --force` (a skill's own option, not git) and 2
+  # were "never bypass with `--no-verify`". Whether prose tells an agent to use
+  # a bypass is a judgement, and it moved to SA-AI-05.
+  #
+  # What a committed settings file can switch off, per
+  # https://code.claude.com/docs/en/settings-reference (checked 2026-09-28):
+  # `disableAllHooks` (any file) turns off every hook; a `permissions.allow`
+  # rule approves a matching tool use without a prompt, so an allow rule for
+  # `--no-verify` or a plain `--force` pre-approves the bypass. Not checked:
+  # `permissions.defaultMode: bypassPermissions`, which has no effect from
+  # project or local settings (https://code.claude.com/docs/en/settings), and
+  # `sandbox.allowUnsandboxedCommands`, whose `true` is the default.
+  # `--force` must end at a non-option character, so `--force-with-lease` and
+  # `--force-if-includes`, the safe variants, do not match. A file jq cannot
+  # parse fails, because nothing about it can be verified.
+  # mechanical-counterpart: SA-AI-05 (the prose half)
   - id: SA-AI-02
-    type: command
-    # `--force` must end at a non-option character, so `--force-with-lease`
-    # (and `--force-if-includes`), the safe variants, do not match.
-    pattern: "! grep -rqE 'dangerouslyDisableSandbox|--no-verify|--force([^-[:alnum:]]|$)' SKILL.md AGENTS.md CLAUDE.md .claude/ 2>/dev/null"
+    type: script
+    command: |
+      st=0
+      for f in .claude/settings.json .claude/settings.local.json; do
+        [ -f "$f" ] || continue
+        if ! jq empty "$f" >/dev/null 2>&1; then
+          echo "$f: not parseable as JSON"
+          st=1
+          continue
+        fi
+        if jq -e '.disableAllHooks == true' "$f" >/dev/null; then
+          echo "$f: disableAllHooks is true"
+          st=1
+        fi
+        hits=$(jq -r '.permissions.allow[]? | strings | select(test("--no-verify|dangerouslyDisableSandbox|--force($|[^-[:alnum:]])"))' "$f")
+        if [ -n "$hits" ]; then
+          echo "$f: permissions.allow pre-approves a bypass: $hits"
+          st=1
+        fi
+      done
+      exit $st
     severity: error
-    desc: "AI agent configs must not disable safety mechanisms (sandbox, hooks, verification)"
+    provenance: upstream
+    source: https://code.claude.com/docs/en/settings-reference
+    verified: 2026-09-28
+    desc: "Claude Code project settings must not disable hooks or pre-approve --no-verify / --force / dangerouslyDisableSandbox"
 
   - id: SA-AI-03
     type: command
@@ -2899,6 +2939,36 @@ mechanical:
     desc: "Sensitive data in NSLog — use os_log with .private annotation"
 
 llm_reviews:
+  # === AI AGENT INSTRUCTIONS: SAFETY BYPASSES ===
+  # mechanical-counterpart: SA-AI-02 (settings files); this entry is the prose
+  # half no pattern can decide.
+  - id: SA-AI-05
+    domain: security
+    prompt: |
+      Read the agent instruction files: SKILL.md, skills/*/SKILL.md, AGENTS.md,
+      CLAUDE.md, GEMINI.md, and Markdown under .claude/ (commands, agents).
+      Find every place that mentions a safety bypass: `--no-verify`,
+      `git push --force` or `-f` (not `--force-with-lease`), `--admin` merges,
+      `dangerouslyDisableSandbox`, `disableAllHooks`, skipping or deleting
+      tests, or `bypassPermissions`.
+
+      For each mention decide what it tells an agent to do:
+      - INSTRUCTS: the agent is told or shown to use the bypass (an imperative,
+        a command in a code block presented as the way to do something, a
+        recipe step), including conditional use ("if the hook fails, commit
+        with --no-verify").
+      - FORBIDS or DESCRIBES: the text bans the bypass, names it as something
+        not to do, or documents it without directing its use.
+      - UNRELATED: the flag belongs to another tool (for example a skill's own
+        `--force` option) and bypasses no safety mechanism.
+
+      Report only INSTRUCTS cases, each with file, line and the sentence. A
+      FORBIDS sentence such as "never bypass with `--no-verify`" is the
+      opposite of a finding.
+    severity: error
+    provenance: org-policy
+    source: https://github.com/netresearch/security-audit-skill
+    desc: "Agent instructions must not direct agents to bypass hooks, sandbox, reviews or force-push without lease"
   # === HARDCODED CREDENTIALS REVIEW ===
   - id: SA-16
     domain: security
