@@ -49,6 +49,8 @@ scan_py_count() {
     for dir in "${SCAN_DIRS[@]}"; do
         local count
         if [[ "$dir" == "$PROJECT_DIR" ]]; then
+            # Not `grep -c`: with several files it prints one count per file.
+            # shellcheck disable=SC2126
             count=$(grep -n -P "$pattern" "$dir"/*.py 2>/dev/null | wc -l || echo "0")
         else
             count=$(grep -rn -P "$pattern" "$dir" --include="*.py" 2>/dev/null | wc -l || echo "0")

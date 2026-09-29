@@ -16,8 +16,6 @@ if [[ -z "$MANIFEST" ]]; then
     exit 0
 fi
 
-MANIFEST_DIR=$(dirname "$MANIFEST")
-
 # Auto-detect source directories
 SCAN_DIRS=()
 for dir in app/src/main src/main src app; do
