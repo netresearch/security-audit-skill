@@ -817,12 +817,28 @@ mechanical:
   # `permissions.defaultMode: bypassPermissions`, which has no effect from
   # project or local settings (https://code.claude.com/docs/en/settings), and
   # `sandbox.allowUnsandboxedCommands`, whose `true` is the default.
-  # `--force` must end at a non-option character, so `--force-with-lease` and
-  # `--force-if-includes`, the safe variants, do not match. The short spellings
+  # `--force` must end at a non-option character, so an exact rule for
+  # `--force-with-lease` or `--force-if-includes`, the safe variants, does not
+  # match. The short spellings
   # count too: `-n` in a `git commit` rule (= --no-verify) and `-f` in a
   # `git push` rule (= --force), also inside a cluster such as `-nm` or `-uf`;
   # `git push -n` is --dry-run and is not flagged. A file jq cannot
   # parse fails, because nothing about it can be verified.
+  #
+  # A wildcard rule approves a bypass without naming it. Per
+  # https://code.claude.com/docs/en/permissions (checked 2026-09-29) a `*`
+  # matches any text, a trailing `:*` equals ` *`, `Bash(*)` equals `Bash`, and
+  # only the text before the first `*` limits the rule. So a rule fails when
+  # that text is empty (`Bash`, `Bash(*)`, `Bash(* main)`), is `git` with at
+  # most global options (`Bash(git *)`, `Bash(git*)`, `Bash(git -C * push *)`),
+  # or starts with `git commit` / `git push` (`Bash(git push:*)`,
+  # `Bash(git commit -m *)`). That includes `Bash(git push --force-with-lease:*)`:
+  # the `*` admits `--force`, which per git-push(1) "disables ... the checks in
+  # --force-with-lease". `Bash(git log:*)`, `Bash(gitk *)` and a rule without
+  # `*` do not match. Not checked: a `permissions.deny` rule or a PreToolUse
+  # hook that blocks the bypass behind a broad allow (the docs present
+  # `"Bash"` plus a blocking hook as a valid setup); this check cannot read
+  # either, so such a file fails.
   # mechanical-counterpart: SA-AI-05 (the prose half)
   - id: SA-AI-02
     type: script
@@ -844,13 +860,18 @@ mechanical:
           echo "$f: permissions.allow pre-approves a bypass: $hits"
           st=1
         fi
+        wild=$(jq -r '.permissions.allow[]? | strings | . as $r | select($r == "Bash" or ($r | startswith("Bash(") and endswith(")"))) | (if $r == "Bash" then "*" else $r[5:-1] end) | select(contains("*")) | sub(":\\*$"; " *") | split("*")[0] | sub("[[:space:]]+$"; "") | select(test("^(git([[:space:]]+(-[Cc][[:space:]]+[^[:space:]]+|-[^[:space:]]+))*([[:space:]]+(commit|push)([[:space:]].*)?)?)?$")) | $r' "$f")
+        if [ -n "$wild" ]; then
+          echo "$f: permissions.allow wildcard also approves a bypass: $wild"
+          st=1
+        fi
       done
       exit $st
     severity: error
     provenance: upstream
     source: https://code.claude.com/docs/en/settings-reference
     verified: 2026-09-28
-    desc: "Claude Code project settings must not disable hooks or pre-approve --no-verify / --force / dangerouslyDisableSandbox"
+    desc: "Claude Code project settings must not disable hooks or pre-approve --no-verify / --force / dangerouslyDisableSandbox, directly or through a wildcard git/Bash allow rule"
 
   - id: SA-AI-03
     type: command
