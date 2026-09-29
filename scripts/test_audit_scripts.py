@@ -34,6 +34,57 @@ class WordPressScannerTest(unittest.TestCase):
         )
 
 
+def with_stub(tmp: str, name: str, body: str) -> dict:
+    """Return an environment whose PATH starts with a stub command `name`."""
+    bin_dir = Path(tmp, "bin")
+    bin_dir.mkdir(exist_ok=True)
+    stub = bin_dir / name
+    stub.write_text(body)
+    stub.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
+    return env
+
+
+class SecretsScannerTest(unittest.TestCase):
+    def scan(self, trufflehog_output: str) -> subprocess.CompletedProcess:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp, "project")
+            project.mkdir()
+            env = with_stub(
+                tmp, "trufflehog", f"#!/bin/sh\nprintf '%s' '{trufflehog_output}'\n"
+            )
+            return run(SCRIPTS / "scanners" / "secrets.sh", str(project), env=env)
+
+    def test_clean_trufflehog_run_reports_no_secrets_without_errors(self) -> None:
+        result = self.scan("")
+        self.assertIn("OK: TruffleHog found no secrets", result.stdout)
+        self.assertNotIn("syntax error", result.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_trufflehog_finding_is_counted(self) -> None:
+        result = self.scan('{"SourceMetadata":{}}\n')
+        self.assertIn("ERROR: TruffleHog found 1 secret(s):", result.stdout)
+        self.assertEqual(result.returncode, 1, result.stderr)
+
+
+class JavaScriptScannerTest(unittest.TestCase):
+    def scan(self, tsconfig: str) -> subprocess.CompletedProcess:
+        with tempfile.TemporaryDirectory() as project:
+            Path(project, "tsconfig.json").write_text(tsconfig)
+            return run(SCRIPTS / "scanners" / "javascript.sh", project)
+
+    def test_strict_mode_enabled(self) -> None:
+        result = self.scan('{"compilerOptions": {"strict": true}}')
+        self.assertIn("OK: TypeScript strict mode is enabled", result.stdout)
+        self.assertNotIn("syntax error", result.stderr)
+
+    def test_strict_mode_not_configured(self) -> None:
+        result = self.scan('{"compilerOptions": {}}')
+        self.assertIn("WARNING: TypeScript strict mode not configured", result.stdout)
+        self.assertNotIn("syntax error", result.stderr)
+
+
 # Stand-in for the gh CLI: answers `gh api <endpoint> [--jq <filter>]` from a
 # fixture file per endpoint. Without a fixture it behaves like gh on a 404:
 # the error body goes to stdout (through --jq, if given) and it exits 1.
@@ -82,11 +133,7 @@ FULLY_CONFIGURED = {
 class GitHubSecurityAuditTest(unittest.TestCase):
     def audit(self, fixtures: dict[str, str]) -> subprocess.CompletedProcess:
         with tempfile.TemporaryDirectory() as tmp:
-            bin_dir = Path(tmp, "bin")
-            bin_dir.mkdir()
-            gh = bin_dir / "gh"
-            gh.write_text(GH_STUB)
-            gh.chmod(0o755)
+            env = with_stub(tmp, "gh", GH_STUB)
             fixture_dir = Path(tmp, "fixtures")
             fixture_dir.mkdir()
             Path(fixture_dir, "not-found").write_text(
@@ -94,8 +141,6 @@ class GitHubSecurityAuditTest(unittest.TestCase):
             )
             for endpoint, body in fixtures.items():
                 Path(fixture_dir, endpoint.replace("/", "__")).write_text(body)
-            env = dict(os.environ)
-            env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
             env["GH_FIXTURES"] = str(fixture_dir)
             return run(SCRIPTS / "github-security-audit.sh", REPO, env=env)
 

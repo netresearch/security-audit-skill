@@ -240,8 +240,8 @@ fi
 echo ""
 echo "=== Checking TypeScript Strict Mode ==="
 if [[ -f "$PROJECT_DIR/tsconfig.json" ]]; then
-    STRICT_ENABLED=$(grep -c '"strict"\s*:\s*true' "$PROJECT_DIR/tsconfig.json" 2>/dev/null || echo "0")
-    STRICT_DISABLED=$(grep -c '"strict"\s*:\s*false' "$PROJECT_DIR/tsconfig.json" 2>/dev/null || echo "0")
+    STRICT_ENABLED=$(grep -c '"strict"\s*:\s*true' "$PROJECT_DIR/tsconfig.json" 2>/dev/null || true)
+    STRICT_DISABLED=$(grep -c '"strict"\s*:\s*false' "$PROJECT_DIR/tsconfig.json" 2>/dev/null || true)
     if [[ "$STRICT_DISABLED" -gt 0 ]]; then
         echo "WARNING: TypeScript strict mode is explicitly disabled"
         WARNINGS=$((WARNINGS + 1))
