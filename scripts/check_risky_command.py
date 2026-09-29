@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """
 PreToolUse hook to detect potentially risky command patterns before execution.
 Warns about dangerous operations without blocking (informational only).

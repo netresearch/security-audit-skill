@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Behavioural tests for the shell audit scripts under skills/security-audit/scripts/."""
 
 import os

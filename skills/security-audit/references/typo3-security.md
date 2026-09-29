@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # TYPO3 Security Patterns (PHP-level)
 
 Security patterns specific to TYPO3 CMS — PHP-level patterns only. For Fluid template auto-escape / ViewHelper pitfalls see `typo3-fluid-security.md`; for TypoScript / TSconfig see `typo3-typoscript-security.md`.

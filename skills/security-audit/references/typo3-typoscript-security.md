@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # TYPO3 TypoScript and TSconfig Security
 
 TypoScript is the configuration language that drives TYPO3's frontend rendering and most backend behaviour. It has its own injection surface — distinct from PHP or Fluid — because several constructs evaluate external input at runtime and at least one (`userFunc`) is a direct arbitrary-code-execution primitive. TSconfig is TypoScript used for backend configuration (page, user, site) with a smaller but similar surface.

@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # C# Security Scanner Module
 # Scans C# / .NET projects for common vulnerability patterns
 # Part of security-audit-skill multi-language scanning

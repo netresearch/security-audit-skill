@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Security Audit Skill
 
 Security audit patterns (OWASP Top 10, CWE Top 25, CVSS v4.0) and deep PHP/TYPO3 code scanning with 80+ checkpoints.

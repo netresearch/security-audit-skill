@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Security assurance case — security-audit-skill
 
 This document states what a user can expect from this repository in terms of security, and argues why that expectation holds. Every claim names the file that implements it. Reporting a vulnerability and supported versions: [SECURITY.md](../SECURITY.md). Components and data flows: [ARCHITECTURE.md](ARCHITECTURE.md).

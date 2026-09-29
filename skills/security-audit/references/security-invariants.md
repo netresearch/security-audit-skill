@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Security Invariants as Runtime Assertions
 
 Encode security guarantees as runtime checks in the code path, not only in tests. A test proves the guarantee held during the test run; an **always-on** inline check proves it holds in production and fails loudly when it doesn't. For security invariants specifically, prefer mechanisms that cannot be stripped at deploy time (a thrown `InvariantViolation`, not a strippable `assert()` / `assert` statement) — see the language-idioms table below.

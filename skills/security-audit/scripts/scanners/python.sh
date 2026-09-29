@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Python Security Scanner Module
 # Scans Python projects for common vulnerability patterns
 # Part of security-audit-skill Phase 4

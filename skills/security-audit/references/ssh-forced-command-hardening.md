@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # SSH Forced-Command Wrappers: Allowlist Bypass via Argument Injection
 
 A common way to give an automated client (CI, a backup job, a monitoring probe) narrow

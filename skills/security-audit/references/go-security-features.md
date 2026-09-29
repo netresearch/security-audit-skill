@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Go Security Features by Version
 
 Modern Go versions introduce language features that directly improve security when used correctly. This reference documents security-relevant features and vulnerability patterns from Go 1.18 through Go 1.22.

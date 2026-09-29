@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Test the PreToolUse hook end to end: payload on stdin, output on stdout."""
 
 import json

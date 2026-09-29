@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # TYPO3 Fluid Template Security
 
 Fluid is the templating engine used by TYPO3 (and Neos / other TYPO3-derived stacks). Its auto-escape pipeline is asymmetric — most variable output escapes by default, but a handful of ViewHelpers and syntax forms bypass that protection silently. This reference catalogues the XSS and template-injection surface specific to Fluid, plus the Fluid 4 breaking changes that shipped with TYPO3 13/14.

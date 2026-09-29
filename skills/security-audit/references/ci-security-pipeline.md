@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # CI/CD Security Pipeline for PHP Projects
 
 A comprehensive reference for integrating security scanning tools into CI/CD pipelines for PHP applications.

@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Drupal Security Scanner Module
 # Detects Drupal projects via sites/default/settings.php
 # Scans for common Drupal-specific vulnerability patterns

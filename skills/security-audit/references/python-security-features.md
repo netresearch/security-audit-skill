@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Python Security Features by Version
 
 Modern Python versions introduce language features and standard library changes that directly improve security when used correctly. This reference documents security-relevant patterns and features from Python 3.9 through 3.13, with detection regexes for automated auditing.

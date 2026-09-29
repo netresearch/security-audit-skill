@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Java Security Scanner Module
 # Scans Java projects for common vulnerability patterns
 # Part of security-audit-skill multi-language scanning

@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # JavaScript/TypeScript Security Features and Vulnerability Patterns
 
 Modern JavaScript (ES5 through ES2024) and TypeScript introduce features that directly improve security when used correctly, but also present unique attack surfaces. This reference documents security-relevant patterns, organized by ES version where applicable, covering prototype pollution, injection vectors, type-safety pitfalls, and more.

@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Indistinguishability Defences (Decoys, Dummy Responses, Constant-Time Paths)
 
 When an endpoint must not reveal whether a subject exists — a username, an

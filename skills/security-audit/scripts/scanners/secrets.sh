@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Secrets Scanner Module
 # Scans projects for leaked secrets using TruffleHog and fallback regex patterns.
 #

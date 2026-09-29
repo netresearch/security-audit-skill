@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Node.js Security Scanner Module
 # Scans Node.js/TypeScript projects for common vulnerability patterns
 # Part of the security-audit-skill scanner architecture

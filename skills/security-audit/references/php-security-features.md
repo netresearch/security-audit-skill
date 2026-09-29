@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # PHP Security Features by Version
 
 Modern PHP versions introduce language features that directly improve security when used correctly. This reference documents security-relevant features from PHP 8.0 through 8.4.

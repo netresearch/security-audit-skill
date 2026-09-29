@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # GitHub Repository Security Audit Script
 # Audits GitHub repository security settings using the gh CLI
 # Phase 4: GitHub and Project Settings

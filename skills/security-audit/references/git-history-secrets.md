@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Pre-Publication Git-History Hygiene
 
 Auditing a repository **before it goes public** — or before pushing a local/private repo to a new remote — is a distinct check from scanning the working tree. A clean `HEAD` does not mean a clean history: secrets and internal notes that were committed and later "deleted" remain in every clone of the history, and flipping a repo to public (or mirroring it) exposes all of it.

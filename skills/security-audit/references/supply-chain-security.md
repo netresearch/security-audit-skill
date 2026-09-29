@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Supply Chain Security
 
 Supply chain attacks target the tools, dependencies, and processes used to build and deliver software. This reference covers frameworks, tools, and practices for securing the software supply chain in PHP projects.

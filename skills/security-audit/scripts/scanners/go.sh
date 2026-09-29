@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Go Security Scanner Module
 # Scans Go projects for common vulnerability patterns
 # Excludes vendor/ directory

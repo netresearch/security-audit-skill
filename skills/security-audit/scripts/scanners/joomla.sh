@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Joomla Security Scanner Module
 # Detects Joomla projects via configuration.php
 # Scans for common Joomla-specific vulnerability patterns

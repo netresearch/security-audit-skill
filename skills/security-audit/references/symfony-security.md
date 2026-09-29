@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Symfony Security Patterns
 
 Security patterns specific to Symfony — voters, firewalls, CSRF, Security Bundle, Rate Limiter.

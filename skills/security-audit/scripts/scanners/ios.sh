@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # iOS Security Scanner Module
 # Scans iOS projects for common vulnerability patterns
 # Part of security-audit-skill multi-language scanning

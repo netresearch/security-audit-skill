@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # WordPress Security Scanner Module
 # Detects WordPress projects via wp-config.php / wp-content/
 # Scans for common WordPress-specific vulnerability patterns

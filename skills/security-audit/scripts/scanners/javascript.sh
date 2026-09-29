@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # JavaScript/TypeScript Security Scanner Module
 # Scans JS/TS projects for common vulnerability patterns
 # Modeled after php.sh scanner architecture

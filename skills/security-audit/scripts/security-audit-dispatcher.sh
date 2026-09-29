@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Security Audit Dispatcher
 # Auto-detects languages/frameworks in a project and invokes relevant scanner modules.
 #
