@@ -822,7 +822,12 @@ mechanical:
   # match. The short spellings
   # count too: `-n` in a `git commit` rule (= --no-verify) and `-f` in a
   # `git push` rule (= --force), also inside a cluster such as `-nm` or `-uf`;
-  # `git push -n` is --dry-run and is not flagged. A file jq cannot
+  # `git push -n` is --dry-run and is not flagged. A refspec with a leading
+  # `+` in a `git push` rule counts as `--force`: git-push(1) gives the format
+  # as `[+]<src>[:<dst>]` and says "The + is optional and does the same thing
+  # as --force." So `Bash(git push origin +main)`, `+HEAD:main` and `+:` fail;
+  # a `+` inside a branch name (`feature+x`) is not preceded by a space and
+  # does not match. A file jq cannot
   # parse fails, because nothing about it can be verified.
   #
   # A wildcard rule approves a bypass without naming it. Per
@@ -855,7 +860,7 @@ mechanical:
           echo "$f: disableAllHooks is true"
           st=1
         fi
-        hits=$(jq -r '.permissions.allow[]? | strings | select(test("--no-verify|dangerouslyDisableSandbox|--force($|[^-[:alnum:]])|git[[:space:]]+commit[^)]*[[:space:]]-[[:alpha:]]*n[[:alpha:]]*($|[^-[:alnum:]])|git[[:space:]]+push[^)]*[[:space:]]-[[:alpha:]]*f[[:alpha:]]*($|[^-[:alnum:]])"))' "$f")
+        hits=$(jq -r '.permissions.allow[]? | strings | select(test("--no-verify|dangerouslyDisableSandbox|--force($|[^-[:alnum:]])|git[[:space:]]+commit[^)]*[[:space:]]-[[:alpha:]]*n[[:alpha:]]*($|[^-[:alnum:]])|git[[:space:]]+push[^)]*[[:space:]]-[[:alpha:]]*f[[:alpha:]]*($|[^-[:alnum:]])|git[[:space:]]+push[^)]*[[:space:]][+][^[:space:])]"))' "$f")
         if [ -n "$hits" ]; then
           echo "$f: permissions.allow pre-approves a bypass: $hits"
           st=1
