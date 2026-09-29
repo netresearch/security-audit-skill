@@ -818,7 +818,10 @@ mechanical:
   # project or local settings (https://code.claude.com/docs/en/settings), and
   # `sandbox.allowUnsandboxedCommands`, whose `true` is the default.
   # `--force` must end at a non-option character, so `--force-with-lease` and
-  # `--force-if-includes`, the safe variants, do not match. A file jq cannot
+  # `--force-if-includes`, the safe variants, do not match. The short spellings
+  # count too: `-n` in a `git commit` rule (= --no-verify) and `-f` in a
+  # `git push` rule (= --force), also inside a cluster such as `-nm` or `-uf`;
+  # `git push -n` is --dry-run and is not flagged. A file jq cannot
   # parse fails, because nothing about it can be verified.
   # mechanical-counterpart: SA-AI-05 (the prose half)
   - id: SA-AI-02
@@ -836,7 +839,7 @@ mechanical:
           echo "$f: disableAllHooks is true"
           st=1
         fi
-        hits=$(jq -r '.permissions.allow[]? | strings | select(test("--no-verify|dangerouslyDisableSandbox|--force($|[^-[:alnum:]])"))' "$f")
+        hits=$(jq -r '.permissions.allow[]? | strings | select(test("--no-verify|dangerouslyDisableSandbox|--force($|[^-[:alnum:]])|git[[:space:]]+commit[^)]*[[:space:]]-[[:alpha:]]*n[[:alpha:]]*($|[^-[:alnum:]])|git[[:space:]]+push[^)]*[[:space:]]-[[:alpha:]]*f[[:alpha:]]*($|[^-[:alnum:]])"))' "$f")
         if [ -n "$hits" ]; then
           echo "$f: permissions.allow pre-approves a bypass: $hits"
           st=1
