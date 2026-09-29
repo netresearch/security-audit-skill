@@ -15,4 +15,4 @@ jobs:
       contents: read
     with:
       python-versions: '["3.12", "3.13"]'
-      test-command: 'uv run --python "$PYTHON_VERSION" scripts/test_risky_patterns.py'
+      test-command: 'uv run --python "$PYTHON_VERSION" scripts/test_risky_patterns.py && uv run --python "$PYTHON_VERSION" scripts/test_audit_scripts.py'
