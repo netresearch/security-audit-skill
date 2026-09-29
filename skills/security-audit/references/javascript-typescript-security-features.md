@@ -809,7 +809,7 @@ class AuthService {
 | setInterval with string | `setInterval\(\s*['"\`]` | error | SA-JS-15 |
 | location.href assignment | `location\.href\s*=` | warning | SA-JS-16 |
 | Wildcard postMessage target | `postMessage\([^,]+,\s*['"]\*['"]` | error | SA-JS-17 |
-| Nested regex quantifiers | `(\+\)\+|\*\)\*|\+\)\*)` | warning | SA-JS-18 |
+| Nested regex quantifiers | `(\+\)\+\|\*\)\*\|\+\)\*)` | warning | SA-JS-18 |
 | strict mode disabled | `"strict"\s*:\s*false` | warning | SA-JS-19 |
 | Unvalidated JSON.parse reviver | `JSON\.parse\([^)]+,\s*\(` | warning | SA-JS-20 |
 | Naive `</script>` escaping of a JSON data island | `replace(All)?\(\s*['"\x60]</script` | warning | SA-JS-21 |
