@@ -118,42 +118,28 @@ Example queries:
 
 ```
 security-audit-skill/
-├── SKILL.md                              # Skill metadata and core patterns
 ├── SECURITY.md                           # Security policy
 ├── hooks/
 │   └── hooks.json                        # PreToolUse hook configuration
 ├── scripts/
-│   └── check_risky_command.py            # Risky command detection hook
+│   ├── check_risky_command.py            # Risky command detection hook
+│   ├── validate_checkpoints.py           # checkpoints.yaml structure check
+│   └── test_*.py                         # Tests (run by ci.yml)
 ├── skills/security-audit/
 │   ├── SKILL.md                          # Skill definition
 │   ├── checkpoints.yaml                  # 80+ automated security checkpoints
 │   ├── scripts/
+│   │   ├── security-audit-dispatcher.sh  # Detects the stack, runs the matching scanners
+│   │   ├── scanners/                     # Per-ecosystem scanner modules
 │   │   ├── security-audit.sh             # PHP project security audit
 │   │   └── github-security-audit.sh      # GitHub repo security audit
-│   └── references/
-│       ├── cwe-top25.md                  # CWE Top 25 (2025) coverage map
-│       ├── owasp-top10.md                # OWASP Top 10 patterns
-│       ├── xxe-prevention.md             # XXE detection and prevention
-│       ├── cvss-scoring.md               # CVSS v3.1 & v4.0 scoring
-│       ├── api-key-encryption.md         # API key encryption (sodium)
-│       ├── deserialization-prevention.md  # Insecure deserialization
-│       ├── path-traversal-prevention.md  # Path traversal prevention
-│       ├── file-upload-security.md       # File upload security
-│       ├── authentication-patterns.md    # Auth, session, JWT, MFA
-│       ├── security-headers.md           # HTTP security headers
-│       ├── security-logging.md           # Security logging & monitoring
-│       ├── input-validation.md           # Input validation & encoding
-│       ├── cryptography-guide.md         # Cryptographic best practices
-│       ├── modern-attacks.md             # SSRF, mass assignment, race conditions
-│       ├── cve-patterns.md              # CVE-derived patterns (15 vulnerability types)
-│       ├── php-security-features.md      # PHP 8.x security features
-│       ├── ci-security-pipeline.md       # CI/CD security tooling
-│       └── supply-chain-security.md      # SLSA, signing, OpenSSF
+│   └── references/                       # 41 reference guides
 └── .github/
-    ├── dependabot.yml                    # Automated dependency updates
     └── workflows/
-        ├── release.yml                   # Release automation
-        └── ci.yml                        # ShellCheck, Python lint, tests
+        ├── ci.yml                        # Python tests
+        ├── lint.yml                      # Skill validation, linters, ShellCheck
+        ├── security.yml                  # Secret, workflow, dependency and SAST scans
+        └── release.yml                   # Release automation
 ```
 
 ## Expertise Areas
