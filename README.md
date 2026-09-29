@@ -1,6 +1,6 @@
 # Security Audit Skill
 
-Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for **any project**. Deep automated PHP/TYPO3 code scanning with 80+ checkpoints, 19 reference guides, and PreToolUse warnings.
+Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for **any project**. Deep automated PHP/TYPO3 code scanning with 80+ checkpoints, 41 reference guides, and PreToolUse warnings.
 
 ## Compatibility
 

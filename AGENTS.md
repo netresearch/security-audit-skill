@@ -10,7 +10,7 @@ security-audit-skill/
 │   ├── SKILL.md                 # Skill metadata and trigger patterns
 │   ├── checkpoints.yaml         # 80+ automated security checkpoints
 │   ├── scripts/                 # Audit scripts (security-audit.sh, github-security-audit.sh)
-│   ├── references/              # 19 reference guides (OWASP, CWE, CVSS, etc.)
+│   ├── references/              # 41 reference guides (OWASP, CWE, CVSS, etc.)
 │   └── evals/                   # Skill evaluation tests
 ├── hooks/                       # PreToolUse hook configuration (hooks.json)
 ├── scripts/                     # Utility scripts (check_risky_command.py)
@@ -46,6 +46,6 @@ No Makefile or build scripts defined. Key operations:
 
 - [SKILL.md](skills/security-audit/SKILL.md) -- skill definition and trigger patterns
 - [checkpoints.yaml](skills/security-audit/checkpoints.yaml) -- 80+ automated checkpoints
-- [references/](skills/security-audit/references/) -- 19 security reference guides
+- [references/](skills/security-audit/references/) -- 41 security reference guides
 - [SECURITY.md](SECURITY.md) -- security policy
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) -- architecture overview
