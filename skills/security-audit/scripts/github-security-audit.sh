@@ -101,7 +101,7 @@ echo ""
 echo "--- Branch Protection ---"
 DEFAULT_BRANCH=$(gh_api "repos/$REPO" --jq '.default_branch // "main"')
 # gh api returns 404 if no branch protection; check if we got a valid response
-PROTECTION_CHECK=$(gh api "repos/$REPO/branches/$DEFAULT_BRANCH/protection" 2>/dev/null && echo "exists" || echo "missing")
+PROTECTION_CHECK=$(gh api "repos/$REPO/branches/$DEFAULT_BRANCH/protection" >/dev/null 2>&1 && echo "exists" || echo "missing")
 if [[ "$PROTECTION_CHECK" == "exists" ]]; then
     ok "Branch protection configured on $DEFAULT_BRANCH"
 else
