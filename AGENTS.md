@@ -30,6 +30,8 @@ No Makefile or build scripts defined. Key operations:
 - Run PHP project security audit: `bash skills/security-audit/scripts/security-audit.sh`
 - Run GitHub repo security audit: `bash skills/security-audit/scripts/github-security-audit.sh`
 - Verify harness maturity: `bash scripts/verify-harness.sh --format=text --status`
+- Run tests (CI runs them in `ci.yml`): `uv run scripts/test_risky_patterns.py`, `uv run scripts/test_check_risky_command.py`, `uv run scripts/test_audit_scripts.py`
+- Validate checkpoints: `uv run scripts/validate_checkpoints.py`
 
 ## Rules
 
