@@ -4,8 +4,11 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.x (current) | Yes |
+| 2.x (current) | Yes: bug fixes and security fixes, released as a new 2.x version |
+| 1.x | No: security fixes ended on 2026-08-07 |
 | < 1.0 | No |
+
+Support follows the [organisation's supported-versions rule](https://github.com/netresearch/.github/blob/main/SECURITY.md#supported-versions): the current major version receives fixes, and the previous major version receives security fixes for six months after the next major version is released. 2.x has been the current major version since v2.1.0 (2026-02-07), so 1.x was eligible for security fixes until 2026-08-07. When 3.0 is released, 2.x receives security fixes for six more months.
 
 ## Reporting a Vulnerability
 
@@ -61,7 +64,7 @@ reporter with a clear justification and revised timeline.
 The following components are covered by this security policy:
 
 - **Skill definitions** (`skills/security-audit/SKILL.md`, reference documents)
-- **Scripts** (`scripts/check_risky_command.py`, `scripts/security-audit.sh`)
+- **Scripts** (`scripts/check_risky_command.py`, the audit scripts and scanner modules under `skills/security-audit/scripts/`)
 - **Hooks** (`hooks/hooks.json`, PreToolUse hook configuration)
 - **CI/CD workflows** (`.github/workflows/`)
 - **Package metadata** (`composer.json`)
@@ -81,8 +84,9 @@ This project implements the following security measures:
 
 ### PreToolUse Hook
 
-A `PreToolUse` hook (`scripts/check_risky_command.py`) inspects commands before
-execution, detecting patterns associated with:
+A `PreToolUse` hook (`scripts/check_risky_command.py`) inspects each Bash command
+before it runs and adds a warning to the agent's context when it matches patterns
+associated with the following. It never blocks a command.
 
 - Destructive file operations (`rm -rf /`, `chmod 777`)
 - Network exfiltration (`curl | sh`, `wget` with suspicious targets)
@@ -99,9 +103,10 @@ Reference documents and audit scripts are aligned with:
 
 ### Secure Defaults
 
-- All PHP code examples use `declare(strict_types=1)`.
-- Vulnerable code examples are clearly marked with `// VULNERABLE - DO NOT USE`.
-- Secure alternatives are provided with `// SECURE:` annotations.
+- The reference guides use a `VULNERABLE` comment (for example
+  `// VULNERABLE - DO NOT USE`) to mark vulnerable code examples and a `SECURE`
+  comment for secure alternatives. The examples are documentation; nothing in this
+  repository runs them.
 
 ### Known Limitations
 
