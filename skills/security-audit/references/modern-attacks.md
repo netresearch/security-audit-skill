@@ -544,6 +544,57 @@ final class UserController extends ActionController
 }
 ```
 
+### TYPO3: The HMAC Does Not Sign the `__identity` Value (IDOR)
+
+`__trustedProperties` signs the *names* of the form fields, not their values.
+A form bound to a persisted object renders a hidden
+`tx_<plugin>[booking][__identity]` field holding its uid; the property mapper
+loads whatever object that uid names and applies the allowed properties to it.
+Changing the value in the browser passes the HMAC check untouched, so the
+trusted properties decide *which* fields may change, never *whose* object
+changes. Ownership must be checked in the action, against the logged-in user:
+
+```php
+<?php
+declare(strict_types=1);
+
+use Psr\Http\Message\ResponseInterface;
+use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
+
+final class BookingController extends ActionController
+{
+    public function __construct(
+        private readonly BookingRepository $bookingRepository,
+        private readonly Context $context,
+    ) {}
+
+    // VULNERABLE: any logged-in user can submit their own edit form with the
+    // uid of someone else's booking in booking[__identity].
+    public function updateAction(Booking $booking): ResponseInterface
+    {
+        $this->bookingRepository->update($booking);
+        return $this->redirect('list');
+    }
+
+    // SECURE: the check runs on the mapped object and its refusal is returned
+    // (since TYPO3 v12 a redirect() that is not returned does not stop the action).
+    public function updateSecureAction(Booking $booking): ResponseInterface
+    {
+        $userId = (int)$this->context->getPropertyFromAspect('frontend.user', 'id');
+        if ($userId === 0 || $booking->getCustomerUid() !== $userId) {
+            return $this->redirect('list');
+        }
+        $this->bookingRepository->update($booking);
+        return $this->redirect('list');
+    }
+}
+```
+
+A check in the *edit* action, which renders the form only for the owner, does
+not protect the *update* action: the attacker submits their own, validly
+signed form with a different uid.
+
 ### Detection Patterns
 
 ```php
@@ -557,6 +608,12 @@ $massAssignmentPatterns = [
     'extract\(\$',                          // extract() creates variables from array
     '->fill\(\$request->all\(\)\)',         // Laravel: filling with all request data
     'fromArray\(\$_',                       // Custom hydration from superglobals
+];
+
+// TYPO3 IDOR via __identity (see above): list the actions that write a
+// mapped object, then check each for an ownership check on that object.
+$identityReviewPatterns = [
+    'function (update|delete|save)\w*Action\(',
 ];
 ```
 
