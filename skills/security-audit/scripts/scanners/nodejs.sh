@@ -264,4 +264,9 @@ echo "Errors: $ERRORS"
 echo "Warnings: $WARNINGS"
 
 # Exit with error count for dispatcher to aggregate
-exit "$ERRORS"
+# An exit status is taken modulo 256, so exiting with the count itself
+# would report success for 256 errors. Exit 1 for any error instead.
+if [[ "$ERRORS" -gt 0 ]]; then
+    exit 1
+fi
+exit 0

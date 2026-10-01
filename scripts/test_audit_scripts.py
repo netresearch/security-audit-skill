@@ -69,6 +69,13 @@ class SecretsScannerTest(unittest.TestCase):
         self.assertIn("ERROR: TruffleHog found 1 secret(s):", result.stdout)
         self.assertEqual(result.returncode, 1, result.stderr)
 
+    def test_256_findings_still_fail(self) -> None:
+        # An exit status is taken modulo 256: exiting with the count reported
+        # success for exactly 256 findings.
+        result = self.scan('{"SourceMetadata":{}}\n' * 256)
+        self.assertIn("ERROR: TruffleHog found 256 secret(s):", result.stdout)
+        self.assertEqual(result.returncode, 1, result.stderr)
+
 
 class JavaScriptScannerTest(unittest.TestCase):
     def scan(self, tsconfig: str) -> subprocess.CompletedProcess:

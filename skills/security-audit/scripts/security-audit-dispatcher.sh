@@ -119,10 +119,8 @@ fi
 echo "Detected languages/frameworks: ${DETECTED_SCANNERS[*]}"
 echo ""
 
-# Run each detected scanner. Scanner modules may exit with a non-zero error
-# count (their `ERRORS` counter), which is not a standard 0/1 exit contract.
-# We therefore count FAILED scanners (any non-zero exit), not the raw exit
-# code (which can overflow the 0-255 exit-code space if summed).
+# Run each detected scanner. A scanner module exits non-zero when it reports
+# errors. We count FAILED scanners (any non-zero exit), not the exit codes.
 for scanner in "${DETECTED_SCANNERS[@]}"; do
     SCANNER_SCRIPT="$SCANNERS_DIR/${scanner}.sh"
     if [[ -f "$SCANNER_SCRIPT" ]]; then
