@@ -110,6 +110,25 @@ final class UserRepositorySafe
 }
 ```
 
+### An SQL expression on the left: `comparison()`, not `eq()`
+
+A raw query is often concatenated because the left side is an expression rather than a column — `REPLACE(ext_key, '_', '') = …`, `LOWER(email) = …` — and `expr()->eq()` seems unable to take one. It cannot: TYPO3's `ExpressionBuilder::eq(string $fieldName, $value)` passes `$fieldName` through `quoteIdentifier()` (v13.4 `ExpressionBuilder.php:86`), so the whole expression becomes one backtick-quoted column name. `expr()->comparison()` concatenates both sides unchanged; build the left side from `quoteIdentifier()` for columns and `quote()` for constant literals, and keep the user value in `createNamedParameter()`:
+
+```php
+$queryBuilder->expr()->comparison(
+    'REPLACE(' . $queryBuilder->quoteIdentifier('ext_key') . ', '
+        . $queryBuilder->quote('_') . ', ' . $queryBuilder->quote('') . ')',
+    '=',
+    $queryBuilder->createNamedParameter(str_replace('_', '', $key))
+)
+```
+
+`quote()` on a constant literal like `'_'` is correct; the `->quote\(` detection pattern below targets user input. Do not write those literals as `"_"`: double quotes are a string only in MySQL without `ANSI_QUOTES`, and an identifier under `ANSI_QUOTES` (MySQL/MariaDB: `Unknown column '_' in 'WHERE'`) and in PostgreSQL (`column "_" does not exist`).
+
+### Never count a SELECT with `executeStatement()`
+
+`Connection::executeStatement()` returns the driver's affected-row count, meant for `INSERT`/`UPDATE`/`DELETE`. For a `SELECT` only `mysqli` happens to fill it with the row count. Measured with doctrine/dbal 4.4 on MariaDB 10.11 and SQLite: `pdo_mysql` returns `0` even when rows match and leaves the result set unread, so the next query on the shared connection fails with `SQLSTATE[HY000]: General error: 2014`; `pdo_sqlite` returns the change count of the last write on the connection, so the answer depends on that write, not on the query. Code like `if ($connection->executeStatement('SELECT …') > 0)` is therefore a correctness defect on every driver but `mysqli` — and in practice it travels with string-concatenated SQL. Count with `$queryBuilder->count('uid')->…->executeQuery()->fetchOne()` instead.
+
 ## FormProtection (CSRF Prevention)
 
 TYPO3 uses form protection tokens (CSRF tokens) for backend modules and install tool.
@@ -457,7 +476,8 @@ final class AdminController extends ActionController
 ```php
 // Grep patterns for TYPO3 security issues:
 $typo3Patterns = [
-    '->quote\(',                        // Using quote() instead of createNamedParameter()
+    '->quote\(',                        // Using quote() instead of createNamedParameter() (fine for constant literals)
+    'executeStatement\(\s*[\'"]\s*[Ss][Ee][Ll][Ee][Cc][Tt]', // Counting a SELECT via affected rows; usually concatenated SQL too
     'allowAllProperties',               // Disabling trusted properties
     'IgnoreValidation.*create',         // IgnoreValidation on write actions
     'IgnoreValidation.*update',         // IgnoreValidation on write actions
