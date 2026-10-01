@@ -256,11 +256,12 @@ The architecture of this skill (actors, components, data flows) is described in 
 
 Checks that run on every pull request to `main` in this repository:
 
-- **Security** (`.github/workflows/security.yml`): Betterleaks secret scanning, zizmor workflow analysis, dependency review, and, through the `typo3-ci-workflows` security reusable, Composer Audit and Opengrep SAST (`--config auto --error --severity WARNING`).
+- **Security** (`.github/workflows/security.yml`): Betterleaks secret scanning, zizmor workflow analysis, dependency review, and, through the `typo3-ci-workflows` security reusable, Composer Audit and Opengrep SAST (findings handled as the [organisation's static analysis rule](https://github.com/netresearch/.github/blob/main/SECURITY.md#static-analysis-sast) sets out).
 - **Skill Validation** (`.github/workflows/lint.yml`): skill structure, plugin manifest sync, markdownlint, yamllint, actionlint, JSON syntax, version checks, ShellCheck at the validator's default severity `error`, ruff and the checkpoint schema. The pre-commit hook runs ShellCheck at `style`.
 - **CI** (`.github/workflows/ci.yml`): the tests listed under Development.
-- **Eval Validation**, **Harness Verification**, the template drift check and **PR Quality Gates**.
+- **Eval Validation**, **Harness Verification**, the template drift check, **Labeler** and **PR Quality Gates**.
 - **CodeQL** through GitHub's default setup, a repository setting.
+- Configured outside the workflows: **DCO** sign-off check, **SonarCloud** code analysis, **CodeRabbit** review, and GitHub secret scanning with push protection, which rejects pushes that contain a recognised secret.
 
 Which of these checks must pass before a merge is set in the repository's branch protection, not in this repository.
 
