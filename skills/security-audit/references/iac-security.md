@@ -1276,7 +1276,7 @@ resource "aws_instance" "web" {
   user_data = <<-EOF
     #!/bin/bash
     export API_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    export DD_API_KEY="abcdef1234567890abcdef1234567890"
+    export DD_API_KEY="abcdef1234567890abcdef1234567890" # nosemgrep: generic.secrets.security.detected-generic-api-key.detected-generic-api-key -- fake value in a deliberately vulnerable example
   EOF
 }
 ```
