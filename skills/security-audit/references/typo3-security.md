@@ -123,7 +123,7 @@ $queryBuilder->expr()->comparison(
 )
 ```
 
-`quote()` on a constant literal like `'_'` is correct; the `->quote\(` detection pattern below targets user input. Do not write those literals as `"_"`: double quotes are a string only in MySQL without `ANSI_QUOTES`, and an identifier under `ANSI_QUOTES` and in PostgreSQL (`Unknown column '_' in 'WHERE'`).
+`quote()` on a constant literal like `'_'` is correct; the `->quote\(` detection pattern below targets user input. Do not write those literals as `"_"`: double quotes are a string only in MySQL without `ANSI_QUOTES`, and an identifier under `ANSI_QUOTES` (MySQL/MariaDB: `Unknown column '_' in 'WHERE'`) and in PostgreSQL (`column "_" does not exist`).
 
 ### Never count a SELECT with `executeStatement()`
 
@@ -477,7 +477,7 @@ final class AdminController extends ActionController
 // Grep patterns for TYPO3 security issues:
 $typo3Patterns = [
     '->quote\(',                        // Using quote() instead of createNamedParameter() (fine for constant literals)
-    'executeStatement\(\s*[\'"]SELECT', // Counting a SELECT via affected rows; usually concatenated SQL too
+    'executeStatement\(\s*[\'"]\s*[Ss][Ee][Ll][Ee][Cc][Tt]', // Counting a SELECT via affected rows; usually concatenated SQL too
     'allowAllProperties',               // Disabling trusted properties
     'IgnoreValidation.*create',         // IgnoreValidation on write actions
     'IgnoreValidation.*update',         // IgnoreValidation on write actions
