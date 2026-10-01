@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # AWS Security Scanner Module
 # Scans AWS infrastructure files for common vulnerability patterns
 # Part of security-audit-skill cloud security references

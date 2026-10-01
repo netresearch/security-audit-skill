@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Secrets Scanner Module
 # Scans projects for leaked secrets using TruffleHog and fallback regex patterns.
 #
@@ -30,7 +32,7 @@ echo ""
 if command -v trufflehog &>/dev/null; then
     echo "=== TruffleHog Filesystem Scan ==="
     TRUFFLEHOG_OUTPUT=$(trufflehog filesystem "$PROJECT_DIR" --no-update --json 2>/dev/null || true)
-    TRUFFLEHOG_COUNT=$(echo "$TRUFFLEHOG_OUTPUT" | grep -c '"SourceMetadata"' 2>/dev/null || echo "0")
+    TRUFFLEHOG_COUNT=$(echo "$TRUFFLEHOG_OUTPUT" | grep -c '"SourceMetadata"' 2>/dev/null || true)
 
     if [[ "$TRUFFLEHOG_COUNT" -gt 0 ]]; then
         echo "ERROR: TruffleHog found $TRUFFLEHOG_COUNT secret(s):"
@@ -45,7 +47,7 @@ if command -v trufflehog &>/dev/null; then
         echo ""
         echo "=== TruffleHog Git History Scan ==="
         GIT_OUTPUT=$(trufflehog git "file://$PROJECT_DIR" --no-update --json 2>/dev/null || true)
-        GIT_COUNT=$(echo "$GIT_OUTPUT" | grep -c '"SourceMetadata"' 2>/dev/null || echo "0")
+        GIT_COUNT=$(echo "$GIT_OUTPUT" | grep -c '"SourceMetadata"' 2>/dev/null || true)
 
         if [[ "$GIT_COUNT" -gt 0 ]]; then
             echo "ERROR: TruffleHog found $GIT_COUNT secret(s) in git history:"
@@ -141,4 +143,9 @@ echo "--- Secrets Scanner Results ---"
 echo "Errors: $ERRORS"
 echo "Warnings: $WARNINGS"
 
-exit "$ERRORS"
+# An exit status is taken modulo 256, so exiting with the count itself
+# would report success for 256 errors. Exit 1 for any error instead.
+if [[ "$ERRORS" -gt 0 ]]; then
+    exit 1
+fi
+exit 0

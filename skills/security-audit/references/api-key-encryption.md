@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # API Key Encryption at Rest
 
 **Source:** nr_llm Extension - ADR-012 API Key Encryption

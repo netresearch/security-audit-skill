@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Vue.js Security Patterns
 
 Security patterns, common misconfigurations, and detection regexes for Vue.js applications (Vue 2 and Vue 3, including Nuxt where applicable). This reference covers XSS via directives and templates, injection risks, data exposure through state management, and security misconfigurations specific to the Vue ecosystem.

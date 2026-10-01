@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # GitHub Repository Security Audit Script
 # Audits GitHub repository security settings using the gh CLI
 # Phase 4: GitHub and Project Settings
@@ -100,10 +102,17 @@ fi
 echo ""
 echo "--- Branch Protection ---"
 DEFAULT_BRANCH=$(gh_api "repos/$REPO" --jq '.default_branch // "main"')
-# gh api returns 404 if no branch protection; check if we got a valid response
-PROTECTION_CHECK=$(gh api "repos/$REPO/branches/$DEFAULT_BRANCH/protection" 2>/dev/null && echo "exists" || echo "missing")
-if [[ "$PROTECTION_CHECK" == "exists" ]]; then
+# Classic branch protection answers 404 when the branch has none. A branch
+# protected only by repository rulesets also answers 404 there, so ask for the
+# ruleset rules that apply to the branch before reporting it unprotected.
+PROTECTION_CHECK="missing"
+if gh api "repos/$REPO/branches/$DEFAULT_BRANCH/protection" >/dev/null 2>&1; then
+    PROTECTION_CHECK="exists"
     ok "Branch protection configured on $DEFAULT_BRANCH"
+elif RULE_COUNT=$(gh api "repos/$REPO/rules/branches/$DEFAULT_BRANCH" --jq 'if type == "array" then length else 0 end' 2>/dev/null) \
+    && [[ "$RULE_COUNT" -gt 0 ]]; then
+    PROTECTION_CHECK="rulesets"
+    ok "Branch protection configured on $DEFAULT_BRANCH (repository rulesets)"
 else
     finding CRITICAL "No branch protection on default branch ($DEFAULT_BRANCH)"
 fi
@@ -223,8 +232,12 @@ fi
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Commit Signing ---"
-if [[ "$PROTECTION_CHECK" == "exists" ]]; then
-    SIGNED_COMMITS=$(gh_api "repos/$REPO/branches/$DEFAULT_BRANCH/protection/required_signatures" --jq '.enabled // false')
+if [[ "$PROTECTION_CHECK" != "missing" ]]; then
+    if [[ "$PROTECTION_CHECK" == "exists" ]]; then
+        SIGNED_COMMITS=$(gh_api "repos/$REPO/branches/$DEFAULT_BRANCH/protection/required_signatures" --jq '.enabled // false')
+    else
+        SIGNED_COMMITS=$(gh_api "repos/$REPO/rules/branches/$DEFAULT_BRANCH" --jq 'any(.[]; .type == "required_signatures")')
+    fi
     if [[ "$SIGNED_COMMITS" == "true" ]]; then
         ok "Signed commits are required on $DEFAULT_BRANCH"
     else

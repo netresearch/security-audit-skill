@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # WordPress Security Scanner Module
 # Detects WordPress projects via wp-config.php / wp-content/
 # Scans for common WordPress-specific vulnerability patterns
@@ -64,7 +66,7 @@ echo "Scanning: ${SCAN_DIRS[*]}"
 echo ""
 
 # === SA-WP-01: SQL injection — $wpdb without prepare() ===
-echo "=== Checking for SQL Injection ($wpdb without prepare) ==="
+echo "=== Checking for SQL Injection (\$wpdb without prepare) ==="
 # shellcheck disable=SC2016
 SQLI=$(scan_wp '\$wpdb\s*->\s*(query|get_results|get_row|get_var|get_col)\s*\(\s*["\x27]' 10)
 if [[ -n "$SQLI" ]]; then

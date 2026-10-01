@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # AWS Security Patterns
 
 Security patterns, common misconfigurations, and detection regexes for Amazon Web Services infrastructure. Covers IAM, S3, Lambda, Security Groups, KMS, CloudTrail, Secrets Manager, and RDS across Terraform, CloudFormation, and raw JSON/YAML configurations.

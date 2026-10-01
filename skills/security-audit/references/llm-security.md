@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # OWASP Top 10 for LLM Applications (2025) - AI Agent Security Audit Patterns
 
 This reference maps the OWASP Top 10 for Large Language Model Applications (2025 edition) to actionable audit patterns for AI agent skills, MCP servers, tool configurations, and agentic workflows. Unlike traditional application security references, this document focuses on auditing AI agent configuration files: SKILL.md, AGENTS.md, CLAUDE.md, mcp.json, hooks.json, and settings files.

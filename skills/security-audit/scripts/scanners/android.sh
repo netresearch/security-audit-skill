@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Android Security Scanner Module
 # Scans Android projects for common vulnerability patterns
 # Part of security-audit-skill multi-language scanning
@@ -15,8 +17,6 @@ if [[ -z "$MANIFEST" ]]; then
     echo "No AndroidManifest.xml found — not an Android project"
     exit 0
 fi
-
-MANIFEST_DIR=$(dirname "$MANIFEST")
 
 # Auto-detect source directories
 SCAN_DIRS=()

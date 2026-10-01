@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # JavaScript/TypeScript Security Features and Vulnerability Patterns
 
 Modern JavaScript (ES5 through ES2024) and TypeScript introduce features that directly improve security when used correctly, but also present unique attack surfaces. This reference documents security-relevant patterns, organized by ES version where applicable, covering prototype pollution, injection vectors, type-safety pitfalls, and more.
@@ -809,7 +812,7 @@ class AuthService {
 | setInterval with string | `setInterval\(\s*['"\`]` | error | SA-JS-15 |
 | location.href assignment | `location\.href\s*=` | warning | SA-JS-16 |
 | Wildcard postMessage target | `postMessage\([^,]+,\s*['"]\*['"]` | error | SA-JS-17 |
-| Nested regex quantifiers | `(\+\)\+|\*\)\*|\+\)\*)` | warning | SA-JS-18 |
+| Nested regex quantifiers | `(\+\)\+\|\*\)\*\|\+\)\*)` | warning | SA-JS-18 |
 | strict mode disabled | `"strict"\s*:\s*false` | warning | SA-JS-19 |
 | Unvalidated JSON.parse reviver | `JSON\.parse\([^)]+,\s*\(` | warning | SA-JS-20 |
 | Naive `</script>` escaping of a JSON data island | `replace(All)?\(\s*['"\x60]</script` | warning | SA-JS-21 |

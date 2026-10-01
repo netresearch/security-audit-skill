@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Joomla Security Scanner Module
 # Detects Joomla projects via configuration.php
 # Scans for common Joomla-specific vulnerability patterns
@@ -66,8 +68,8 @@ fi
 # === SA-JOOMLA-02: Input filtering ===
 echo ""
 echo "=== Checking for Unfiltered Input ==="
-# shellcheck disable=SC2016
 RAW_INPUT=$(scan_joomla "->get\s*\([^,)]+\s*,\s*[^,)]*\s*,\s*['\"]RAW['\"]" 10)
+# shellcheck disable=SC2016
 SUPERGLOBALS=$(scan_joomla '\$_GET\s*\[|\$_POST\s*\[|\$_REQUEST\s*\[' 10)
 if [[ -n "$RAW_INPUT" || -n "$SUPERGLOBALS" ]]; then
     echo "ERROR: Unfiltered input detected:"

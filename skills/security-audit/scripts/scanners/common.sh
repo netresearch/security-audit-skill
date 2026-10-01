@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Common utilities for scanner modules
 # Sourced by individual scanner scripts
 #
@@ -12,6 +14,9 @@ if (( BASH_VERSINFO[0] < 4 )); then
     echo "  macOS ships Bash 3.2 as /bin/bash; install GNU bash via Homebrew" >&2
     echo "  and run the dispatcher with 'bash scripts/security-audit-dispatcher.sh …'" >&2
     echo "  using that newer binary." >&2
+    # `return` ends a sourced file; when the file is executed, `return` fails
+    # and `exit` ends the script instead.
+    # shellcheck disable=SC2317
     return 1 2>/dev/null || exit 1
 fi
 

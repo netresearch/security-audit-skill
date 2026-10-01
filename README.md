@@ -1,6 +1,9 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Security Audit Skill
 
-Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for **any project**. Deep automated PHP/TYPO3 code scanning with 80+ checkpoints, 19 reference guides, and PreToolUse warnings.
+Security audit patterns (OWASP Top 10, CWE Top 25 2025, CVSS v4.0) and GitHub project security checks for **any project**. Deep automated PHP/TYPO3 code scanning with 80+ checkpoints, 41 reference guides, and PreToolUse warnings.
 
 ## Compatibility
 
@@ -118,42 +121,28 @@ Example queries:
 
 ```
 security-audit-skill/
-├── SKILL.md                              # Skill metadata and core patterns
 ├── SECURITY.md                           # Security policy
 ├── hooks/
 │   └── hooks.json                        # PreToolUse hook configuration
 ├── scripts/
-│   └── check_risky_command.py            # Risky command detection hook
+│   ├── check_risky_command.py            # Risky command detection hook
+│   ├── validate_checkpoints.py           # checkpoints.yaml structure check
+│   └── test_*.py                         # Tests (run by ci.yml)
 ├── skills/security-audit/
 │   ├── SKILL.md                          # Skill definition
 │   ├── checkpoints.yaml                  # 80+ automated security checkpoints
 │   ├── scripts/
+│   │   ├── security-audit-dispatcher.sh  # Detects the stack, runs the matching scanners
+│   │   ├── scanners/                     # Per-ecosystem scanner modules
 │   │   ├── security-audit.sh             # PHP project security audit
 │   │   └── github-security-audit.sh      # GitHub repo security audit
-│   └── references/
-│       ├── cwe-top25.md                  # CWE Top 25 (2025) coverage map
-│       ├── owasp-top10.md                # OWASP Top 10 patterns
-│       ├── xxe-prevention.md             # XXE detection and prevention
-│       ├── cvss-scoring.md               # CVSS v3.1 & v4.0 scoring
-│       ├── api-key-encryption.md         # API key encryption (sodium)
-│       ├── deserialization-prevention.md  # Insecure deserialization
-│       ├── path-traversal-prevention.md  # Path traversal prevention
-│       ├── file-upload-security.md       # File upload security
-│       ├── authentication-patterns.md    # Auth, session, JWT, MFA
-│       ├── security-headers.md           # HTTP security headers
-│       ├── security-logging.md           # Security logging & monitoring
-│       ├── input-validation.md           # Input validation & encoding
-│       ├── cryptography-guide.md         # Cryptographic best practices
-│       ├── modern-attacks.md             # SSRF, mass assignment, race conditions
-│       ├── cve-patterns.md              # CVE-derived patterns (15 vulnerability types)
-│       ├── php-security-features.md      # PHP 8.x security features
-│       ├── ci-security-pipeline.md       # CI/CD security tooling
-│       └── supply-chain-security.md      # SLSA, signing, OpenSSF
+│   └── references/                       # 41 reference guides
 └── .github/
-    ├── dependabot.yml                    # Automated dependency updates
     └── workflows/
-        ├── release.yml                   # Release automation
-        └── ci.yml                        # ShellCheck, Python lint, tests
+        ├── ci.yml                        # Python tests
+        ├── lint.yml                      # Skill validation, linters, ShellCheck
+        ├── security.yml                  # Secret, workflow, dependency and SAST scans
+        └── release.yml                   # Release automation
 ```
 
 ## Expertise Areas
@@ -231,6 +220,50 @@ security-audit-skill/
 - **enterprise-readiness-skill**: References this skill for security assessment
 - **php-modernization-skill**: Type safety enhances security
 - **typo3-testing-skill**: Security test patterns
+
+## Development
+
+Run the tests from the repository root with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv run scripts/test_risky_patterns.py      # hook patterns: expected matches and non-matches
+uv run scripts/test_check_risky_command.py # hook input and output as Claude Code uses them
+uv run scripts/test_audit_scripts.py       # audit scripts against fixtures (needs bash 4+, GNU grep, jq)
+uv run scripts/validate_checkpoints.py     # checkpoints.yaml structure and unique IDs
+pre-commit run --all-files                 # the linters CI runs in Skill Validation
+```
+
+CI runs the three test scripts on Python 3.12 and 3.13 (`.github/workflows/ci.yml`). A failing test prints its name and the assertion that failed; the test scripts exit non-zero. A change to the hook or the audit scripts comes with a test in these files.
+
+## Dependencies
+
+- **Using the skill:** the audit scripts need bash 4+, GNU grep (for `grep -P`) and `find`; `github-security-audit.sh` needs the `gh` CLI. The hook needs `python3` and uses only its standard library. `composer`, `npm`, `govulncheck` and `trufflehog` are optional: a scanner calls them only when `command -v` finds them, and the skill does not install them.
+- **Installing the skill:** `composer.json` requires `netresearch/composer-agent-skill-plugin` (`^2.0`); `package.json` declares `@netresearch/agent-skill-coordinator` as a peer dependency. The repository commits no lock file for either; the consuming project resolves them.
+- **Development and CI:** `scripts/validate_checkpoints.py` declares PyYAML as inline script metadata, which `uv run` installs; the test scripts use the standard library. The pre-commit hooks are pinned by `rev:` in `.pre-commit-config.yaml`. The workflows call reusable workflows from `netresearch/skill-repo-skill`, `netresearch/.github` and `netresearch/typo3-ci-workflows` at `@main`; the third-party actions inside those are pinned to commit SHAs there.
+- **Tracking:** Renovate (`renovate.json`, `config:recommended` with pre-commit updates enabled) opens update pull requests, and `.github/workflows/auto-merge-deps.yml` hands them to the organisation's auto-merge workflow. On pull requests, dependency review and Composer Audit check the dependencies (`.github/workflows/security.yml`). New dependencies must meet the licence and vulnerability rules of the organisation's security policy linked below.
+
+## Governance and policies
+
+This repository follows the Netresearch organisation policies:
+
+- [Governance](https://github.com/netresearch/.github/blob/main/GOVERNANCE.md): ownership, roles, how decisions are made and disputes resolved, and continuity.
+- [Roadmap](https://github.com/netresearch/.github/blob/main/ROADMAP.md): planned and explicitly excluded work for the coming year.
+- [Handling of dependency and code analysis findings](https://github.com/netresearch/.github/blob/main/SECURITY.md#handling-of-dependency-and-code-analysis-findings): thresholds, deadlines and the exception process for dependency (SCA) and static analysis (SAST) findings.
+- [Secret management](https://github.com/netresearch/.github/blob/main/SECURITY.md#secret-management): how CI and release credentials are stored, accessed and rotated.
+- [Access roster](https://github.com/netresearch/.github/blob/main/docs/access-roster.md): who holds administrative access to this repository and the organisation.
+
+The architecture of this skill (actors, components, data flows) is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and its security assurance case (threat model, trust boundaries, countermeasures and limits) in [docs/SECURITY-ASSURANCE.md](docs/SECURITY-ASSURANCE.md). Supported versions and vulnerability reporting: [SECURITY.md](SECURITY.md).
+
+Checks that run on every pull request to `main` in this repository:
+
+- **Security** (`.github/workflows/security.yml`): Betterleaks secret scanning, zizmor workflow analysis, dependency review, and, through the `typo3-ci-workflows` security reusable, Composer Audit and Opengrep SAST (findings handled as the [organisation's static analysis rule](https://github.com/netresearch/.github/blob/main/SECURITY.md#static-analysis-sast) sets out).
+- **Skill Validation** (`.github/workflows/lint.yml`): skill structure, plugin manifest sync, markdownlint, yamllint, actionlint, JSON syntax, version checks, ShellCheck at the validator's default severity `error`, ruff and the checkpoint schema. The pre-commit hook runs ShellCheck at `style`.
+- **CI** (`.github/workflows/ci.yml`): the tests listed under Development.
+- **Eval Validation**, **Harness Verification**, the template drift check, **Labeler** and **PR Quality Gates**.
+- **CodeQL** through GitHub's default setup, a repository setting.
+- Configured outside the workflows: **DCO** sign-off check, **SonarCloud** code analysis, **CodeRabbit** review, and GitHub secret scanning with push protection, which rejects pushes that contain a recognised secret.
+
+Which of these checks must pass before a merge is set in the repository's branch protection, not in this repository.
 
 ## License
 

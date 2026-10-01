@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # betterleaks/gitleaks fingerprint allowlist.
 #
 # Every entry below is a FALSE POSITIVE: an illustrative, fake credential that

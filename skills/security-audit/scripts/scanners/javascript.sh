@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # JavaScript/TypeScript Security Scanner Module
 # Scans JS/TS projects for common vulnerability patterns
 # Modeled after php.sh scanner architecture
@@ -240,8 +242,8 @@ fi
 echo ""
 echo "=== Checking TypeScript Strict Mode ==="
 if [[ -f "$PROJECT_DIR/tsconfig.json" ]]; then
-    STRICT_ENABLED=$(grep -c '"strict"\s*:\s*true' "$PROJECT_DIR/tsconfig.json" 2>/dev/null || echo "0")
-    STRICT_DISABLED=$(grep -c '"strict"\s*:\s*false' "$PROJECT_DIR/tsconfig.json" 2>/dev/null || echo "0")
+    STRICT_ENABLED=$(grep -c '"strict"\s*:\s*true' "$PROJECT_DIR/tsconfig.json" 2>/dev/null || true)
+    STRICT_DISABLED=$(grep -c '"strict"\s*:\s*false' "$PROJECT_DIR/tsconfig.json" 2>/dev/null || true)
     if [[ "$STRICT_DISABLED" -gt 0 ]]; then
         echo "WARNING: TypeScript strict mode is explicitly disabled"
         WARNINGS=$((WARNINGS + 1))
@@ -261,5 +263,9 @@ echo "--- JavaScript/TypeScript Scanner Results ---"
 echo "Errors: $ERRORS"
 echo "Warnings: $WARNINGS"
 
-# Exit with error count for dispatcher to aggregate
-exit "$ERRORS"
+# An exit status is taken modulo 256, so exiting with the count itself
+# would report success for 256 errors. Exit 1 for any error instead.
+if [[ "$ERRORS" -gt 0 ]]; then
+    exit 1
+fi
+exit 0

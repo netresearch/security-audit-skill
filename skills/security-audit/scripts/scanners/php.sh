@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # PHP Security Scanner Module
 # Invoked by security-audit-dispatcher.sh; also usable standalone.
 # Performs security checks on PHP projects (TYPO3, Symfony, Laravel, custom).

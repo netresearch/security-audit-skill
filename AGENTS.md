@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Security Audit Skill
 
 Security audit patterns (OWASP Top 10, CWE Top 25, CVSS v4.0) and deep PHP/TYPO3 code scanning with 80+ checkpoints.
@@ -10,7 +13,7 @@ security-audit-skill/
 │   ├── SKILL.md                 # Skill metadata and trigger patterns
 │   ├── checkpoints.yaml         # 80+ automated security checkpoints
 │   ├── scripts/                 # Audit scripts (security-audit.sh, github-security-audit.sh)
-│   ├── references/              # 19 reference guides (OWASP, CWE, CVSS, etc.)
+│   ├── references/              # 41 reference guides (OWASP, CWE, CVSS, etc.)
 │   └── evals/                   # Skill evaluation tests
 ├── hooks/                       # PreToolUse hook configuration (hooks.json)
 ├── scripts/                     # Utility scripts (check_risky_command.py)
@@ -30,6 +33,8 @@ No Makefile or build scripts defined. Key operations:
 - Run PHP project security audit: `bash skills/security-audit/scripts/security-audit.sh`
 - Run GitHub repo security audit: `bash skills/security-audit/scripts/github-security-audit.sh`
 - Verify harness maturity: `bash scripts/verify-harness.sh --format=text --status`
+- Run tests (CI runs them in `ci.yml`): `uv run scripts/test_risky_patterns.py`, `uv run scripts/test_check_risky_command.py`, `uv run scripts/test_audit_scripts.py`
+- Validate checkpoints: `uv run scripts/validate_checkpoints.py`
 
 ## Rules
 
@@ -46,6 +51,6 @@ No Makefile or build scripts defined. Key operations:
 
 - [SKILL.md](skills/security-audit/SKILL.md) -- skill definition and trigger patterns
 - [checkpoints.yaml](skills/security-audit/checkpoints.yaml) -- 80+ automated checkpoints
-- [references/](skills/security-audit/references/) -- 19 security reference guides
+- [references/](skills/security-audit/references/) -- 41 security reference guides
 - [SECURITY.md](SECURITY.md) -- security policy
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) -- architecture overview

@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Automated Scanning Tools Reference
 
 Configuration, custom rules, CI integration, and best practices for semgrep / opengrep, trivy, and gitleaks, plus false-positive handling for SonarCloud / SonarQube quality gates (SonarCloud is hosted; SonarQube is self-hosted).

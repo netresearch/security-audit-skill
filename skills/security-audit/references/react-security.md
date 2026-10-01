@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # React Security Patterns
 
 Security patterns, common misconfigurations, and detection regexes for React applications. React provides some built-in XSS protection through JSX auto-escaping, but developers can bypass these protections or introduce new vulnerability classes through unsafe APIs, unvetted dependencies, and improper state management.

@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Python Security Features by Version
 
 Modern Python versions introduce language features and standard library changes that directly improve security when used correctly. This reference documents security-relevant patterns and features from Python 3.9 through 3.13, with detection regexes for automated auditing.
@@ -584,7 +587,7 @@ def verify_integrity(data: bytes, key: bytes, expected: str) -> bool:
 
 **Security implication:** MD5 (CWE-328) and SHA1 are cryptographically broken for collision resistance. MD5 collisions can be computed in seconds. Use bcrypt, scrypt, or argon2 for passwords. Use SHA-256+ or SHA-3 for integrity verification.
 
-### 11. Dynamic Import Abuse via __import__ / importlib
+### 11. Dynamic Import Abuse via `__import__` / importlib
 
 Dynamic imports with user-controlled module names allow loading arbitrary modules.
 
@@ -1016,7 +1019,7 @@ def check_rate_limit_safe(ip: str) -> bool:
 | Weak hash: MD5 for security | `hashlib\.md5\(` | warning |
 | Weak hash: SHA1 for security | `hashlib\.sha1\(` | warning |
 | Deprecated tempfile.mktemp | `tempfile\.mktemp\(` | error |
-| Dynamic import with __import__ | `__import__\(` | warning |
+| Dynamic import with `__import__` | `__import__\(` | warning |
 | XML parsing without defusedxml | `xml\.etree\.ElementTree` | warning |
 | Jinja2 Template with variable | `Template\s*\(.*\w+.*\)` | warning |
 | Command injection via os.popen | `os\.popen\(` | error |

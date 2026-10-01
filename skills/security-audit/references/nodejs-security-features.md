@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Node.js Security Features by Version
 
 Modern Node.js versions introduce runtime features, APIs, and permission controls that directly improve security when used correctly. This reference documents security-relevant patterns and features from Node.js 16 through 22+, focusing on server-side vulnerability classes unique to the Node.js execution model.

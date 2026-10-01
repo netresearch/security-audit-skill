@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Infrastructure-as-Code Security
 
 Infrastructure-as-Code (IaC) defines cloud and container infrastructure in version-controlled configuration files. Security misconfigurations in these files are deployed automatically and at scale, making IaC a critical audit surface. This reference covers Dockerfiles, Docker Compose, Kubernetes manifests, and Terraform configurations.

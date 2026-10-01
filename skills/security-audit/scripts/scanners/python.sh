@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Python Security Scanner Module
 # Scans Python projects for common vulnerability patterns
 # Part of security-audit-skill Phase 4
@@ -49,6 +51,8 @@ scan_py_count() {
     for dir in "${SCAN_DIRS[@]}"; do
         local count
         if [[ "$dir" == "$PROJECT_DIR" ]]; then
+            # Not `grep -c`: with several files it prints one count per file.
+            # shellcheck disable=SC2126
             count=$(grep -n -P "$pattern" "$dir"/*.py 2>/dev/null | wc -l || echo "0")
         else
             count=$(grep -rn -P "$pattern" "$dir" --include="*.py" 2>/dev/null | wc -l || echo "0")
@@ -274,4 +278,9 @@ else
     echo "PASS: No critical security errors detected"
 fi
 
-exit "$ERRORS"
+# An exit status is taken modulo 256, so exiting with the count itself
+# would report success for 256 errors. Exit 1 for any error instead.
+if [[ "$ERRORS" -gt 0 ]]; then
+    exit 1
+fi
+exit 0

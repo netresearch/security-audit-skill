@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Security Audit Script
 # Performs security checks on PHP projects
 # Scans both src/ and Classes/ directories (TYPO3, Symfony, custom)

@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Supply Chain Incident Response
 
 Operational playbook for responding to GitHub Actions supply chain compromises, based on the aquasecurity/trivy-action tag force-push incident (2026-03-19). Covers detection, triage, remediation, and post-incident hardening.

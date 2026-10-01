@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """
 PreToolUse hook to detect potentially risky command patterns before execution.
 Warns about dangerous operations without blocking (informational only).
@@ -199,13 +201,7 @@ def main():
     if not input_data:
         return
 
-    # Parse the tool input
-    try:
-        data = json.loads(input_data)
-        command = data.get("command", "")
-    except (json.JSONDecodeError, TypeError):
-        command = input_data
-
+    command = extract_command(input_data)
     if not command:
         return
 
@@ -213,19 +209,54 @@ def main():
     warnings = check_command(command)
 
     if warnings:
-        severity_icons = {"high": "🔴", "medium": "🟡", "low": "🟢"}
-        warning_lines = []
-        for w in warnings:
-            icon = severity_icons.get(w["severity"], "⚠️")
-            warning_lines.append(f"  {icon} [{w['severity'].upper()}] {w['message']}")
+        print(json.dumps(build_hook_output(warnings)))
 
-        print(f"""<system-reminder>
-Security warning for command:
-{chr(10).join(warning_lines)}
 
-Review the command carefully before proceeding.
-The security-audit skill can help assess risks: /security-audit
-</system-reminder>""")
+def extract_command(input_data: str) -> str:
+    """Return the Bash command from the hook payload.
+
+    Claude Code passes the tool call as JSON with the command under
+    ``tool_input.command``. A top-level ``command`` key and non-JSON input
+    (the raw command) are accepted as well.
+    """
+    try:
+        data = json.loads(input_data)
+    except (json.JSONDecodeError, TypeError):
+        return input_data
+    if not isinstance(data, dict):
+        return ""
+    tool_input = data.get("tool_input")
+    if isinstance(tool_input, dict):
+        command = tool_input.get("command", "")
+    else:
+        command = data.get("command", "")
+    return command if isinstance(command, str) else ""
+
+
+def build_hook_output(warnings: list[dict]) -> dict:
+    """Build the PreToolUse output that adds the warnings to the agent's context.
+
+    Plain stdout of a PreToolUse hook only reaches the debug log; the
+    ``additionalContext`` field is what the agent sees. The hook never blocks.
+    """
+    severity_icons = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+    warning_lines = []
+    for w in warnings:
+        icon = severity_icons.get(w["severity"], "⚠️")
+        warning_lines.append(f"  {icon} [{w['severity'].upper()}] {w['message']}")
+
+    message = (
+        "Security warning for command:\n"
+        + "\n".join(warning_lines)
+        + "\n\nReview the command carefully before proceeding.\n"
+        + "The security-audit skill can help assess risks: /security-audit"
+    )
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": message,
+        }
+    }
 
 
 if __name__ == "__main__":
