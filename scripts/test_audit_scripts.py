@@ -172,6 +172,37 @@ class GitHubSecurityAuditTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 1, result.stdout)
 
+    def test_branch_protected_by_rulesets_only_is_reported_as_protected(self) -> None:
+        fixtures = {
+            endpoint: body
+            for endpoint, body in FULLY_CONFIGURED.items()
+            if "/protection" not in endpoint
+        }
+        fixtures["repos/acme/widget/rules/branches/main"] = (
+            '[{"type":"deletion"},{"type":"required_signatures"}]'
+        )
+        result = self.audit(fixtures)
+        self.assertIn(
+            "[OK] Branch protection configured on main (repository rulesets)",
+            result.stdout,
+        )
+        self.assertIn("[OK] Signed commits are required on main", result.stdout)
+        self.assertNotIn("[CRITICAL]", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_empty_ruleset_rules_are_no_protection(self) -> None:
+        fixtures = {
+            endpoint: body
+            for endpoint, body in FULLY_CONFIGURED.items()
+            if "/protection" not in endpoint
+        }
+        fixtures["repos/acme/widget/rules/branches/main"] = "[]"
+        result = self.audit(fixtures)
+        self.assertIn(
+            "[CRITICAL] No branch protection on default branch (main)", result.stdout
+        )
+        self.assertEqual(result.returncode, 1, result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

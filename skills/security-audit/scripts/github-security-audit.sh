@@ -102,10 +102,18 @@ fi
 echo ""
 echo "--- Branch Protection ---"
 DEFAULT_BRANCH=$(gh_api "repos/$REPO" --jq '.default_branch // "main"')
-# gh api returns 404 if no branch protection; check if we got a valid response
-PROTECTION_CHECK=$(gh api "repos/$REPO/branches/$DEFAULT_BRANCH/protection" >/dev/null 2>&1 && echo "exists" || echo "missing")
-if [[ "$PROTECTION_CHECK" == "exists" ]]; then
+# Classic branch protection answers 404 when the branch has none. A branch
+# protected only by repository rulesets also answers 404 there, so ask for the
+# ruleset rules that apply to the branch before reporting it unprotected.
+PROTECTION_CHECK="missing"
+BRANCH_RULES="[]"
+if gh api "repos/$REPO/branches/$DEFAULT_BRANCH/protection" >/dev/null 2>&1; then
+    PROTECTION_CHECK="exists"
     ok "Branch protection configured on $DEFAULT_BRANCH"
+elif BRANCH_RULES=$(gh api "repos/$REPO/rules/branches/$DEFAULT_BRANCH" 2>/dev/null) \
+    && [[ "$(jq 'if type == "array" then length else 0 end' <<<"$BRANCH_RULES" 2>/dev/null)" -gt 0 ]]; then
+    PROTECTION_CHECK="rulesets"
+    ok "Branch protection configured on $DEFAULT_BRANCH (repository rulesets)"
 else
     finding CRITICAL "No branch protection on default branch ($DEFAULT_BRANCH)"
 fi
@@ -225,8 +233,12 @@ fi
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Commit Signing ---"
-if [[ "$PROTECTION_CHECK" == "exists" ]]; then
-    SIGNED_COMMITS=$(gh_api "repos/$REPO/branches/$DEFAULT_BRANCH/protection/required_signatures" --jq '.enabled // false')
+if [[ "$PROTECTION_CHECK" != "missing" ]]; then
+    if [[ "$PROTECTION_CHECK" == "exists" ]]; then
+        SIGNED_COMMITS=$(gh_api "repos/$REPO/branches/$DEFAULT_BRANCH/protection/required_signatures" --jq '.enabled // false')
+    else
+        SIGNED_COMMITS=$(jq 'any(.[]; .type == "required_signatures")' <<<"$BRANCH_RULES")
+    fi
     if [[ "$SIGNED_COMMITS" == "true" ]]; then
         ok "Signed commits are required on $DEFAULT_BRANCH"
     else
