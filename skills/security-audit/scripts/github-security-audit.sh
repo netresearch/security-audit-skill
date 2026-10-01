@@ -106,12 +106,11 @@ DEFAULT_BRANCH=$(gh_api "repos/$REPO" --jq '.default_branch // "main"')
 # protected only by repository rulesets also answers 404 there, so ask for the
 # ruleset rules that apply to the branch before reporting it unprotected.
 PROTECTION_CHECK="missing"
-BRANCH_RULES="[]"
 if gh api "repos/$REPO/branches/$DEFAULT_BRANCH/protection" >/dev/null 2>&1; then
     PROTECTION_CHECK="exists"
     ok "Branch protection configured on $DEFAULT_BRANCH"
-elif BRANCH_RULES=$(gh api "repos/$REPO/rules/branches/$DEFAULT_BRANCH" 2>/dev/null) \
-    && [[ "$(jq 'if type == "array" then length else 0 end' <<<"$BRANCH_RULES" 2>/dev/null)" -gt 0 ]]; then
+elif RULE_COUNT=$(gh api "repos/$REPO/rules/branches/$DEFAULT_BRANCH" --jq 'if type == "array" then length else 0 end' 2>/dev/null) \
+    && [[ "$RULE_COUNT" -gt 0 ]]; then
     PROTECTION_CHECK="rulesets"
     ok "Branch protection configured on $DEFAULT_BRANCH (repository rulesets)"
 else
@@ -237,7 +236,7 @@ if [[ "$PROTECTION_CHECK" != "missing" ]]; then
     if [[ "$PROTECTION_CHECK" == "exists" ]]; then
         SIGNED_COMMITS=$(gh_api "repos/$REPO/branches/$DEFAULT_BRANCH/protection/required_signatures" --jq '.enabled // false')
     else
-        SIGNED_COMMITS=$(jq 'any(.[]; .type == "required_signatures")' <<<"$BRANCH_RULES")
+        SIGNED_COMMITS=$(gh_api "repos/$REPO/rules/branches/$DEFAULT_BRANCH" --jq 'any(.[]; .type == "required_signatures")')
     fi
     if [[ "$SIGNED_COMMITS" == "true" ]]; then
         ok "Signed commits are required on $DEFAULT_BRANCH"
