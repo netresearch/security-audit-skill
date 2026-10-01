@@ -539,6 +539,12 @@ return new Response($invoice->toPdf());
 // Or use scoped queries: $invoiceRepo->findByUserAndId($currentUser, $id)
 ```
 
+**TYPO3 Extbase:** the key need not be a query parameter. A form bound to a
+persisted object carries its uid in a hidden `…[__identity]` field. The
+`__trustedProperties` HMAC covers that field's *name*, not the uid it holds —
+see `modern-attacks.md` → *TYPO3: The HMAC Does Not Sign the `__identity`
+Value (IDOR)*.
+
 **Coverage:**
 - Checkpoints: SA-40 (direct $_GET/$_POST ID in query), SA-LLM-28 (LLM IDOR review)
 - Script: IDOR pattern check in `security-audit.sh`
