@@ -261,11 +261,21 @@ echo ""
 echo "=== Checking Dependencies ==="
 if [[ -f "$PROJECT_DIR/composer.lock" ]]; then
     if command -v composer &> /dev/null; then
-        AUDIT_OUTPUT=$(cd "$PROJECT_DIR" && composer audit 2>&1 || true)
+        # --locked audits composer.lock, which the check above requires, and
+        # needs no vendor/. --no-plugins/--no-scripts: the audited project's
+        # installed plugins and scripts are its code, and composer would
+        # otherwise load them. A run that could not check is an error, not a
+        # clean result.
+        AUDIT_RC=0
+        AUDIT_OUTPUT=$(cd "$PROJECT_DIR" && composer audit --locked --no-plugins --no-scripts --no-interaction 2>&1) || AUDIT_RC=$?
         if echo "$AUDIT_OUTPUT" | grep -q "Found"; then
             echo "⚠️  Vulnerable dependencies found:"
             echo "$AUDIT_OUTPUT" | head -20
             WARNINGS=$((WARNINGS + 1))
+        elif [[ "$AUDIT_RC" -ne 0 ]]; then
+            echo "❌ composer audit could not check the dependencies (exit $AUDIT_RC):"
+            echo "$AUDIT_OUTPUT" | head -20
+            ERRORS=$((ERRORS + 1))
         else
             echo "✅ No known vulnerable dependencies"
         fi

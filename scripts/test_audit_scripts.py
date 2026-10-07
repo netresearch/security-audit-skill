@@ -204,5 +204,177 @@ class GitHubSecurityAuditTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
 
 
+RECORDER = (
+    "#!/bin/sh\n"
+    'printf "%s\\n" "$*" >> "$RECORD_DIR/$(basename "$0").args"\n'
+    'printf -- "---call---\\n" >> "$RECORD_DIR/$(basename "$0").env"\n'
+    'env >> "$RECORD_DIR/$(basename "$0").env"\n'
+    'printf "%s" "${STUB_OUTPUT:-}"\n'
+    'exit "${STUB_EXIT:-0}"\n'
+)
+
+
+def recording_env(tmp: str, *names: str) -> dict:
+    """PATH stubs for `names` that record their arguments and environment."""
+    for name in names:
+        with_stub(tmp, name, RECORDER)
+    env = dict(os.environ)
+    env["PATH"] = f"{Path(tmp, 'bin')}{os.pathsep}{env['PATH']}"
+    env["RECORD_DIR"] = tmp
+    return env
+
+
+def recorded(tmp: str, name: str, kind: str = "args") -> str:
+    path = Path(tmp, f"{name}.{kind}")
+    return path.read_text() if path.exists() else ""
+
+
+class ComposerAuditTest(unittest.TestCase):
+    """composer audit runs without the audited project's plugins and scripts."""
+
+    def audit(self, script: Path, **extra: str) -> str:
+        return self.run_audit(script, **extra)[0]
+
+    def run_audit(
+        self, script: Path, **extra: str
+    ) -> tuple[str, subprocess.CompletedProcess]:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp, "project")
+            project.mkdir()
+            Path(project, "composer.json").write_text("{}\n")
+            Path(project, "composer.lock").write_text("{}\n")
+            env = {**recording_env(tmp, "composer"), **extra}
+            result = run(script, str(project), env=env)
+            return recorded(tmp, "composer"), result
+
+    def test_the_lock_file_is_audited(self) -> None:
+        for script in (SCRIPTS / "scanners" / "php.sh", SCRIPTS / "security-audit.sh"):
+            with self.subTest(script=script.name):
+                self.assertIn("--locked", self.audit(script))
+
+    def test_a_run_that_could_not_check_is_an_error(self) -> None:
+        for script in (SCRIPTS / "scanners" / "php.sh", SCRIPTS / "security-audit.sh"):
+            with self.subTest(script=script.name):
+                _args, result = self.run_audit(
+                    script, STUB_EXIT="1", STUB_OUTPUT="Could not read composer.lock"
+                )
+                self.assertIn(
+                    "composer audit could not check the dependencies", result.stdout
+                )
+                self.assertNotIn("No known vulnerable dependencies", result.stdout)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+
+    def test_a_finding_is_a_warning(self) -> None:
+        _args, result = self.run_audit(
+            SCRIPTS / "scanners" / "php.sh",
+            STUB_EXIT="1",
+            STUB_OUTPUT="Found 6 security vulnerability advisories affecting 1 package:",
+        )
+        self.assertIn("Vulnerable dependencies found:", result.stdout)
+
+    def test_php_scanner(self) -> None:
+        args = self.audit(SCRIPTS / "scanners" / "php.sh")
+        self.assertIn("audit", args)
+        self.assertIn("--no-plugins", args)
+        self.assertIn("--no-scripts", args)
+
+    def test_security_audit_script(self) -> None:
+        args = self.audit(SCRIPTS / "security-audit.sh")
+        self.assertIn("audit", args)
+        self.assertIn("--no-plugins", args)
+        self.assertIn("--no-scripts", args)
+
+
+class TruffleHogVerificationTest(unittest.TestCase):
+    """Candidate secrets are verified with their services only on request."""
+
+    def scan(self, **extra: str) -> tuple[str, str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp, "project")
+            Path(project, ".git").mkdir(parents=True)
+            env = {**recording_env(tmp, "trufflehog"), **extra}
+            env["GIT_DIR"] = "/elsewhere/.git"
+            run(SCRIPTS / "scanners" / "secrets.sh", str(project), env=env)
+            return recorded(tmp, "trufflehog"), recorded(tmp, "trufflehog", "env")
+
+    def test_verification_is_off_by_default(self) -> None:
+        args, _env = self.scan()
+        calls = args.splitlines()
+        self.assertEqual(len(calls), 2, args)
+        for call in calls:
+            self.assertIn("--no-verification", call)
+
+    def test_verification_can_be_requested(self) -> None:
+        args, _env = self.scan(SECURITY_AUDIT_VERIFY_SECRETS="1")
+        self.assertEqual(len(args.splitlines()), 2, args)
+        self.assertNotIn("--no-verification", args)
+
+    def test_history_scan_limits_git(self) -> None:
+        _args, env = self.scan()
+        calls = env.split("---call---\n")[1:]
+        self.assertEqual(len(calls), 2)
+        history = calls[1].splitlines()
+        self.assertIn("GIT_ALLOW_PROTOCOL=file", history)
+        self.assertIn("GIT_NO_LAZY_FETCH=1", history)
+        self.assertFalse([line for line in history if line.startswith("GIT_DIR=")])
+
+
+class GoVulncheckTest(unittest.TestCase):
+    """govulncheck runs with the local toolchain, no VCS stamping, no go.mod edits."""
+
+    def scan(self, **extra: str) -> subprocess.CompletedProcess:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp, "project")
+            project.mkdir()
+            Path(project, "go.mod").write_text("module example.com/p\n\ngo 1.22\n")
+            Path(project, "go.sum").write_text("")
+            Path(project, "main.go").write_text("package main\n\nfunc main() {}\n")
+            env = {**recording_env(tmp, "govulncheck"), **extra}
+            return run(SCRIPTS / "scanners" / "go.sh", str(project), env=env)
+
+    def test_a_run_that_could_not_check_is_an_error(self) -> None:
+        result = self.scan(
+            STUB_EXIT="1",
+            STUB_OUTPUT="go: go.mod requires go >= 1.99 (GOTOOLCHAIN=local)",
+        )
+        self.assertIn(
+            "ERROR: govulncheck could not check the dependencies", result.stdout
+        )
+        self.assertNotIn("OK: No known vulnerable dependencies", result.stdout)
+        self.assertEqual(result.returncode, 1, result.stdout)
+
+    def test_a_finding_is_a_warning(self) -> None:
+        result = self.scan(STUB_EXIT="3", STUB_OUTPUT="Vulnerability #1: GO-2026-0001")
+        self.assertIn("WARNING: Vulnerable dependencies found:", result.stdout)
+
+    def test_a_clean_run_is_ok(self) -> None:
+        result = self.scan()
+        self.assertIn("OK: No known vulnerable dependencies", result.stdout)
+
+    def check(self, vendored: bool) -> list[str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp, "project")
+            project.mkdir()
+            Path(project, "go.mod").write_text("module example.com/p\n\ngo 1.22\n")
+            Path(project, "go.sum").write_text("")
+            Path(project, "main.go").write_text("package main\n\nfunc main() {}\n")
+            if vendored:
+                Path(project, "vendor").mkdir()
+                Path(project, "vendor", "modules.txt").write_text("")
+            env = recording_env(tmp, "govulncheck")
+            env["GOFLAGS"] = "-mod=mod"
+            env["GOTOOLCHAIN"] = "auto"
+            run(SCRIPTS / "scanners" / "go.sh", str(project), env=env)
+            return recorded(tmp, "govulncheck", "env").splitlines()
+
+    def test_toolchain_and_flags(self) -> None:
+        env = self.check(vendored=False)
+        self.assertIn("GOTOOLCHAIN=local", env)
+        self.assertIn("GOFLAGS=-mod=readonly -buildvcs=false", env)
+
+    def test_vendored_module(self) -> None:
+        self.assertIn("GOFLAGS=-mod=vendor -buildvcs=false", self.check(vendored=True))
+
+
 if __name__ == "__main__":
     unittest.main()

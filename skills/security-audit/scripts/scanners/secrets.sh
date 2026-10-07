@@ -29,9 +29,20 @@ echo "Scanning: $PROJECT_DIR"
 echo ""
 
 # === TruffleHog (if available) ===
+# TruffleHog verifies a candidate secret by sending it to the service it
+# belongs to, or to the URL it contains. That is off unless
+# SECURITY_AUDIT_VERIFY_SECRETS=1 is set: the candidates come from the
+# audited project and stay on this machine by default.
+TRUFFLEHOG_FLAGS=(--no-update --json)
+if [[ "${SECURITY_AUDIT_VERIFY_SECRETS:-0}" != "1" ]]; then
+    TRUFFLEHOG_FLAGS+=(--no-verification)
+fi
 if command -v trufflehog &>/dev/null; then
     echo "=== TruffleHog Filesystem Scan ==="
-    TRUFFLEHOG_OUTPUT=$(trufflehog filesystem "$PROJECT_DIR" --no-update --json 2>/dev/null || true)
+    if [[ "${SECURITY_AUDIT_VERIFY_SECRETS:-0}" == "1" ]]; then
+        echo "INFO: SECURITY_AUDIT_VERIFY_SECRETS=1 — candidate secrets are sent to their services for verification"
+    fi
+    TRUFFLEHOG_OUTPUT=$(trufflehog filesystem "$PROJECT_DIR" "${TRUFFLEHOG_FLAGS[@]}" 2>/dev/null || true)
     TRUFFLEHOG_COUNT=$(echo "$TRUFFLEHOG_OUTPUT" | grep -c '"SourceMetadata"' 2>/dev/null || true)
 
     if [[ "$TRUFFLEHOG_COUNT" -gt 0 ]]; then
@@ -46,7 +57,11 @@ if command -v trufflehog &>/dev/null; then
     if [[ -d "$PROJECT_DIR/.git" ]]; then
         echo ""
         echo "=== TruffleHog Git History Scan ==="
-        GIT_OUTPUT=$(trufflehog git "file://$PROJECT_DIR" --no-update --json 2>/dev/null || true)
+        # TruffleHog clones the repository with git: only the file protocol,
+        # no lazy fetch from a promisor remote, no inherited repository location.
+        GIT_OUTPUT=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
+            GIT_ALLOW_PROTOCOL=file GIT_NO_LAZY_FETCH=1 GIT_CONFIG_NOSYSTEM=1 \
+            trufflehog git "file://$PROJECT_DIR" "${TRUFFLEHOG_FLAGS[@]}" 2>/dev/null || true)
         GIT_COUNT=$(echo "$GIT_OUTPUT" | grep -c '"SourceMetadata"' 2>/dev/null || true)
 
         if [[ "$GIT_COUNT" -gt 0 ]]; then
