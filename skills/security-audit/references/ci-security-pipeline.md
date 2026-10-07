@@ -132,11 +132,12 @@ for dev versions of packages that should be stable:
 composer show --locked | grep -- '-dev'
 ```
 
-**A global plugin in the CI image runs on every project.** It can block or
-change audit results regardless of the project's own config. Seen:
-`netresearch/composer-audit-responsibility` up to 0.4.0 ignored the project's
-advisory ignores and failed `composer install`; 0.4.1 fixes it. Check inside
-the CI image:
+**A global plugin in the CI image is loaded for every project.** What it does
+depends on the plugin, not on the project's own config. Seen:
+`netresearch/composer-audit-responsibility` activates for framework package
+types (`typo3-cms-extension`, bundles, modules, plugins), not for
+`type: project`. Up to 0.4.0 it ignored the project's advisory ignores and
+failed `composer install`; 0.4.1 fixes it. Check inside the CI image:
 
 ```bash
 composer global show
