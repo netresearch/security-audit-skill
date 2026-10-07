@@ -260,7 +260,9 @@ echo ""
 echo "=== Checking Dependencies ==="
 if [[ -f "$PROJECT_DIR/composer.lock" ]]; then
     if command -v composer &> /dev/null; then
-        AUDIT_OUTPUT=$(cd "$PROJECT_DIR" && composer audit 2>&1 || true)
+        # --no-plugins/--no-scripts: the audited project's installed plugins and
+        # scripts are its code, and composer would otherwise load them.
+        AUDIT_OUTPUT=$(cd "$PROJECT_DIR" && composer audit --no-plugins --no-scripts --no-interaction 2>&1 || true)
         if echo "$AUDIT_OUTPUT" | grep -q "Found"; then
             echo "⚠️  Vulnerable dependencies found:"
             echo "$AUDIT_OUTPUT" | head -20

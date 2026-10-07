@@ -195,7 +195,13 @@ echo ""
 echo "=== Checking Dependencies ==="
 if [[ -f "$PROJECT_DIR/go.sum" ]]; then
     if command -v govulncheck &> /dev/null; then
-        VULN_OUTPUT=$(cd "$PROJECT_DIR" && govulncheck ./... 2>&1 || true)
+        # GOTOOLCHAIN=local: the project's go.mod cannot make go download and
+        # run another toolchain. -buildvcs=false: go does not run git in the
+        # project, whose .git/config can name commands. -mod: go.mod and
+        # go.sum are not rewritten.
+        GO_MOD_FLAG="-mod=readonly"
+        [[ -f "$PROJECT_DIR/vendor/modules.txt" ]] && GO_MOD_FLAG="-mod=vendor"
+        VULN_OUTPUT=$(cd "$PROJECT_DIR" && GOTOOLCHAIN=local GOFLAGS="$GO_MOD_FLAG -buildvcs=false" govulncheck ./... 2>&1 || true)
         if echo "$VULN_OUTPUT" | grep -q "Vulnerability"; then
             echo "WARNING: Vulnerable dependencies found:"
             echo "$VULN_OUTPUT" | head -20
