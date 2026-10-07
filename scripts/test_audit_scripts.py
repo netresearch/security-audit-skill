@@ -209,6 +209,8 @@ RECORDER = (
     'printf "%s\\n" "$*" >> "$RECORD_DIR/$(basename "$0").args"\n'
     'printf -- "---call---\\n" >> "$RECORD_DIR/$(basename "$0").env"\n'
     'env >> "$RECORD_DIR/$(basename "$0").env"\n'
+    'printf "%s" "${STUB_OUTPUT:-}"\n'
+    'exit "${STUB_EXIT:-0}"\n'
 )
 
 
@@ -289,6 +291,35 @@ class TruffleHogVerificationTest(unittest.TestCase):
 
 class GoVulncheckTest(unittest.TestCase):
     """govulncheck runs with the local toolchain, no VCS stamping, no go.mod edits."""
+
+    def scan(self, **extra: str) -> subprocess.CompletedProcess:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp, "project")
+            project.mkdir()
+            Path(project, "go.mod").write_text("module example.com/p\n\ngo 1.22\n")
+            Path(project, "go.sum").write_text("")
+            Path(project, "main.go").write_text("package main\n\nfunc main() {}\n")
+            env = {**recording_env(tmp, "govulncheck"), **extra}
+            return run(SCRIPTS / "scanners" / "go.sh", str(project), env=env)
+
+    def test_a_run_that_could_not_check_is_an_error(self) -> None:
+        result = self.scan(
+            STUB_EXIT="1",
+            STUB_OUTPUT="go: go.mod requires go >= 1.99 (GOTOOLCHAIN=local)",
+        )
+        self.assertIn(
+            "ERROR: govulncheck could not check the dependencies", result.stdout
+        )
+        self.assertNotIn("OK: No known vulnerable dependencies", result.stdout)
+        self.assertEqual(result.returncode, 1, result.stdout)
+
+    def test_a_finding_is_a_warning(self) -> None:
+        result = self.scan(STUB_EXIT="3", STUB_OUTPUT="Vulnerability #1: GO-2026-0001")
+        self.assertIn("WARNING: Vulnerable dependencies found:", result.stdout)
+
+    def test_a_clean_run_is_ok(self) -> None:
+        result = self.scan()
+        self.assertIn("OK: No known vulnerable dependencies", result.stdout)
 
     def check(self, vendored: bool) -> list[str]:
         with tempfile.TemporaryDirectory() as tmp:

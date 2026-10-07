@@ -201,11 +201,19 @@ if [[ -f "$PROJECT_DIR/go.sum" ]]; then
         # go.sum are not rewritten.
         GO_MOD_FLAG="-mod=readonly"
         [[ -f "$PROJECT_DIR/vendor/modules.txt" ]] && GO_MOD_FLAG="-mod=vendor"
-        VULN_OUTPUT=$(cd "$PROJECT_DIR" && GOTOOLCHAIN=local GOFLAGS="$GO_MOD_FLAG -buildvcs=false" govulncheck ./... 2>&1 || true)
-        if echo "$VULN_OUTPUT" | grep -q "Vulnerability"; then
+        # govulncheck exits 0 when it finds nothing, 3 when it finds a
+        # vulnerability, and anything else when it could not check, for
+        # example because go.mod needs a newer Go than the local toolchain.
+        VULN_RC=0
+        VULN_OUTPUT=$(cd "$PROJECT_DIR" && GOTOOLCHAIN=local GOFLAGS="$GO_MOD_FLAG -buildvcs=false" govulncheck ./... 2>&1) || VULN_RC=$?
+        if [[ "$VULN_RC" -eq 3 ]]; then
             echo "WARNING: Vulnerable dependencies found:"
             echo "$VULN_OUTPUT" | head -20
             WARNINGS=$((WARNINGS + 1))
+        elif [[ "$VULN_RC" -ne 0 ]]; then
+            echo "ERROR: govulncheck could not check the dependencies (exit $VULN_RC):"
+            echo "$VULN_OUTPUT" | head -20
+            ERRORS=$((ERRORS + 1))
         else
             echo "OK: No known vulnerable dependencies"
         fi
