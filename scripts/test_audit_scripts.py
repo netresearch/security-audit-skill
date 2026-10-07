@@ -232,15 +232,45 @@ def recorded(tmp: str, name: str, kind: str = "args") -> str:
 class ComposerAuditTest(unittest.TestCase):
     """composer audit runs without the audited project's plugins and scripts."""
 
-    def audit(self, script: Path) -> str:
+    def audit(self, script: Path, **extra: str) -> str:
+        return self.run_audit(script, **extra)[0]
+
+    def run_audit(
+        self, script: Path, **extra: str
+    ) -> tuple[str, subprocess.CompletedProcess]:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp, "project")
             project.mkdir()
             Path(project, "composer.json").write_text("{}\n")
             Path(project, "composer.lock").write_text("{}\n")
-            env = recording_env(tmp, "composer")
-            run(script, str(project), env=env)
-            return recorded(tmp, "composer")
+            env = {**recording_env(tmp, "composer"), **extra}
+            result = run(script, str(project), env=env)
+            return recorded(tmp, "composer"), result
+
+    def test_the_lock_file_is_audited(self) -> None:
+        for script in (SCRIPTS / "scanners" / "php.sh", SCRIPTS / "security-audit.sh"):
+            with self.subTest(script=script.name):
+                self.assertIn("--locked", self.audit(script))
+
+    def test_a_run_that_could_not_check_is_an_error(self) -> None:
+        for script in (SCRIPTS / "scanners" / "php.sh", SCRIPTS / "security-audit.sh"):
+            with self.subTest(script=script.name):
+                _args, result = self.run_audit(
+                    script, STUB_EXIT="1", STUB_OUTPUT="Could not read composer.lock"
+                )
+                self.assertIn(
+                    "composer audit could not check the dependencies", result.stdout
+                )
+                self.assertNotIn("No known vulnerable dependencies", result.stdout)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+
+    def test_a_finding_is_a_warning(self) -> None:
+        _args, result = self.run_audit(
+            SCRIPTS / "scanners" / "php.sh",
+            STUB_EXIT="1",
+            STUB_OUTPUT="Found 6 security vulnerability advisories affecting 1 package:",
+        )
+        self.assertIn("Vulnerable dependencies found:", result.stdout)
 
     def test_php_scanner(self) -> None:
         args = self.audit(SCRIPTS / "scanners" / "php.sh")
