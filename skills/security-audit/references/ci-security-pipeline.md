@@ -101,6 +101,49 @@ update` time, not looked up live at audit time. Two consequences:
   against the **new** lock before pushing, or CI trades one red audit for
   another.
 
+#### Composer: accepting an advisory on purpose
+
+Three things decide whether an accepted advisory actually stays accepted.
+
+**Where the ignore goes.** `config.policy` exists since Composer 2.10.0
+(`src/Composer/Policy/` is absent in 2.10.0-RC1 and 2.9.8, present from
+2.10.0-RC2). Composer 2.10 reads `config.audit.ignore` only when
+`config.policy.advisories` is absent; once `policy.advisories` is set, an
+`audit.ignore` entry is silently dropped. Put per-advisory ignores into
+`policy.advisories.ignore-id` and package-wide ones into
+`policy.advisories.ignore` (`AdvisoriesPolicyConfig::fromRawConfig()`, lines
+171-198 at tag 2.10.3):
+
+```bash
+composer config policy.advisories   # set? then audit.ignore is not read
+composer audit --locked             # the ignored ID must not be reported
+```
+
+**A blocked stable release can turn into a dev branch.** When block-insecure
+filtering removes every stable version of a package and the root sets
+`minimum-stability: dev`, the solver falls back to a dev branch without an
+error. Seen in a TYPO3 12 project: after
+[TYPO3-CORE-SA-2026-022](https://typo3.org/security/advisory/typo3-core-sa-2026-022)
+(affects 12.0.0-12.4.48) blocked all stable 12.4 releases, `typo3/cms-backend`
+was locked as `12.4.x-dev`. Check the lock
+for dev versions of packages that should be stable:
+
+```bash
+composer show --locked | grep -- '-dev'
+```
+
+**A global plugin in the CI image is loaded for every project.** What it does
+depends on the plugin, not on the project's own config. Seen:
+`netresearch/composer-audit-responsibility` activates for framework package
+types (`typo3-cms-extension`, bundles, modules, plugins), not for
+`type: project`. Up to 0.4.0 it ignored the project's advisory ignores and
+failed `composer install`; 0.4.1 fixes it. Check inside the CI image:
+
+```bash
+composer global show
+composer -vvv about | grep -i plugin
+```
+
 ### Trivy (Multi-Purpose Scanner)
 
 Trivy scans dependencies, containers, IaC files, and checks licenses. It is a strong starting point because a single tool covers multiple categories.
