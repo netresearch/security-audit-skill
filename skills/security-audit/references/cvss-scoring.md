@@ -183,6 +183,28 @@ Base Score: 6.5 (MEDIUM)
 
 ## Scoring Calculator
 
+**Prefer the official `cvss` library over any hand-rolled calculator — mandatory for v4.0.** CVSS v4.0 is scored by a MacroVector lookup table, not a closed formula, so it cannot be computed by hand reliably. Use the maintained `cvss` Python library through `uvx` (no install step):
+
+```bash
+uvx --from cvss python -c "
+from cvss import CVSS3, CVSS4
+print(CVSS3('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H').scores())
+c = CVSS4('CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N')
+print(c.base_score, c.severity)
+"
+```
+
+`CVSS3(...).scores()` returns `(base, temporal, environmental)`; `CVSS4` exposes `.base_score` and `.severity`. Feed candidate vectors through it to check how the score moves when a metric is uncertain. For a file-write-to-RCE (`AV:N/PR:N/UI:N/VC:H/VI:H/VA:H`, subsequent metrics `N`), the v4.0 base stays Critical across the plausible exploitability combinations — run them and read the numbers rather than assuming a band (cvss 3.6, 2026-10-08):
+
+| vector | base | severity |
+| --- | --- | --- |
+| `AC:L/AT:N` | 9.3 | Critical |
+| `AC:L/AT:P` | 9.2 | Critical |
+| `AC:H/AT:N` | 9.2 | Critical |
+| `AC:H/AT:P` | 9.2 | Critical |
+
+The PHP class below reproduces the v3.1 base formula for embedding in an application; it is not a substitute for the library when you only need a score, and it does not implement v4.0.
+
 ```php
 final class CvssCalculator
 {
