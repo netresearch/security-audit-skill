@@ -8,10 +8,15 @@ name: Lint
 # contents: read` at top level; the calling job mirrors it explicitly so the
 # grant is visible at the call site and independent of the repo default.
 
+# `merge_group`: `Skill Validation / Skill Validation` is a required context,
+# and a merge queue waits for every required context on its
+# gh-readonly-queue ref. Without the trigger the check never reports there and
+# the queue ejects the entry when its timeout expires.
 on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
 
 permissions: {}
 
