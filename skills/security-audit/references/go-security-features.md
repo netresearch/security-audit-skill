@@ -224,19 +224,20 @@ func processFileValidated(filename string) ([]byte, error) {
 
 A client that sends a PowerShell script to a remote host, for example over WinRM, has no argument vector to fall back on: every value is part of the script text, so the quoting is the whole defence. Three rules decide whether a value arrives unchanged.
 
-- **A double-quoted PowerShell string ends at four characters, not one.** PowerShell treats the typographic quotes `“` (U+201C), `”` (U+201D) and `„` (U+201E) as string delimiters, like `"`. Escape each of them with a backtick, together with the backtick itself and `$`, which otherwise expands `$x` and `$(...)`. Single-quoted strings have the same issue with `‘ ’ ‚ ‛` (U+2018 to U+201B) and escape by doubling.
+- **A double-quoted PowerShell string has four delimiters.** PowerShell treats `"`, `“` (U+201C), `”` (U+201D) and `„` (U+201E) alike as double quotes, and the first unescaped one ends the string. Escape each of them with a backtick, together with the backtick itself and `$`, which otherwise expands `$x` and `$(...)`. Single-quoted strings have the same issue with `‘ ’ ‚ ‛` (U+2018 to U+201B) and escape by doubling.
 - **Go's `%q` is not PowerShell quoting.** `fmt.Sprintf("%q", v)` escapes by Go rules: it turns `\` into `\\` and `"` into `\"`. PowerShell does not use backslash escapes, so a backslash arrives doubled and `\"` ends the string. A DN such as `OU=Doe\, Jane,DC=example,DC=com` then names no object, and a password with `\` is set to a different value.
 - **Escape each value exactly once, at one boundary.** A value escaped by a sanitiser and then formatted with `%q` is escaped twice; a value that skips the sanitiser is not escaped at all. Give the two inputs different helpers, so the call site shows which one it holds.
 
 ```go
-// VULNERABLE: Go quoting inside a PowerShell script — "\" doubles, `$` expands
+// VULNERABLE: Go quoting inside a PowerShell script — a backslash doubles, `$` expands
 cmd := fmt.Sprintf("Rename-ADObject -Identity %q -NewName %q", guid, newName)
 
 // SECURE: one PowerShell escape, one quoting step
 var psEscaper = strings.NewReplacer(
     "`", "``", `"`, "`\"", "$", "`$",
     "\u201c", "`\u201c", "\u201d", "`\u201d", "\u201e", "`\u201e",
-    "\x00", "`0", "\n", "`n", "\r", "`r", "\t", "`t",
+    "\x00", "`0", "\a", "`a", "\b", "`b", "\f", "`f",
+    "\n", "`n", "\r", "`r", "\t", "`t", "\v", "`v",
 )
 
 // psQuote takes a raw value; psQuoteEscaped takes one psEscaper already saw.
@@ -245,6 +246,8 @@ func psQuoteEscaped(escaped string) string { return `"` + escaped + `"` }
 
 cmd := fmt.Sprintf("Rename-ADObject -Identity %s -NewName %s", psQuote(guid), psQuote(newName))
 ```
+
+**Send the script encoded, not as raw XML text.** WinRM carries the command inside a SOAP request, and XML 1.0 admits no C0 control other than tab, line feed and carriage return. `winrm.Powershell` from `github.com/masterzen/winrm` sends it as `-EncodedCommand`, Base64 of UTF-16LE, so the XML never holds a control character. A client that puts the script into the SOAP body as text has to escape every control character, as above, or reject the value.
 
 **Verify by running the rendered command, not by reading it.** Put the escaped value into the real cmdlet line, run it through a local `pwsh`, and compare what the cmdlet received with the input — `Write-Output` in place of the AD cmdlet is enough. Reading the Go source shows what was intended; only PowerShell shows which characters end the string.
 
