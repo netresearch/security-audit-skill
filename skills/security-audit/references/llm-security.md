@@ -583,7 +583,7 @@ You are a cleanup assistant.
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/check_risky_command.py",
+            "command": "uv run --offline \"${CLAUDE_PLUGIN_ROOT}/scripts/check_risky_command.py\" || true",
             "timeout": 2
           }
         ]
@@ -593,8 +593,9 @@ You are a cleanup assistant.
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate_executable_writes.py",
-            "timeout": 2
+            "command": "uv run \"${CLAUDE_PLUGIN_ROOT}/scripts/gate_executable_writes.py\"",
+            "timeout": 2,
+            "onFailure": "block"
           }
         ]
       }
@@ -605,8 +606,8 @@ You are a cleanup assistant.
 
 Hook scripts read the tool input from stdin, decide what to do, and signal the result via exit code. Two conventions are common:
 
-- **Warn-only** — print a `<system-reminder>` to stdout and `sys.exit(0)`. Claude sees the message but the tool call still runs. This is what ships in `scripts/check_risky_command.py` (`data.get("command")` shape).
-- **Blocking** — `sys.exit(2)` to block the tool call outright. Claude Code treats exit 2 as a hard block; the message on stderr surfaces to the user.
+- **Warn-only** — print a JSON object with `hookSpecificOutput.additionalContext` to stdout and `sys.exit(0)`. Claude sees the message but the tool call still runs; plain stdout text of a PreToolUse hook reaches only the debug log. This is what ships in `scripts/check_risky_command.py`, which reads the command from `data["tool_input"]["command"]`.
+- **Blocking** — `sys.exit(2)` to block the tool call outright. Claude Code treats exit 2 as a hard block; the message on stderr surfaces to the user. Give a blocking gate `"onFailure": "block"` (Claude Code v2.1.295 or later): without it, a gate that crashes, times out or cannot be started lets the call through.
 
 A minimal **blocking** gate — distinct from the shipped warn-only script — looks like this:
 
