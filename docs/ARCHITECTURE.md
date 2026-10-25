@@ -33,7 +33,7 @@ The security-audit-skill is an AI agent skill that provides security audit capab
 
 ### Hook (`hooks/hooks.json`, `scripts/check_risky_command.py`)
 
-- **hooks.json**: registers a PreToolUse hook for the `Bash` tool that runs `uv run ${CLAUDE_PLUGIN_ROOT}/scripts/check_risky_command.py || true` with a two-second timeout. `|| true` keeps a failure to start the script, such as uv exiting 2 when it finds no Python 3.11 or later, from counting as a blocking exit 2.
+- **hooks.json**: registers a PreToolUse hook for the `Bash` tool that runs `uv run "${CLAUDE_PLUGIN_ROOT}/scripts/check_risky_command.py" || true` with a two-second timeout. `|| true` keeps a failure to start the script, such as uv exiting 2 when it finds no Python 3.11 or later, from counting as a blocking exit 2.
 - **check_risky_command.py**: reads the tool call from stdin, matches `tool_input.command` against a list of regular expressions (destructive deletes, `curl | sh`, credentials in commands, force pushes, raw block device writes, …) and, on a match, prints a warning as `hookSpecificOutput.additionalContext`. It never blocks the command.
 
 ### Repository tooling
