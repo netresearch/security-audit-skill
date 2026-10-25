@@ -605,7 +605,7 @@ You are a cleanup assistant.
 
 Hook scripts read the tool input from stdin, decide what to do, and signal the result via exit code. Two conventions are common:
 
-- **Warn-only** — print a `<system-reminder>` to stdout and `sys.exit(0)`. Claude sees the message but the tool call still runs. This is what ships in `scripts/check_risky_command.py` (`data.get("command")` shape).
+- **Warn-only** — print a JSON object with `hookSpecificOutput.additionalContext` to stdout and `sys.exit(0)`. Claude sees the message but the tool call still runs; plain stdout text of a PreToolUse hook reaches only the debug log. This is what ships in `scripts/check_risky_command.py`, which reads the command from `data["tool_input"]["command"]`.
 - **Blocking** — `sys.exit(2)` to block the tool call outright. Claude Code treats exit 2 as a hard block; the message on stderr surfaces to the user.
 
 A minimal **blocking** gate — distinct from the shipped warn-only script — looks like this:
