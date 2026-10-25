@@ -4,7 +4,7 @@
 name: security-audit
 description: "Use when conducting security assessments — OWASP Top 10 / API / LLM, CWE Top 25, CVSS scoring — auditing PHP/TYPO3, APIs, frontend, Terraform/K8s/Docker IaC, AWS cloud, AI agent configs, or scanning dependencies."
 license: "(MIT AND CC-BY-SA-4.0). See LICENSE-MIT and LICENSE-CC-BY-SA-4.0"
-compatibility: "Requires grep, jq, gh CLI."
+compatibility: "Requires uv (runs the hook on Python 3.11 or later), grep, jq, gh CLI."
 metadata:
   author: Netresearch DTT GmbH
   version: "2.11.9"
