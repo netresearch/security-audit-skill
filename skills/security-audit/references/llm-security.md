@@ -583,7 +583,7 @@ You are a cleanup assistant.
         "hooks": [
           {
             "type": "command",
-            "command": "uv run \"${CLAUDE_PLUGIN_ROOT}/scripts/check_risky_command.py\" || true",
+            "command": "uv run --offline \"${CLAUDE_PLUGIN_ROOT}/scripts/check_risky_command.py\" || true",
             "timeout": 2
           }
         ]
