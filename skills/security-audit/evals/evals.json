@@ -363,6 +363,20 @@
         "Treats the webhook as an external effect that does not join the database transaction and distinguishes post-commit publication from guaranteed eventual delivery.",
         "Does not treat mocked transaction calls as database or process-loss evidence and does not claim a refinement, source-equivalence or whole-application proof from the bounded model."
       ]
+    },
+    {
+      "id": 29,
+      "eval_name": "bun-transitive-advisory-fix",
+      "prompt": "With bun 1.3.5, bun audit fails on undici 8.11.2, which our frontend only gets through jsdom (jsdom declares undici ^8.11.2). The advisory is fixed in 8.12.2. I ran `bun update undici`: the install printed 8.12.3, package.json now lists undici under dependencies, and bun.lock shows both undici@8.12.3 and jsdom/undici@8.11.2. Is the vulnerability fixed, and is this the right way to fix it?",
+      "expected_output": "Says the fix is incomplete: jsdom's nested copy is still 8.11.2 and undici became a direct dependency. Recommends updating jsdom or a top-level override, checking the other consumers first, then bun install, the tests and bun audit.",
+      "files": [],
+      "expectations": [
+        "States that jsdom's nested undici is still 8.11.2, so the advisory is not fixed until bun audit passes.",
+        "States that the command made undici a direct dependency, and recommends removing that entry.",
+        "Recommends updating the parent (jsdom) or adding a top-level `overrides` entry such as `\"undici\": \"^8.12.2\"`.",
+        "Before an override, lists every consumer of undici (for example with `bun why undici`) and checks that each accepts the forced range.",
+        "Checks the parent's declared range floor against the first patched version, rather than trusting the version the lock happens to hold."
+      ]
     }
   ]
 }

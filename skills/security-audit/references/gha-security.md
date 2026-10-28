@@ -87,6 +87,29 @@ When upstream hasn't patched, use package manager overrides:
 }
 ```
 
+**bun:** what `bun update <transitive>` does depends on the bun version. Measured
+on one lock where undici came only through jsdom (`^8.11.2`):
+
+```text
+bun 1.3.5  bun update undici → package.json gains "undici": "^8.12.3"
+                                bun.lock keeps "jsdom/undici": ["undici@8.11.2"]
+                                bun audit: 4 high
+bun 1.4.3  bun update undici → package.json unchanged, undici@8.12.3, audit clean
+either     bun update jsdom  → undici@8.12.3, audit clean
+```
+
+So check `bun --version` (and the version CI runs) before updating a transitive
+package by name, and read `package.json` and `bun audit` afterwards. Updating the
+parent works on both.
+
+The lock is not the floor. jsdom 30.1.3 declares `undici ^8.12.1`, the fix is
+8.12.2, so the range still admits a vulnerable version. bun reads the top-level
+`overrides` key, and `"undici": "^8.12.2"` puts the floor into `package.json`.
+An override replaces **every** copy of the package, so list its consumers first
+with `bun why undici` and make sure each one accepts the forced range; a parent
+that requires an older major can break under it. Run `bun install`, the tests and
+`bun audit` after any of these changes.
+
 ```yaml
 # Go — replace directive in go.mod
 replace (
