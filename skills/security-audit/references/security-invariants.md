@@ -3,11 +3,11 @@
 
 # Security Invariants as Runtime Assertions
 
-Encode security guarantees as runtime checks in the code path, not only in tests. A test proves the guarantee held during the test run; an **always-on** inline check proves it holds in production and fails loudly when it doesn't. For security invariants specifically, prefer mechanisms that cannot be stripped at deploy time (a thrown `InvariantViolation`, not a strippable `assert()` / `assert` statement) — see the language-idioms table below.
+Encode locally checkable security guarantees as runtime checks in the code path, alongside tests. A test gives evidence for its executed cases; an **always-on** inline check detects a violation only when execution reaches it and its predicate captures the intended rule. Neither proves the guarantee for all production executions. For security checks, prefer mechanisms that cannot be stripped at deploy time (a thrown `InvariantViolation`, not a strippable `assert()` / `assert` statement) — see the language-idioms table below.
 
 ## Why
 
-A security test answers "did this case work?". A security invariant answers "is this guarantee still true right now?". The two are complementary: tests give coverage on known inputs; inline invariants catch the unknown ones (the bypass you didn't anticipate, the refactor that quietly broke the boundary, the AI-generated code path that "looks right").
+A security test answers "did this case work?". A runtime invariant checks a precise rule at a particular point. The two are complementary: inline checks may catch additional violations on paths that reach them, while tests examine selected behavior and failure cases.
 
 Three properties make a security invariant pay off:
 
@@ -27,7 +27,7 @@ If any one is missing, you want input validation, authorization middleware, or a
 | Capability checks | "this code path is unreachable for anonymous sessions" | Inside the branch |
 | Redaction | "this response body contains no PII when the requester is unauthenticated" | Just before the response is serialized |
 | Crypto state | "this key is only ever used with the cipher mode it was generated for" | At the use site, not at construction |
-| Audit logging | "every mutation reaches the audit sink" | Postcondition on the service method |
+| Audit durability | "every committed mutation has a matching durable audit entry" | Persistence boundary; a service postcondition alone cannot establish this |
 
 ## Where NOT to Use
 
@@ -149,6 +149,17 @@ def serialize_for(viewer: Viewer, doc: Document) -> dict:
 ```
 
 ## Implementation Notes
+
+### Persistence and process loss
+
+A postcondition after a mutation and audit call is skipped if the process dies
+between them. Throwing from that check, or compensating in `catch`, does not
+undo an earlier committed write. Separate detection from prevention: examine
+the actual transaction boundary, every participating connection and the
+failure behavior before claiming mutation/audit atomicity. A file or remote
+sink does not join a database transaction merely because the call is nearby.
+For a specific guarantee affected by crashes or competing writers, use the
+bounded design workflow in [Formal Model Checking](formal-model-checking.md).
 
 ### Failing closed
 

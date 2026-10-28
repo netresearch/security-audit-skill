@@ -603,6 +603,16 @@ $logger->warning('Authentication failure for {username}', [
 
 ### Audit Trail Requirements
 
+Entry fields and successful logger calls do not establish durable coverage of
+every mutation. Check whether the mutation, its audit row and any required
+relations or anchor commit together on the same actual connection. A later
+postcondition or `catch` cannot run after abrupt process loss. Synchronous event
+listeners may write through the same transactional connection; their external
+side effects and remote sinks do not share that commit. Post-commit publication
+alone does not promise reliable eventual delivery. When ordering affects the
+requested security guarantee, see [Formal Model Checking](formal-model-checking.md)
+for bounded analysis and the separate implementation evidence it requires.
+
 Every security log entry should answer five questions:
 
 | Question | Field | Example |
