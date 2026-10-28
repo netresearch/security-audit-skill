@@ -325,6 +325,44 @@
         "Recommends creating a non-root user and switching to it",
         "Recommends pinning the base image to a specific digest or version tag"
       ]
+    },
+    {
+      "id": 26,
+      "eval_name": "audit-postcondition-process-loss",
+      "prompt": "Our security review says this always-on postcondition proves audit completeness in production: save and commit the new secret, call the audit logger, then throw if no audit entry exists. The catch block restores the previous secret. Does that establish the guarantee if a worker is abruptly terminated during a save?",
+      "expected_output": "Explains the unprotected committed-mutation window, the skipped postcondition/catch on process loss, and the difference between a local runtime check and a durability guarantee; does not claim an unverified fix.",
+      "files": [],
+      "expectations": [
+        "States that abrupt process loss can occur after the committed mutation and before the audit call, and executes neither the postcondition nor catch/finally compensation.",
+        "Explains that a later exception or check cannot undo a previously committed write, and that this runtime assertion does not prove the guarantee for all production executions.",
+        "Identifies the actual persistence and transaction boundary as the next audit question, including whether the audit destination shares the real connection, without automatically prescribing an outbox or claiming a fix was executed."
+      ]
+    },
+    {
+      "id": 27,
+      "eval_name": "bounded-model-review-vacuity-and-controls",
+      "prompt": "Please review this audit design only. Our checker explores Init -> Stopped; no request ever commits, so every committed change is audited. Its deliberately unsafe variant exits with a syntax error, which the team counted as a passing negative control. Can we use these green results for sign-off? Application changes and CI work are outside this request.",
+      "expected_output": "Rejects vacuous success and the invalid negative control, asks for reachable successful and failure paths and an intended-invariant counterexample, and keeps the result within the design-review assignment.",
+      "files": [],
+      "expectations": [
+        "Rejects audit completeness as useful evidence when no operation can commit, and requires evidence that successful operations and relevant crash or competing-request paths are reachable.",
+        "Does not accept a parser error, timeout or unrelated failure as a valid negative control; requires the intended invariant violation and an interpretable trace, alongside a completed bounded search.",
+        "Records the finite bounds, assumptions and checker/configuration version, and distinguishes safety from eventual delivery or termination.",
+        "Respects the design-only scope: an explained counterexample or incomplete verification is a valid review outcome; does not edit application behavior or CI or impose runtime-test work as a condition of completing this review."
+      ]
+    },
+    {
+      "id": 28,
+      "eval_name": "model-to-code-persistence-boundaries",
+      "prompt": "Assess this proposed security guarantee: every committed secret version has a matching durable audit entry. The model checks two requests, but only compares the latest value to the latest audit row. In deployment, the secret and ACL relation table use different connections; the audit writer releases a nested savepoint and named lock before the caller's outer commit, then sends a webhook. The tests only mock begin/commit calls. Is this sufficient to declare the application formally verified?",
+      "expected_output": "Checks historical mutations and actual connection/transaction/lock ownership, separates external delivery and implementation evidence from a bounded model result, and refuses the whole-application proof claim.",
+      "files": [],
+      "expectations": [
+        "Explains that an earlier unaudited committed mutation can be hidden by a later audited value, so the property must retain historical committed operations rather than checking only the latest state.",
+        "Maps the claimed transaction to actual connection identities, the outer owner, nested savepoint semantics, lock lifetime and the ACL relation table; does not treat a savepoint release or separate connections as one durable commit.",
+        "Treats the webhook as an external effect that does not join the database transaction and distinguishes post-commit publication from guaranteed eventual delivery.",
+        "Does not treat mocked transaction calls as database or process-loss evidence and does not claim a refinement, source-equivalence or whole-application proof from the bounded model."
+      ]
     }
   ]
 }
