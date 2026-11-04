@@ -71,7 +71,26 @@ rules:
 some_safe_code()
 ```
 
+Two details decide whether the comment suppresses anything. Measured with semgrep 1.181.0 and opengrep 1.31.0, which behave the same:
+
+- **The id must be a dotted suffix of the `check_id` the scanner reports.** Registry rules report a doubled last segment, e.g. `python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected`. `# nosemgrep: dynamic-urllib-use-detected` and the full doubled id both suppress it; the path-looking single form `python.lang.security.audit.dynamic-urllib-use-detected` does **not**, because it is not a suffix. Copy the id from the scan output (`--json` → `.results[].check_id`), not from the rule's file path.
+- **The comment goes on the flagged line or on the line directly above it.** A second comment line between `# nosemgrep:` and the finding (a `# reason: …` line underneath) makes the suppression miss. Put the justification on the same line after the id (`# nosemgrep: <id> -- reason`) or above the `nosemgrep` line.
+
+A bare `# nosemgrep` with no id suppresses every rule on that line; name the rule so a new finding on the same line is still reported.
+
 An inline `nosemgrep` comment does not reliably close a GitHub code-scanning alert. Observed with Opengrep's `php.lang.security.injection.tainted-filename.tainted-filename` rule: the commit that added the suppression comment also moved the flagged line down by five lines. The alert on the old line switched to "fixed", and a new alert with the same rule opened on the suppressed line, so the finding was still reported under a new alert number. After suppressing, check the full list of open alerts, not one alert id. When the flagged flow is real — for example a request path reaching `is_file()` — fix the code instead: confine the path with `realpath()` against the base directory (see [path-traversal-prevention.md](path-traversal-prevention.md), "realpath() Validation"), then confirm with the scanner version CI pins that the finding fires before the fix and is gone after it.
+
+**CodeQL `js/bad-tag-filter` (and its Python twin) is fixed in the regex, not suppressed.** The query flags a regular expression that tries to match an HTML element but misses forms browsers accept: an end tag with whitespace or attributes before `>` (`</script >`, `</script foo="bar">`) and upper-case tag names (`<SCRIPT>`). Adding `\s*` before `>` is not enough. A pattern that covers both:
+
+```python
+re.sub(r"<script\b[^>]*>[\s\S]*?</script\b[^>]*>", "", html, flags=re.S | re.I)
+```
+
+```javascript
+html.replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, "");
+```
+
+The same query names HTML comments ending in `--!>` as a further case. A regex is still not a sanitizer; use a parser or a sanitizer library where the output reaches a browser, and keep a regex like this for stripping known, trusted markup (a build step removing scripts from a template, for example).
 
 Or use `.semgrepignore` (follows .gitignore syntax):
 
