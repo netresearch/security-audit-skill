@@ -115,11 +115,12 @@ lock that no longer matches `package.json`.
 **npm:** npm reads only `overrides`. The yarn-style `resolutions` field, which
 bun also honours, is ignored by npm, so an audit job that runs
 `npm i --package-lock-only && npm audit` stays red with `resolutions` alone; use
-`overrides`, which npm and bun both read. When `npm audit` is clean locally and
+`overrides`, which npm (from 8.3.0) and bun both read; older npm ignores it. When `npm audit` is clean locally and
 red in CI, compare `npm --version` on both sides before trusting the local
 result: a newer npm can resolve the patched transitive versions inside the same
 ranges where CI's npm still picks the vulnerable ones. Reproduce with CI's
-version (`npx --yes npm@<ci-version> i --package-lock-only`, then
+version in a clean checkout of the commit CI ran, so the lockfile state matches
+(`npx --yes npm@<ci-version> i --package-lock-only`, then
 `npx --yes npm@<ci-version> audit`) and set
 the floor through `overrides` so the result no longer depends on the resolver.
 

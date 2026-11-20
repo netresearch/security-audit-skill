@@ -1382,16 +1382,21 @@ The same applies one level down. A secret in the `argv:` or `command:` of
 stays readable through the Docker Engine API, which returns an exec's arguments
 in `ProcessConfig` (`GET /exec/<id>/json`, measured on Engine 29.9); the
 standard input is not stored there, so pass the secret with the module's
-`stdin:` option to a command that reads it from standard input.
+`stdin:` option to a command that reads it from standard input, and set
+`no_log: true` on that task too: the module does not mark `stdin` as sensitive.
+`stdin:` needs `detach: false` and does not work over a TLS-secured TCP
+connection to the daemon (community.docker documents this); there, run the
+command on the Docker host or pass the secret as a file mounted into the
+container instead.
 
 ### Detection Patterns
 
 ```
-# environment: blocks in tasks, then check each key for a secret-bearing value
-rg -n -A6 '^\s*environment:' --glob '*.yml' --glob '*.yaml' . | rg -i 'pass|secret|token|key'
+# Leads only: list the files, then read every environment: block in full
+rg -l '^\s*environment:' --glob '*.yml' --glob '*.yaml' .
 
-# Secrets passed as command arguments to a container exec
-rg -n -B2 -A8 'docker_container_exec' --glob '*.yml' --glob '*.yaml' . | rg -i -- '-p|password|secret|token'
+# Container exec tasks: read argv:/command: of each one for a secret
+rg -n -A12 'docker_container_exec' --glob '*.yml' --glob '*.yaml' .
 ```
 
 ---
@@ -1463,7 +1468,7 @@ rg -n -B2 -A8 'docker_container_exec' --glob '*.yml' --glob '*.yaml' . | rg -i -
 ### Ansible
 
 - [ ] Secrets reach `shell`/`command` tasks through `stdin:`, never through `environment:` or the command line; `no_log: true` is set as well
-- [ ] `docker_container_exec` tasks pass secrets with `stdin:`, not in `argv:`/`command:`
+- [ ] `docker_container_exec` tasks pass secrets with `stdin:`, not in `argv:`/`command:`, and set `no_log: true`
 
 ### General IaC Practices
 

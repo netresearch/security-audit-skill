@@ -930,6 +930,11 @@ function safeRelativeRedirect(userPath) {
       return fallback;
     }
 
+    // blob:https://app.example.com/<id> has the page's origin too
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return fallback;
+    }
+
     // Return the parsed absolute URL, never a path: the browser parses the
     // returned string again, and '/.//evil.com' has the path '//evil.com'
     return parsed.href;
@@ -952,7 +957,8 @@ backslashes first, collapse slash runs second, then parse the result and assert
 the same origin.
 
 Keep a payload table as regression tests next to the sanitizer, and assert the
-origin of what the function returns, re-parsed against the page URL. The two
+scheme and the origin of what the function returns, re-parsed against the page
+URL (a `blob:` URL of the page's own origin passes an origin-only assertion). The two
 secure examples above return a same-origin URL for every row (measured with
 Node 26.13 and Chromium 143); the earlier version of `safeRelativeRedirect`,
 which returned `pathname + search + hash`, returned `//evil.example` for the
@@ -961,6 +967,7 @@ dot-segment rows:
 | Payload | What it exercises |
 |---|---|
 | `javascript:alert(1)`, `data:text/html,...` | scheme allowlist |
+| `blob:https://app.example.com/<id>` | non-HTTP scheme that carries the page's origin |
 | `//evil.example`, `https://evil.example` | protocol-relative and absolute URLs |
 | `/\evil.example`, `\\evil.example` | backslash read as slash |
 | a raw tab, LF or CR between the slashes (`/<TAB>/evil.example`; a query parameter carries it as `%09`, `%0A`, `%0D` and hands it on decoded) | control characters the parser removes |
