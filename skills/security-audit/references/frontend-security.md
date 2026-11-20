@@ -126,6 +126,22 @@ heading.textContent = 'Hello, ' + params.get('name');
 document.body.appendChild(heading);
 ```
 
+A URL that passed a scheme allowlist is still not safe to interpolate into a
+quoted HTML attribute. The WHATWG parser keeps `"`, `'` and backtick
+unescaped in the host: `new URL('https://x"onmouseover=alert(1)//').href`
+returns the quote unchanged (Node 26.13, Chromium 143), so
+`` `<a href="${url.href}">` `` breaks out of the attribute and adds a handler.
+Set the property instead of building markup, or attribute-escape
+`& " ' < >`:
+
+```javascript
+// SECURE: assign the URL through the DOM, not through an HTML string
+const link = document.createElement('a');
+link.href = url.href;          // property assignment, no attribute parsing
+link.textContent = label;
+container.appendChild(link);
+```
+
 ```javascript
 // SECURE: setTimeout with a function reference, never a string
 const action = new URLSearchParams(location.search).get('action');
@@ -914,13 +930,50 @@ function safeRelativeRedirect(userPath) {
       return fallback;
     }
 
-    // Return only the path + search + hash (strip origin for safety)
-    return parsed.pathname + parsed.search + parsed.hash;
+    // blob:https://app.example.com/<id> has the page's origin too
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return fallback;
+    }
+
+    // Return the parsed absolute URL, never a path: the browser parses the
+    // returned string again, and '/.//evil.com' has the path '//evil.com'
+    return parsed.href;
   } catch (e) {
     return fallback;
   }
 }
 ```
+
+### Test Redirect Validation Against Parser Normalization
+
+The URL parser rewrites its input before an origin exists: it removes tab, LF
+and CR anywhere in the URL, treats `\` like `/` in http(s) URLs, and resolves
+dot segments, so `/.//evil.example` has the path `//evil.example`. A check that
+inspects or edits the string (collapsing `//`, testing for a leading `/`) is
+evaluated against one URL while the browser navigates to another. Parse with
+`new URL()`, compare the origin, and hand on the parsed `href`. If a
+string-level sanitizer cannot be avoided, strip control characters and
+backslashes first, collapse slash runs second, then parse the result and assert
+the same origin.
+
+Keep a payload table as regression tests next to the sanitizer, and assert the
+scheme and the origin of what the function returns, re-parsed against the page
+URL (a `blob:` URL of the page's own origin passes an origin-only assertion).
+The two secure examples above return a same-origin http(s) URL for every row
+(measured with Node 26.13 and Chromium 143; the `blob:` row with Node 26.13
+only); the earlier version of `safeRelativeRedirect`,
+which returned `pathname + search + hash`, returned `//evil.example` for the
+dot-segment rows:
+
+| Payload | What it exercises |
+|---|---|
+| `javascript:alert(1)`, `data:text/html,...` | scheme allowlist |
+| `blob:https://app.example.com/<id>` | non-HTTP scheme that carries the page's origin |
+| `//evil.example`, `https://evil.example` | protocol-relative and absolute URLs |
+| `/\evil.example`, `\\evil.example` | backslash read as slash |
+| a raw tab, LF or CR between the slashes (`/<TAB>/evil.example`; a query parameter carries it as `%09`, `%0A`, `%0D` and hands it on decoded) | control characters the parser removes |
+| `/.//evil.example`, `/%2e//evil.example` | dot segments that leave a path starting with `//` |
+| `https://app.example.com@evil.example` | userinfo before the real host |
 
 ### Detection Patterns
 
@@ -983,5 +1036,6 @@ window\.open\s*\(.*(?:URLSearchParams|location\.search|location\.hash)
 - [ ] Parse all redirect targets with `new URL()` and validate the origin
 - [ ] Block `javascript:` and `data:` URL schemes
 - [ ] Maintain an explicit allowlist of permitted redirect origins
-- [ ] Prefer relative paths for same-site redirects
+- [ ] Prefer relative paths for same-site redirects, and return the parsed same-origin `href` rather than a path string
+- [ ] Run the sanitizer against a payload table (backslash, tab/LF/CR, dot segments, `//host`, userinfo) kept as regression tests
 - [ ] Log and alert on blocked redirect attempts

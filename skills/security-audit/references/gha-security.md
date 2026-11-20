@@ -108,7 +108,21 @@ The lock is not the floor. jsdom 30.1.3 declares `undici ^8.12.1`, the fix is
 An override replaces **every** copy of the package, so list its consumers first
 with `bun why undici` and make sure each one accepts the forced range; a parent
 that requires an older major can break under it. Run `bun install`, the tests and
-`bun audit` after any of these changes.
+`bun audit` after any of these changes, and commit the regenerated `bun.lock`
+with the `package.json` change: CI's `bun install --frozen-lockfile` refuses a
+lock that no longer matches `package.json`.
+
+**npm:** npm reads only `overrides`. The yarn-style `resolutions` field, which
+bun also honours, is ignored by npm, so an audit job that runs
+`npm i --package-lock-only && npm audit` stays red with `resolutions` alone; use
+`overrides`, which npm (from 8.3.0) and bun both read; older npm ignores it. When `npm audit` is clean locally and
+red in CI, compare `npm --version` on both sides before trusting the local
+result: a newer npm can resolve the patched transitive versions inside the same
+ranges where CI's npm still picks the vulnerable ones. Reproduce with CI's
+version in a clean checkout of the commit CI ran, so the lockfile state matches
+(`npx --yes npm@<ci-version> i --package-lock-only`, then
+`npx --yes npm@<ci-version> audit`) and set
+the floor through `overrides` so the result no longer depends on the resolver.
 
 ```yaml
 # Go — replace directive in go.mod

@@ -20,7 +20,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 
 - **Vulnerabilities**: XXE, SQLi, XSS, CSRF, command injection, path traversal, file upload, deserialization, SSRF, SSTI, JWT, type juggling
 - **Standards**: OWASP Top 10 / API / LLM (2025), CWE Top 25, CVSS v3.1/v4.0, OWASP ASVS
-- **Cloud & IaC**: AWS; Terraform, Kubernetes, Docker, Helm
+- **Cloud & IaC**: AWS; Terraform, Kubernetes, Docker, Helm, Ansible
 - **API & Frontend**: REST/GraphQL authZ, rate limits, mass assignment, CSP, DOM-XSS
 - **AI Agents**: SKILL.md/AGENTS.md/CLAUDE.md/mcp.json/hooks.json audit; prompt injection; excessive agency
 
