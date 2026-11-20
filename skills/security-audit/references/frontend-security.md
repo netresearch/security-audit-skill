@@ -958,9 +958,10 @@ the same origin.
 
 Keep a payload table as regression tests next to the sanitizer, and assert the
 scheme and the origin of what the function returns, re-parsed against the page
-URL (a `blob:` URL of the page's own origin passes an origin-only assertion). The two
-secure examples above return a same-origin URL for every row (measured with
-Node 26.13 and Chromium 143); the earlier version of `safeRelativeRedirect`,
+URL (a `blob:` URL of the page's own origin passes an origin-only assertion).
+The two secure examples above return a same-origin http(s) URL for every row
+(measured with Node 26.13 and Chromium 143; the `blob:` row with Node 26.13
+only); the earlier version of `safeRelativeRedirect`,
 which returned `pathname + search + hash`, returned `//evil.example` for the
 dot-segment rows:
 
