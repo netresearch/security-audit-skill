@@ -1342,6 +1342,60 @@ user_data\s*=.*<<[\s\S]*?(PASSWORD|SECRET|TOKEN|API_KEY)
 
 ---
 
+## Ansible Security
+
+### Secrets in `environment:` Reach the Remote Command Line
+
+`environment:` on a task looks like the safe alternative to a password in a
+command's arguments, and it is not. The action plugin prepends the variables to
+the module command (`ansible/plugins/action/__init__.py`, before the
+connection plugin sends it), so the target host runs
+`/bin/sh -c 'VAR=value python3 .../AnsiballZ_command.py'`. For as long as the
+task runs, the value is in that process's `/proc/<pid>/cmdline`, readable by
+every local user unless `/proc` is mounted with `hidepid`. `no_log: true`
+hides the value from Ansible's output, not from the process table. Measured with
+ansible-core 2.22.0 and `connection: local`: a sentinel passed through
+`environment:` appeared verbatim in `ps`, the same sentinel passed through
+`stdin:` did not, because module arguments travel inside the module payload.
+
+```yaml
+# VULNERABLE: the key is on the remote command line while the task runs
+- name: Import the encryption key
+  ansible.builtin.shell: app-cli key:import --from-env APP_KEY
+  environment:
+    APP_KEY: "{{ app_key }}"
+  no_log: true
+```
+
+```yaml
+# SECURE: the key reaches the command on its standard input
+- name: Import the encryption key
+  ansible.builtin.shell:
+    cmd: app-cli key:import --from-stdin
+    stdin: "{{ app_key }}"
+    stdin_add_newline: false   # when the bytes must be exact
+  no_log: true
+```
+
+The same applies one level down. A secret in the `argv:` or `command:` of
+`community.docker.docker_container_exec` (for example `mysql -p<password>`)
+stays readable through the Docker Engine API, which returns an exec's arguments
+in `ProcessConfig` (`GET /exec/<id>/json`, measured on Engine 29.9); the
+standard input is not stored there, so pass the secret with the module's
+`stdin:` option to a command that reads it from standard input.
+
+### Detection Patterns
+
+```
+# environment: blocks in tasks, then check each key for a secret-bearing value
+rg -n -A6 '^\s*environment:' --glob '*.yml' --glob '*.yaml' . | rg -i 'pass|secret|token|key'
+
+# Secrets passed as command arguments to a container exec
+rg -n -B2 -A8 'docker_container_exec' --glob '*.yml' --glob '*.yaml' . | rg -i -- '-p|password|secret|token'
+```
+
+---
+
 ## Prevention Checklist
 
 ### Dockerfile
@@ -1405,6 +1459,11 @@ user_data\s*=.*<<[\s\S]*?(PASSWORD|SECRET|TOKEN|API_KEY)
 - [ ] Terraform state bucket has versioning, logging, and access controls
 - [ ] `user_data` scripts do not contain inline secrets (use IAM roles or Secrets Manager)
 - [ ] `deletion_protection` is enabled on production databases and critical resources
+
+### Ansible
+
+- [ ] Secrets reach `shell`/`command` tasks through `stdin:`, never through `environment:` or the command line; `no_log: true` is set as well
+- [ ] `docker_container_exec` tasks pass secrets with `stdin:`, not in `argv:`/`command:`
 
 ### General IaC Practices
 
