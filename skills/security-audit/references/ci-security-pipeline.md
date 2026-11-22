@@ -103,7 +103,28 @@ update` time, not looked up live at audit time. Two consequences:
 
 #### Composer: accepting an advisory on purpose
 
-Three things decide whether an accepted advisory actually stays accepted.
+**Check the range before accepting.** `composer audit` reads GitHub's
+reviewed advisory, and its `vulnerable_version_range` can be wider than the
+range the maintainer published. Seen with CVE-2026-84308: the phpseclib
+repository advisory names `>= 3.0.0, <= 3.0.56` and 4.0.0, the reviewed
+record says `< 3.0.57`, so the audit also blocks phpseclib 2. Compare both
+records, read the affected code in the version you ship, and only then ignore
+the advisory by its ID with the reason written next to it:
+
+```bash
+gh api "/advisories?cve_id=CVE-2026-84308" \
+  --jq '.[] | .ghsa_id, (.vulnerabilities[] | {package: .package.name, vulnerable_version_range})'
+gh api repos/phpseclib/phpseclib/security-advisories \
+  --jq '.[] | select(.cve_id == "CVE-2026-84308") | .vulnerabilities'
+```
+
+A wrong reviewed range is corrected by a PR against github/advisory-database.
+Search its open PRs by the GHSA ID or the package name before opening one:
+those PRs are titled `Update GHSA-….json`, so a search for the CVE ID finds
+nothing (`gh search prs --repo github/advisory-database --state open
+GHSA-q97c-8qh3-fpc6` finds github/advisory-database#10865).
+
+Three more things decide whether an accepted advisory actually stays accepted.
 
 **Where the ignore goes.** `config.policy` exists since Composer 2.10.0
 (`src/Composer/Policy/` is absent in 2.10.0-RC1 and 2.9.8, present from
