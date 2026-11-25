@@ -80,6 +80,15 @@ grep -rE 'catch.*Exception.*getMessage' Classes/
 grep -rE '\?(key|api_key|apikey|token|secret|access_token)=.*\$' Classes/
 ```
 
+### Extending a Masking Function
+
+A function that masks several credential shapes in one regex alternation, or in several replacements, fails in a way a test of the new shape does not show: the new pattern takes text from an existing one. A URL-password pattern added to an alternation matched `http://[::1]:8080/?password=p` up to the `@` inside the query value, and the value's tail, masked until then, stayed readable.
+
+- **Add the pattern as a separate pass at the end**, over the already masked text. It can then replace text only, so it cannot take a match from an earlier pattern. Let it cross the marker (`[REDACTED]`) an earlier pass left inside the same value, or the text around the marker stays readable.
+- **Compare the old and the new function before merging.** Over stored logs and over random strings built from credential shapes, separators, quotes, ports and markers, assert two things: no text readable in the new output was masked in the old one, and the strings that changed are ones the new pattern is meant for. Count both; zero changed strings means that the input never reached the new pattern.
+- **Add negatives**: the same syntax without a credential (`host:8443/path@x`, `host:$PORT/path@x`) must stay readable.
+- **Bound every unlimited repeat** (`{1,200}`) and time the function on a long run of the pattern's own prefix.
+
 ---
 
 ## Exception Type Consistency

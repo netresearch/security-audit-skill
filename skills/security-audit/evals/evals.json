@@ -377,6 +377,20 @@
         "Before an override, lists every consumer of undici (for example with `bun why undici`) and checks that each accepts the forced range.",
         "Checks the parent's declared range floor against the first patched version, rather than trusting the version the lock happens to hold."
       ]
+    },
+    {
+      "id": 30,
+      "eval_name": "extend-masking-function",
+      "prompt": "Our log masker runs one Python regex with named alternatives (query credentials such as ?password=..., bearer tokens, https://user:pass@host) and replaces every match with [REDACTED]. It misses postgres://app:ab/cd@db because the URL pattern stops at the first slash. I want to let the URL alternative accept slashes in the password and add a test for that URL. What can go wrong, and how should I make and check the change?",
+      "expected_output": "Warns that the wider alternative can take text from the query-credential alternative and leave a previously masked tail readable; recommends a separate last pass, an old-versus-new comparison, negatives and a bounded repeat.",
+      "files": [],
+      "expectations": [
+        "Explains that the wider URL alternative can match into a query value that contains an @ and so leave part of a value readable that was masked before.",
+        "Recommends a separate pass after the existing patterns instead of widening the alternative.",
+        "Recommends comparing the old and the new function over logs or random strings and asserting that nothing masked before is readable now.",
+        "Asks for negative cases such as a port followed by a path with an @ (host:8443/path@x).",
+        "Mentions bounding the repeat or checking the run time on long input."
+      ]
     }
   ]
 }
