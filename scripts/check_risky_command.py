@@ -18,7 +18,12 @@ import sys
 RISKY_PATTERNS = [
     # Destructive file operations
     {
-        "pattern": r"rm\s+(-[rf]+\s+)?[/~]",
+        # Recursive in any spelling, and an absolute or home path among the
+        # operands: `rm -f /tmp/x` deletes one file and stays silent.
+        "pattern": (
+            r"\brm\s+(?=(?:[^;&|<>\n]*\s)?(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(?:\s|$))"
+            r"(?:[^;&|<>\n]*\s)?['\"]?(?:[/~]|\$\{?HOME\b)"
+        ),
         "severity": "high",
         "message": "Recursive delete on root or home directory",
     },
