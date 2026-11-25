@@ -18,12 +18,7 @@ import sys
 RISKY_PATTERNS = [
     # Destructive file operations
     {
-        # Recursive in any spelling, and an absolute or home path among the
-        # operands: `rm -f /tmp/x` deletes one file and stays silent.
-        "pattern": (
-            r"\brm\s+(?=(?:[^;&|<>\n]*\s)?(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(?:\s|$))"
-            r"(?:[^;&|<>\n]*\s)?['\"]?(?:[/~]|\$\{?HOME\b)"
-        ),
+        "check": "recursive_delete",
         "severity": "high",
         "message": "Recursive delete on root or home directory",
     },
@@ -186,11 +181,39 @@ RISKY_PATTERNS = [
 ]
 
 
+# The words of one `rm` call, up to the end of the simple command.
+RM_CALL = re.compile(r"\brm\s([^;&|<>\n]*)", re.IGNORECASE)
+RM_PATHS = ("/", "~", "$HOME", "${HOME")
+
+
+def recursive_delete(command: str) -> bool:
+    """An `rm` with a recursive flag, anywhere, and an absolute or home path.
+
+    Read word by word instead of by one expression: linear on any input, and a
+    flag ends at a quote or a bracket as well as at a space.
+    `rm -f /tmp/x` deletes one file and stays silent.
+    """
+    for call in RM_CALL.finditer(command.replace("\\\n", " ")):
+        words = [word.strip("'\"`(){}") for word in call[1].split()]
+        recursive = any(
+            word.lower() == "--recursive"
+            or (word[:1] == "-" and word[1:].isalpha() and "r" in word.lower())
+            for word in words
+        )
+        if recursive and any(word.startswith(RM_PATHS) for word in words):
+            return True
+    return False
+
+
 def check_command(command: str) -> list[dict]:
     """Check command against risky patterns."""
     warnings = []
     for entry in RISKY_PATTERNS:
-        if re.search(entry["pattern"], command, re.IGNORECASE):
+        if entry.get("check") == "recursive_delete":
+            matched = recursive_delete(command)
+        else:
+            matched = re.search(entry["pattern"], command, re.IGNORECASE)
+        if matched:
             warnings.append(
                 {
                     "severity": entry["severity"],
