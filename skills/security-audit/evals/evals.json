@@ -388,7 +388,7 @@
         "Explains that the wider URL alternative can match into a query value that contains an @ and so leave part of a value readable that was masked before.",
         "Recommends matching on the original text and masking the union of the ranges, or a separate pass after the existing patterns, instead of widening the alternative.",
         "Recommends comparing the old and the new function over logs or random strings and asserting that nothing masked before is readable now.",
-        "Asks for negative cases such as a port followed by a path with an @ (host:8443/path@x).",
+        "Asks for negative cases such as a port followed by a path with an @ (https://host:8443/path@x).",
         "Asks for a run-time check on long input, and does not offer a bounded repeat as a fix unless a longer value is masked as a whole."
       ]
     }
