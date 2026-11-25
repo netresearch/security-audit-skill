@@ -46,6 +46,12 @@ TESTS = [
     ("rm -f /tmp/x; ls -r /", False, "a flag of another command"),
     ("rm -rf build > /dev/null", False, "redirection is no operand"),
     ("rm -rf build && ls /", False, "a path of another command"),
+    (
+        'docker run --rm -v "$PWD":/app alpine grep -rn foo /app',
+        False,
+        "a --rm flag",
+    ),
+    ("docker run --rm -v a:/app x rm -rf /app", True, "an rm behind a --rm flag"),
     ("confirm -r /x", False, "a word that ends in rm"),
     ("git push --force-with-lease main", False, "force-with-lease is safe"),
     ("ls -la", False, "safe command"),

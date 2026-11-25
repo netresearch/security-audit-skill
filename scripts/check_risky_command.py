@@ -182,7 +182,7 @@ RISKY_PATTERNS = [
 
 
 # The words of one `rm` call, up to the end of the simple command.
-RM_CALL = re.compile(r"\brm\s([^;&|<>\n]*)", re.IGNORECASE)
+RM_CALL = re.compile(r"(?<![\w-])rm\s([^;&|<>\n]*)", re.IGNORECASE)
 RM_PATHS = ("/", "~", "$HOME", "${HOME")
 
 
