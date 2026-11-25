@@ -805,6 +805,20 @@ monolog:
             channels: ['!security', '!audit']
 ```
 
+**A `fingers_crossed` handler drops warnings.** It buffers every record and
+writes the buffer only when a record reaches `action_level` (`error` in the
+usual production recipe). Lowering a security event from error to warning, or
+no longer logging an error in the same request, therefore removes it from the
+production log, while development and unit tests still show it. Give such
+events a channel and a handler of their own (as above) and test against the
+production handler configuration, with a warning-only request. Observed on
+[netresearch/timetracker#970](https://github.com/netresearch/timetracker/pull/970):
+refused LDAP logins of unknown usernames would have left the log, fixed in
+[#984](https://github.com/netresearch/timetracker/pull/984) before a release.
+The record appears twice when the request also logs an error, unless the
+buffered handler excludes the channel; excluding it also keeps that channel's
+errors from flushing the buffer.
+
 ```php
 <?php
 
