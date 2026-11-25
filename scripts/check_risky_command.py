@@ -191,14 +191,16 @@ def recursive_delete(command: str) -> bool:
 
     Read word by word instead of by one expression: linear on any input, and a
     flag ends at a quote or a bracket as well as at a space.
+    Quotes are not parsed: a separator inside one ends the call here.
     `rm -f /tmp/x` deletes one file and stays silent.
     """
-    for call in RM_CALL.finditer(command.replace("\\\n", " ")):
+    for call in RM_CALL.finditer(command.replace("\\\n", "")):
         words = [word.strip("'\"`(){}") for word in call[1].split()]
+        options = words[: words.index("--")] if "--" in words else words
         recursive = any(
             word.lower() == "--recursive"
             or (word[:1] == "-" and word[1:].isalpha() and "r" in word.lower())
-            for word in words
+            for word in options
         )
         if recursive and any(word.startswith(RM_PATHS) for word in words):
             return True
