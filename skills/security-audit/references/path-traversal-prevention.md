@@ -360,7 +360,7 @@ A client that builds a REST URL from an identifier it was given (`f"rest/api/2/i
 A check on the final URL alone misses the query case, because `?a=b` without a `/` looks like an ordinary query. Use two layers:
 
 1. **Allowlist each identifier where it enters**, before any request: an issue key `[A-Za-z]\w*-\d+`, an id `\d+`, each matched against the whole value (`re.fullmatch`; `re.match` and `re.search` accept `PROJ-1?deleteSubtasks=true` by its prefix) and with `re.ASCII` (without it, `\d` also matches digits of other scripts, such as `٤٢`).
-2. **Check the final URL in the HTTP session**, for paths a library builds and ids no allowlist covers: refuse `#`, a `.` or `..` segment (also percent-encoded, and with a `;` parameter), a backslash or `%2F`/`%5C` in the path, and a `/` in the query. A request sent outside that session, such as a plain `requests.get`, must call the same check before it is sent.
+2. **Check the URL as built, in the HTTP session, before the HTTP library normalises it**: requests removes dot segments while it prepares a request, so a check on the prepared or sent URL sees `issue/PROJ-2` instead of `../../PROJ-2`. Wrap the session's `request()` (or the call that receives the URL string), not a hook on the prepared request. This layer covers paths a library builds and ids no allowlist covers: refuse `#`, a `.` or `..` segment (also percent-encoded, and with a `;` parameter), a backslash or `%2F`/`%5C` in the path, and a `/` in the query. A request sent outside that session, such as a plain `requests.get`, must call the same check before it is sent.
 
 For a destructive call, also compare the resource that a preceding GET returned with the id you were given before sending the DELETE.
 
