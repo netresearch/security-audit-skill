@@ -4,6 +4,7 @@
 """Behavioural tests for the shell audit scripts under skills/security-audit/scripts/."""
 
 import http.server
+import json
 import os
 import shutil
 import subprocess
@@ -440,7 +441,7 @@ class NpmAuditTest(unittest.TestCase):
                 self.assertNotEqual(Path(cwd).resolve(), project.resolve())
                 self.assertEqual(
                     sorted(files.split()),
-                    ["node_modules", "package-lock.json", "package.json"],
+                    ["package-lock.json", "package.json"],
                 )
 
     def test_a_shrinkwrap_file_is_copied(self) -> None:
@@ -492,6 +493,25 @@ class NpmAuditTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, result.stdout)
 
 
+LEFT_PAD_ADVISORY = (
+    b'{"left-pad":[{"id":1,"url":"https://example.invalid/1","title":"probe",'
+    b'"severity":"high","vulnerable_versions":"<=1.3.0","cwe":[],'
+    b'"cvss":{"score":0,"vectorString":null}}]}'
+)
+
+MONOREPO_LOCK = (
+    '{"name":"root","version":"1.0.0","lockfileVersion":3,"requires":true,'
+    '"packages":{"":{"name":"root","version":"1.0.0","workspaces":["packages/*"],'
+    '"devDependencies":{"right-pad":"1.0.1"}},'
+    '"node_modules/a":{"resolved":"packages/a","link":true},'
+    '"node_modules/left-pad":{"version":"1.3.0",'
+    '"resolved":"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz"},'
+    '"node_modules/right-pad":{"version":"1.0.1","dev":true,'
+    '"resolved":"https://registry.npmjs.org/right-pad/-/right-pad-1.0.1.tgz"},'
+    '"packages/a":{"name":"a","version":"1.0.0",'
+    '"dependencies":{"left-pad":"1.3.0"}}}}\n'
+)
+
 LEFT_PAD_LOCK = (
     '{"name":"p","version":"1.0.0","lockfileVersion":3,"requires":true,'
     '"packages":{"":{"name":"p","version":"1.0.0",'
@@ -517,10 +537,20 @@ class NpmAuditRegistryTest(unittest.TestCase):
                 requests.setdefault(port, []).append(
                     (self.path, self.headers.get("authorization"))
                 )
+                name = self.path.strip("/")
+                body = json.dumps(
+                    {
+                        "name": name,
+                        "dist-tags": {"latest": "1.3.0"},
+                        "versions": {"1.3.0": {"name": name, "version": "1.3.0"}},
+                    }
+                ).encode()
+                if self.path.endswith("/advisories/bulk"):
+                    body = LEFT_PAD_ADVISORY
                 self.send_response(200)
                 self.send_header("content-type", "application/json")
                 self.end_headers()
-                self.wfile.write(b"{}")
+                self.wfile.write(body)
 
             do_GET = do_POST = handle_one
 
@@ -565,15 +595,17 @@ class NpmAuditRegistryTest(unittest.TestCase):
         project: Path,
         user_registry: bool = True,
         keep_manifest: bool = True,
+        write_fixture: bool = True,
         **extra: str,
-    ) -> None:
-        # A dependency, so that npm sends the bulk advisory request at all.
-        Path(project, "package.json").write_text(
-            '{"name":"p","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}\n'
-        )
-        if not keep_manifest:
-            Path(project, "package.json").unlink()
-        Path(project, "package-lock.json").write_text(LEFT_PAD_LOCK)
+    ) -> subprocess.CompletedProcess:
+        if write_fixture:
+            # A dependency, so that npm sends the bulk advisory request.
+            Path(project, "package.json").write_text(
+                '{"name":"p","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}\n'
+            )
+            if not keep_manifest:
+                Path(project, "package.json").unlink()
+            Path(project, "package-lock.json").write_text(LEFT_PAD_LOCK)
         userconfig = Path(tmp, "user.npmrc")
         userconfig.write_text(
             f"registry=http://127.0.0.1:{self.own}/\n" if user_registry else ""
@@ -587,10 +619,11 @@ class NpmAuditRegistryTest(unittest.TestCase):
         env["NPM_CONFIG_UPDATE_NOTIFIER"] = "false"
         env.update(extra)
         self.requests.clear()
-        run(script, str(project), env=env)
+        result = run(script, str(project), env=env)
         self.assertEqual(self.requests.get(self.attacker, []), [])
         paths = [path for path, _auth in self.requests.get(self.own, [])]
         self.assertIn("/-/npm/v1/security/advisories/bulk", paths)
+        return result
 
     def test_the_global_npmrc_is_read(self) -> None:
         for script in NPM_SCANNERS:
@@ -618,6 +651,27 @@ class NpmAuditRegistryTest(unittest.TestCase):
                 shared = self.plant_workspace_root(tmp)
                 self.audit(
                     script, tmp, project, keep_manifest=False, TMPDIR=str(shared)
+                )
+
+    def test_a_workspace_dependency_is_audited(self) -> None:
+        # The vulnerable package is needed only by a workspace, and the
+        # root has a dependency of its own.
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").unlink()
+                Path(project, "package.json").write_text(
+                    '{"name":"root","version":"1.0.0","workspaces":["packages/*"],'
+                    '"devDependencies":{"right-pad":"1.0.1"}}\n'
+                )
+                Path(project, "package-lock.json").write_text(MONOREPO_LOCK)
+                Path(project, "packages", "a").mkdir(parents=True)
+                Path(project, "packages", "a", "package.json").write_text(
+                    '{"name":"a","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}\n'
+                )
+                result = self.audit(script, tmp, project, write_fixture=False)
+                self.assertIn(
+                    "WARNING: Vulnerable dependencies found: 1", result.stdout
                 )
 
     def test_the_project_npmrc_is_not_read(self) -> None:

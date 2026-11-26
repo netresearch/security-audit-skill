@@ -246,22 +246,27 @@ if [[ -f "$PROJECT_DIR/package-lock.json" || -f "$PROJECT_DIR/yarn.lock" || -f "
         # auditor's environment variables into the request, so npm audit
         # runs on a copy of the manifest and lock file in an empty
         # directory, where npm reads only the auditor's own
-        # configuration. The node_modules directory and --no-workspaces
-        # keep npm from taking a parent of that directory (for example a
-        # shared /tmp) as its project or workspace root; --prefix would
-        # do that too, but would also move npm's global config file. A
-        # run that could not check is an error, not a clean result.
+        # configuration. --prefix keeps npm from taking a parent of that
+        # directory (for example a shared /tmp) as its project or
+        # workspace root. It also moves the default global config file to
+        # <prefix>/etc/npmrc, so --globalconfig passes on the path npm
+        # uses outside the copy. A run that could not check is an error,
+        # not a clean result.
         AUDIT_DIR=$(mktemp -d)
         trap 'rm -rf "$AUDIT_DIR"' EXIT
-        mkdir "$AUDIT_DIR/node_modules"
         cp "$PROJECT_DIR/package-lock.json" "$AUDIT_DIR/"
         for NPM_FILE in package.json npm-shrinkwrap.json; do
             if [[ -f "$PROJECT_DIR/$NPM_FILE" ]]; then
                 cp "$PROJECT_DIR/$NPM_FILE" "$AUDIT_DIR/"
             fi
         done
+        NPM_ARGS=(--prefix "$AUDIT_DIR")
+        NPM_GLOBALCONFIG=$(cd / && npm config get globalconfig 2>/dev/null) || NPM_GLOBALCONFIG=""
+        if [[ -n "$NPM_GLOBALCONFIG" ]]; then
+            NPM_ARGS+=(--globalconfig "$NPM_GLOBALCONFIG")
+        fi
         AUDIT_RC=0
-        AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json --no-workspaces 2>/dev/null) || AUDIT_RC=$?
+        AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json "${NPM_ARGS[@]}" 2>/dev/null) || AUDIT_RC=$?
         rm -rf "$AUDIT_DIR"
         trap - EXIT
         VULN_COUNT=$(printf '%s' "$AUDIT_OUTPUT" | node -e '
