@@ -478,6 +478,15 @@ class NpmAuditTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, result.stdout)
 
 
+LEFT_PAD_LOCK = (
+    '{"name":"p","version":"1.0.0","lockfileVersion":3,"requires":true,'
+    '"packages":{"":{"name":"p","version":"1.0.0",'
+    '"dependencies":{"left-pad":"1.3.0"}},'
+    '"node_modules/left-pad":{"version":"1.3.0",'
+    '"resolved":"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz"}}}\n'
+)
+
+
 @unittest.skipUnless(shutil.which("npm"), "npm is not installed")
 class NpmAuditRegistryTest(unittest.TestCase):
     """End to end with npm: only the auditor's own registry gets the audit request."""
@@ -523,6 +532,11 @@ class NpmAuditRegistryTest(unittest.TestCase):
         )
 
     def audit(self, script: Path, tmp: str, project: Path, **extra: str) -> None:
+        # A dependency, so that npm sends the bulk advisory request at all.
+        Path(project, "package.json").write_text(
+            '{"name":"p","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}\n'
+        )
+        Path(project, "package-lock.json").write_text(LEFT_PAD_LOCK)
         userconfig = Path(tmp, "user.npmrc")
         userconfig.write_text(f"registry=http://127.0.0.1:{self.own}/\n")
         # npm settings from the caller's environment outrank a project's
@@ -531,11 +545,13 @@ class NpmAuditRegistryTest(unittest.TestCase):
         env["NPM_PROBE"] = "probe-value"
         env["NPM_CONFIG_USERCONFIG"] = str(userconfig)
         env["NPM_CONFIG_CACHE"] = str(Path(tmp, "cache"))
+        env["NPM_CONFIG_UPDATE_NOTIFIER"] = "false"
         env.update(extra)
         self.requests.clear()
         run(script, str(project), env=env)
         self.assertEqual(self.requests.get(self.attacker, []), [])
-        self.assertTrue(self.requests.get(self.own), "npm did not reach its registry")
+        paths = [path for path, _auth in self.requests.get(self.own, [])]
+        self.assertIn("/-/npm/v1/security/advisories/bulk", paths)
 
     def test_the_project_npmrc_is_not_read(self) -> None:
         for script in NPM_SCANNERS:
