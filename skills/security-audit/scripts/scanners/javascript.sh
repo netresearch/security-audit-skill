@@ -221,13 +221,56 @@ echo ""
 echo "=== Checking Dependencies ==="
 if [[ -f "$PROJECT_DIR/package-lock.json" ]] || [[ -f "$PROJECT_DIR/yarn.lock" ]]; then
     if command -v npm &> /dev/null && [[ -f "$PROJECT_DIR/package-lock.json" ]]; then
-        AUDIT_OUTPUT=$(cd "$PROJECT_DIR" && npm audit --json 2>/dev/null | head -50 || true)
-        VULN_COUNT=$(echo "$AUDIT_OUTPUT" | grep -o '"vulnerabilities"' | wc -l || echo "0")
-        if [[ "$VULN_COUNT" -gt 0 ]]; then
-            echo "WARNING: Vulnerable dependencies found (run 'npm audit' for details)"
-            WARNINGS=$((WARNINGS + 1))
+        # npm reads the .npmrc of the directory it runs in. The audited
+        # project's .npmrc could name its own registry and put the
+        # auditor's environment variables into the request, so npm audit
+        # runs on a copy of the manifest and lock file in an empty
+        # directory, where npm reads only the auditor's own
+        # configuration. --prefix keeps npm from taking a parent of that
+        # directory (for example a shared /tmp) as its project or
+        # workspace root. It also moves the default global config file to
+        # <prefix>/etc/npmrc, so --globalconfig passes on the path npm
+        # uses outside the copy. A run that could not check is an error,
+        # not a clean result.
+        AUDIT_DIR=$(mktemp -d)
+        trap 'rm -rf "$AUDIT_DIR"' EXIT
+        cp "$PROJECT_DIR/package-lock.json" "$AUDIT_DIR/"
+        for NPM_FILE in package.json npm-shrinkwrap.json; do
+            if [[ -f "$PROJECT_DIR/$NPM_FILE" ]]; then
+                cp "$PROJECT_DIR/$NPM_FILE" "$AUDIT_DIR/"
+            fi
+        done
+        # Without the path, the audit would silently skip the global
+        # npmrc, so a failed lookup ends the check as an error.
+        AUDIT_RC=0
+        NPM_GLOBALCONFIG=$(cd / && npm config get globalconfig 2>/dev/null) || AUDIT_RC=$?
+        if [[ "$AUDIT_RC" -ne 0 || "$NPM_GLOBALCONFIG" != /* || "$NPM_GLOBALCONFIG" == *$'\n'* ]]; then
+            AUDIT_OUTPUT="could not read npm's globalconfig (npm config get globalconfig, exit $AUDIT_RC)"
+            if [[ "$AUDIT_RC" -eq 0 ]]; then
+                AUDIT_RC=1
+            fi
         else
+            AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json --prefix "$AUDIT_DIR" --globalconfig "$NPM_GLOBALCONFIG" 2>/dev/null) || AUDIT_RC=$?
+        fi
+        rm -rf "$AUDIT_DIR"
+        trap - EXIT
+        VULN_COUNT=$(printf '%s' "$AUDIT_OUTPUT" | node -e '
+            let s = "";
+            process.stdin.on("data", (d) => (s += d)).on("end", () => {
+                try {
+                    const total = JSON.parse(s).metadata.vulnerabilities.total;
+                    if (Number.isInteger(total)) console.log(total);
+                } catch {}
+            });' 2>/dev/null || true)
+        if [[ -n "$VULN_COUNT" && "$VULN_COUNT" -gt 0 ]]; then
+            echo "WARNING: Vulnerable dependencies found: $VULN_COUNT (run 'npm audit' for details)"
+            WARNINGS=$((WARNINGS + 1))
+        elif [[ "$VULN_COUNT" == "0" && "$AUDIT_RC" -eq 0 ]]; then
             echo "OK: No known vulnerable dependencies"
+        else
+            echo "ERROR: npm audit could not check the dependencies (exit $AUDIT_RC):"
+            echo "$AUDIT_OUTPUT" | head -10
+            ERRORS=$((ERRORS + 1))
         fi
     else
         echo "WARNING: npm not available or no package-lock.json for dependency audit"

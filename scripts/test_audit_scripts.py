@@ -3,9 +3,13 @@
 # SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Behavioural tests for the shell audit scripts under skills/security-audit/scripts/."""
 
+import http.server
+import json
 import os
+import shutil
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -374,6 +378,363 @@ class GoVulncheckTest(unittest.TestCase):
 
     def test_vendored_module(self) -> None:
         self.assertIn("GOFLAGS=-mod=vendor -buildvcs=false", self.check(vendored=True))
+
+
+NPM_STUB = (
+    "#!/bin/sh\n"
+    'if [ "$1" = config ]; then\n'
+    '  if [ -n "$STUB_CONFIG_EXIT" ]; then\n'
+    '    echo "The globalconfig option is protected" >&2; exit "$STUB_CONFIG_EXIT"\n'
+    "  fi\n"
+    '  echo "npm warn Unknown user config \\"always-auth\\"" >&2\n'
+    '  printf "%s\\n" "${STUB_CONFIG_OUTPUT:-/etc/npmrc}"; exit 0\n'
+    "fi\n"
+    'printf "%s\\n" "$*" > "$RECORD_DIR/npm.args"\n'
+    'pwd > "$RECORD_DIR/npm.cwd"\n'
+    'ls -A > "$RECORD_DIR/npm.files"\n'
+    'printf "%s" "${STUB_OUTPUT:-}"\n'
+    'exit "${STUB_EXIT:-0}"\n'
+)
+
+NPM_CLEAN = '{"vulnerabilities":{},"metadata":{"vulnerabilities":{"total":0}}}'
+NPM_FINDING = (
+    '{"vulnerabilities":{"minimist":{}},"metadata":{"vulnerabilities":{"total":1}}}'
+)
+NPM_FAILED = '{"message":"request failed","error":{"summary":"","detail":""}}'
+
+NPM_SCANNERS = (
+    SCRIPTS / "scanners" / "javascript.sh",
+    SCRIPTS / "scanners" / "nodejs.sh",
+)
+
+
+def npm_project(tmp: str) -> Path:
+    """A project whose .npmrc points npm at its own registry."""
+    project = Path(tmp, "project")
+    project.mkdir()
+    Path(project, "src").mkdir()
+    Path(project, "src", "index.js").write_text("module.exports = {};\n")
+    Path(project, "package.json").write_text('{"name":"p","version":"1.0.0"}\n')
+    Path(project, "package-lock.json").write_text(
+        '{"name":"p","version":"1.0.0","lockfileVersion":3,"packages":{}}\n'
+    )
+    Path(project, ".npmrc").write_text(
+        "registry=http://127.0.0.1:9/\n//127.0.0.1:9/:_authToken=${NPM_PROBE}\n"
+    )
+    return project
+
+
+class NpmAuditTest(unittest.TestCase):
+    """npm audit reads the audited project's lock file but not its .npmrc."""
+
+    def scan(
+        self, script: Path, **extra: str
+    ) -> tuple[Path, str, str, subprocess.CompletedProcess]:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = npm_project(tmp)
+            env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp, **extra}
+            result = run(script, str(project), env=env)
+            return (
+                project,
+                recorded(tmp, "npm", "cwd").strip(),
+                recorded(tmp, "npm", "files"),
+                result,
+            )
+
+    def test_npm_runs_outside_the_project_without_its_npmrc(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                project, cwd, files, _result = self.scan(script, STUB_OUTPUT=NPM_CLEAN)
+                self.assertTrue(cwd, "npm was not called")
+                self.assertNotEqual(Path(cwd).resolve(), project.resolve())
+                self.assertEqual(
+                    sorted(files.split()),
+                    ["package-lock.json", "package.json"],
+                )
+
+    def test_a_failed_globalconfig_lookup_is_an_error(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                result = self.scan(script, STUB_CONFIG_EXIT="1", STUB_OUTPUT=NPM_CLEAN)[
+                    3
+                ]
+                self.assertIn(
+                    "ERROR: npm audit could not check the dependencies", result.stdout
+                )
+                self.assertIn("could not read npm's globalconfig", result.stdout)
+                self.assertNotIn("No known vulnerable dependencies", result.stdout)
+                self.assertEqual(result.returncode, 1, result.stdout)
+
+    def test_a_globalconfig_that_is_not_one_absolute_path_is_an_error(self) -> None:
+        for script in NPM_SCANNERS:
+            for output in ("etc/npmrc", "Usage:\n/etc/npmrc", "/etc/npmrc\nextra"):
+                with self.subTest(script=script.name, output=output):
+                    result = self.scan(
+                        script, STUB_CONFIG_OUTPUT=output, STUB_OUTPUT=NPM_CLEAN
+                    )[3]
+                    self.assertIn("could not read npm's globalconfig", result.stdout)
+                    self.assertNotIn("No known vulnerable dependencies", result.stdout)
+                    self.assertEqual(result.returncode, 1, result.stdout)
+
+    def test_the_global_config_path_is_passed_on(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp}
+                env["STUB_OUTPUT"] = NPM_CLEAN
+                run(script, str(project), env=env)
+                args = recorded(tmp, "npm", "args")
+                self.assertIn("--globalconfig /etc/npmrc", args)
+                self.assertNotIn("warn", args)
+
+    def test_a_shrinkwrap_file_is_copied(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, "npm-shrinkwrap.json").write_text("{}\n")
+                env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp}
+                env["STUB_OUTPUT"] = NPM_CLEAN
+                run(script, str(project), env=env)
+                self.assertIn("npm-shrinkwrap.json", recorded(tmp, "npm", "files"))
+
+    def test_the_temporary_directory_is_removed_when_a_copy_fails(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, "package.json").chmod(0)
+                scratch = Path(tmp, "scratch")
+                scratch.mkdir()
+                env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp}
+                env["TMPDIR"] = str(scratch)
+                result = run(script, str(project), env=env)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertEqual(list(scratch.iterdir()), [])
+
+    def test_a_clean_run_is_ok(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                result = self.scan(script, STUB_OUTPUT=NPM_CLEAN)[3]
+                self.assertIn("OK: No known vulnerable dependencies", result.stdout)
+                self.assertNotIn("Vulnerable dependencies found", result.stdout)
+
+    def test_a_finding_is_a_warning(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                result = self.scan(script, STUB_EXIT="1", STUB_OUTPUT=NPM_FINDING)[3]
+                self.assertIn(
+                    "WARNING: Vulnerable dependencies found: 1", result.stdout
+                )
+
+    def test_a_run_that_could_not_check_is_an_error(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                result = self.scan(script, STUB_EXIT="1", STUB_OUTPUT=NPM_FAILED)[3]
+                self.assertIn(
+                    "ERROR: npm audit could not check the dependencies", result.stdout
+                )
+                self.assertNotIn("No known vulnerable dependencies", result.stdout)
+                self.assertEqual(result.returncode, 1, result.stdout)
+
+
+LEFT_PAD_ADVISORY = (
+    b'{"left-pad":[{"id":1,"url":"https://example.invalid/1","title":"probe",'
+    b'"severity":"high","vulnerable_versions":"<=1.3.0","cwe":[],'
+    b'"cvss":{"score":0,"vectorString":null}}]}'
+)
+
+MONOREPO_LOCK = (
+    '{"name":"root","version":"1.0.0","lockfileVersion":3,"requires":true,'
+    '"packages":{"":{"name":"root","version":"1.0.0","workspaces":["packages/*"],'
+    '"devDependencies":{"right-pad":"1.0.1"}},'
+    '"node_modules/a":{"resolved":"packages/a","link":true},'
+    '"node_modules/left-pad":{"version":"1.3.0",'
+    '"resolved":"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz"},'
+    '"node_modules/right-pad":{"version":"1.0.1","dev":true,'
+    '"resolved":"https://registry.npmjs.org/right-pad/-/right-pad-1.0.1.tgz"},'
+    '"packages/a":{"name":"a","version":"1.0.0",'
+    '"dependencies":{"left-pad":"1.3.0"}}}}\n'
+)
+
+LEFT_PAD_LOCK = (
+    '{"name":"p","version":"1.0.0","lockfileVersion":3,"requires":true,'
+    '"packages":{"":{"name":"p","version":"1.0.0",'
+    '"dependencies":{"left-pad":"1.3.0"}},'
+    '"node_modules/left-pad":{"version":"1.3.0",'
+    '"resolved":"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz"}}}\n'
+)
+
+
+@unittest.skipUnless(shutil.which("npm"), "npm is not installed")
+class NpmAuditRegistryTest(unittest.TestCase):
+    """End to end with npm: only the auditor's own registry gets the audit request."""
+
+    def setUp(self) -> None:
+        self.requests: dict[int, list[tuple[str, str | None]]] = {}
+        requests = self.requests
+
+        class Registry(http.server.BaseHTTPRequestHandler):
+            def handle_one(self) -> None:
+                length = int(self.headers.get("content-length") or 0)
+                self.rfile.read(length)
+                port = self.server.server_address[1]
+                requests.setdefault(port, []).append(
+                    (self.path, self.headers.get("authorization"))
+                )
+                name = self.path.strip("/")
+                body = json.dumps(
+                    {
+                        "name": name,
+                        "dist-tags": {"latest": "1.3.0"},
+                        "versions": {"1.3.0": {"name": name, "version": "1.3.0"}},
+                    }
+                ).encode()
+                if self.path.endswith("/advisories/bulk"):
+                    body = LEFT_PAD_ADVISORY
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(body)
+
+            do_GET = do_POST = handle_one
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        self.servers = [
+            http.server.HTTPServer(("127.0.0.1", 0), Registry) for _ in range(2)
+        ]
+        for server in self.servers:
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.attacker, self.own = (s.server_address[1] for s in self.servers)
+
+    def tearDown(self) -> None:
+        for server in self.servers:
+            server.shutdown()
+            server.server_close()
+
+    def attacker_npmrc(self) -> str:
+        return (
+            f"registry=http://127.0.0.1:{self.attacker}/\n"
+            f"//127.0.0.1:{self.attacker}/:_authToken=${{NPM_PROBE}}\n"
+        )
+
+    def plant_workspace_root(self, tmp: str) -> Path:
+        shared = Path(tmp, "shared-tmp")
+        shared.mkdir()
+        Path(shared, "package.json").write_text(
+            '{"name":"root","version":"1.0.0","workspaces":["*"]}\n'
+        )
+        Path(shared, "package-lock.json").write_text(
+            '{"name":"root","version":"1.0.0","lockfileVersion":3,'
+            '"packages":{"":{"name":"root","workspaces":["*"]}}}\n'
+        )
+        Path(shared, ".npmrc").write_text(self.attacker_npmrc())
+        return shared
+
+    def audit(
+        self,
+        script: Path,
+        tmp: str,
+        project: Path,
+        user_registry: bool = True,
+        keep_manifest: bool = True,
+        write_fixture: bool = True,
+        **extra: str,
+    ) -> subprocess.CompletedProcess:
+        if write_fixture:
+            # A dependency, so that npm sends the bulk advisory request.
+            Path(project, "package.json").write_text(
+                '{"name":"p","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}\n'
+            )
+            if not keep_manifest:
+                Path(project, "package.json").unlink()
+            Path(project, "package-lock.json").write_text(LEFT_PAD_LOCK)
+        userconfig = Path(tmp, "user.npmrc")
+        userconfig.write_text(
+            f"registry=http://127.0.0.1:{self.own}/\n"
+            if user_registry
+            # An unknown key makes npm print a warning on every command.
+            else "always-auth=true\n"
+        )
+        # npm settings from the caller's environment outrank a project's
+        # .npmrc and would let the unfixed scanner pass.
+        env = {k: v for k, v in os.environ.items() if not k.lower().startswith("npm_")}
+        env["NPM_PROBE"] = "probe-value"
+        env["NPM_CONFIG_USERCONFIG"] = str(userconfig)
+        env["NPM_CONFIG_CACHE"] = str(Path(tmp, "cache"))
+        env["NPM_CONFIG_UPDATE_NOTIFIER"] = "false"
+        env.update(extra)
+        self.requests.clear()
+        result = run(script, str(project), env=env)
+        self.assertEqual(self.requests.get(self.attacker, []), [])
+        paths = [path for path, _auth in self.requests.get(self.own, [])]
+        self.assertIn("/-/npm/v1/security/advisories/bulk", paths)
+        return result
+
+    def test_the_global_npmrc_is_read(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").write_text(self.attacker_npmrc())
+                global_prefix = Path(tmp, "global")
+                Path(global_prefix, "etc").mkdir(parents=True)
+                Path(global_prefix, "etc", "npmrc").write_text(
+                    f"registry=http://127.0.0.1:{self.own}/\n"
+                )
+                self.audit(
+                    script,
+                    tmp,
+                    project,
+                    user_registry=False,
+                    NPM_CONFIG_PREFIX=str(global_prefix),
+                )
+
+    def test_a_lock_file_only_project_under_a_workspace_root(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").unlink()
+                shared = self.plant_workspace_root(tmp)
+                self.audit(
+                    script, tmp, project, keep_manifest=False, TMPDIR=str(shared)
+                )
+
+    def test_a_workspace_dependency_is_audited(self) -> None:
+        # The vulnerable package is needed only by a workspace, and the
+        # root has a dependency of its own.
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").unlink()
+                Path(project, "package.json").write_text(
+                    '{"name":"root","version":"1.0.0","workspaces":["packages/*"],'
+                    '"devDependencies":{"right-pad":"1.0.1"}}\n'
+                )
+                Path(project, "package-lock.json").write_text(MONOREPO_LOCK)
+                Path(project, "packages", "a").mkdir(parents=True)
+                Path(project, "packages", "a", "package.json").write_text(
+                    '{"name":"a","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}\n'
+                )
+                result = self.audit(script, tmp, project, write_fixture=False)
+                self.assertIn(
+                    "WARNING: Vulnerable dependencies found: 1", result.stdout
+                )
+
+    def test_the_project_npmrc_is_not_read(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").write_text(self.attacker_npmrc())
+                self.audit(script, tmp, project)
+
+    def test_a_workspace_root_above_the_temporary_directory_is_not_used(self) -> None:
+        # Another user of a shared /tmp can plant a workspace root there.
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").unlink()
+                shared = self.plant_workspace_root(tmp)
+                self.audit(script, tmp, project, TMPDIR=str(shared))
 
 
 if __name__ == "__main__":
