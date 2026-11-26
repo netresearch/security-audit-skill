@@ -467,7 +467,7 @@ class NpmAuditTest(unittest.TestCase):
 
     def test_a_globalconfig_that_is_not_one_absolute_path_is_an_error(self) -> None:
         for script in NPM_SCANNERS:
-            for output in ("etc/npmrc", "Usage:\n/etc/npmrc"):
+            for output in ("etc/npmrc", "Usage:\n/etc/npmrc", "/etc/npmrc\nextra"):
                 with self.subTest(script=script.name, output=output):
                     result = self.scan(
                         script, STUB_CONFIG_OUTPUT=output, STUB_OUTPUT=NPM_CLEAN
