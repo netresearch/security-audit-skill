@@ -251,6 +251,7 @@ if [[ -f "$PROJECT_DIR/package-lock.json" || -f "$PROJECT_DIR/yarn.lock" || -f "
         # workspace root. A run that could not check is an error, not a
         # clean result.
         AUDIT_DIR=$(mktemp -d)
+        trap 'rm -rf "$AUDIT_DIR"' EXIT
         cp "$PROJECT_DIR/package-lock.json" "$AUDIT_DIR/"
         for NPM_FILE in package.json npm-shrinkwrap.json; do
             if [[ -f "$PROJECT_DIR/$NPM_FILE" ]]; then
@@ -260,6 +261,7 @@ if [[ -f "$PROJECT_DIR/package-lock.json" || -f "$PROJECT_DIR/yarn.lock" || -f "
         AUDIT_RC=0
         AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json --prefix "$AUDIT_DIR" 2>/dev/null) || AUDIT_RC=$?
         rm -rf "$AUDIT_DIR"
+        trap - EXIT
         VULN_COUNT=$(printf '%s' "$AUDIT_OUTPUT" | node -e '
             let s = "";
             process.stdin.on("data", (d) => (s += d)).on("end", () => {

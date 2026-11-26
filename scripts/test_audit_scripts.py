@@ -452,6 +452,19 @@ class NpmAuditTest(unittest.TestCase):
                 run(script, str(project), env=env)
                 self.assertIn("npm-shrinkwrap.json", recorded(tmp, "npm", "files"))
 
+    def test_the_temporary_directory_is_removed_when_a_copy_fails(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, "package.json").chmod(0)
+                scratch = Path(tmp, "scratch")
+                scratch.mkdir()
+                env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp}
+                env["TMPDIR"] = str(scratch)
+                result = run(script, str(project), env=env)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertEqual(list(scratch.iterdir()), [])
+
     def test_a_clean_run_is_ok(self) -> None:
         for script in NPM_SCANNERS:
             with self.subTest(script=script.name):
