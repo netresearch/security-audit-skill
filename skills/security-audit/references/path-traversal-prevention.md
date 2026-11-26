@@ -344,6 +344,28 @@ final class PathValidator
 }
 ```
 
+## Identifiers in Outgoing Request Paths
+
+A client that builds a REST URL from an identifier it was given (`f"rest/api/2/issue/{key}/worklog/{wid}"`) has the same flaw on the request side: the identifier can make the request address another resource. This matters when an agent passes on a key or an id it read in someone else's text. Shapes that retarget a request, measured with Python `requests` 2.x and atlassian-python-api 3.41 in [netresearch/jira-skill#347](https://github.com/netresearch/jira-skill/pull/347):
+
+| Identifier | What is sent |
+|---|---|
+| `../../PROJ-2` as the worklog id | `DELETE issue/PROJ-2`: requests removes dot segments before sending |
+| `PROJ-2?x=` as the key, worklog `42` | `DELETE issue/PROJ-2`: the rest of the path (`/worklog/42`) moves into the query |
+| `PROJ-1#` as the key | `DELETE issue/PROJ-1`: the rest is a fragment and never sent |
+| `PROJ-1?deleteSubtasks=true` as the key | `?deleteSubtasks=true&deleteSubtasks=false`: the library appends its own parameter with `&`; which value the server reads depends on its framework |
+| `PROJ-1/comment/7` as the key | a sub-resource of the named issue |
+| `..;x` as a segment | requests leaves it alone; Tomcat strips `;` path parameters before it normalises, so it reads `..` (known Tomcat behaviour, not measured in that PR) |
+
+A check on the final URL alone misses the query case, because `?a=b` without a `/` looks like an ordinary query. Use two layers:
+
+1. **Allowlist each identifier where it enters**, before any request: an issue key `[A-Za-z]\w*-\d+`, an id `\d+`, each matched against the whole value (`re.fullmatch`; `re.match` and `re.search` accept `PROJ-1?deleteSubtasks=true` by its prefix) and with `re.ASCII` (without it, `\d` also matches digits of other scripts, such as `٤٢`).
+2. **Check the URL as built, in the HTTP session, before the HTTP library normalises it**: requests removes dot segments while it prepares a request, so a check on the prepared or sent URL sees `issue/PROJ-2` instead of `../../PROJ-2`. Wrap the session's `request()` (or the call that receives the URL string), not a hook on the prepared request. This layer covers paths a library builds and ids no allowlist covers: refuse `#`, a `.` or `..` segment (also percent-encoded, and with a `;` parameter), a backslash or `%2F`/`%5C` in the path, and a `/` in the query. A request sent outside that session, such as a plain `requests.get`, must call the same check before it is sent.
+
+For a destructive call, also compare the resource that a preceding GET returned with the id you were given before sending the DELETE.
+
+To see what a client really sends, point it at a local `http.server.BaseHTTPRequestHandler` that logs `self.command` and `self.path`. No real server or credentials are needed, and the log shows the request after the client's own normalisation.
+
 ## Framework-Specific Solutions
 
 ### TYPO3 FAL (File Abstraction Layer)
