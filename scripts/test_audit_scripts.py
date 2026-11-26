@@ -442,6 +442,16 @@ class NpmAuditTest(unittest.TestCase):
                     sorted(files.split()), ["package-lock.json", "package.json"]
                 )
 
+    def test_a_shrinkwrap_file_is_copied(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, "npm-shrinkwrap.json").write_text("{}\n")
+                env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp}
+                env["STUB_OUTPUT"] = NPM_CLEAN
+                run(script, str(project), env=env)
+                self.assertIn("npm-shrinkwrap.json", recorded(tmp, "npm", "files"))
+
     def test_a_clean_run_is_ok(self) -> None:
         for script in NPM_SCANNERS:
             with self.subTest(script=script.name):
@@ -470,16 +480,20 @@ class NpmAuditTest(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("npm"), "npm is not installed")
 class NpmAuditRegistryTest(unittest.TestCase):
-    """End to end with npm: the project's .npmrc sends nothing to its registry."""
+    """End to end with npm: only the auditor's own registry gets the audit request."""
 
-    def test_project_registry_receives_no_request(self) -> None:
-        requests: list[tuple[str, str | None]] = []
+    def setUp(self) -> None:
+        self.requests: dict[int, list[tuple[str, str | None]]] = {}
+        requests = self.requests
 
         class Registry(http.server.BaseHTTPRequestHandler):
             def handle_one(self) -> None:
                 length = int(self.headers.get("content-length") or 0)
                 self.rfile.read(length)
-                requests.append((self.path, self.headers.get("authorization")))
+                port = self.server.server_address[1]
+                requests.setdefault(port, []).append(
+                    (self.path, self.headers.get("authorization"))
+                )
                 self.send_response(200)
                 self.send_header("content-type", "application/json")
                 self.end_headers()
@@ -490,35 +504,63 @@ class NpmAuditRegistryTest(unittest.TestCase):
             def log_message(self, *args: object) -> None:
                 pass
 
-        servers = [http.server.HTTPServer(("127.0.0.1", 0), Registry) for _ in range(2)]
-        for server in servers:
+        self.servers = [
+            http.server.HTTPServer(("127.0.0.1", 0), Registry) for _ in range(2)
+        ]
+        for server in self.servers:
             threading.Thread(target=server.serve_forever, daemon=True).start()
-        attacker, own = (server.server_address[1] for server in servers)
-        try:
-            for script in NPM_SCANNERS:
-                with (
-                    self.subTest(script=script.name),
-                    tempfile.TemporaryDirectory() as tmp,
-                ):
-                    requests.clear()
-                    project = npm_project(tmp)
-                    Path(project, ".npmrc").write_text(
-                        f"registry=http://127.0.0.1:{attacker}/\n"
-                        f"//127.0.0.1:{attacker}/:_authToken=${{NPM_PROBE}}\n"
-                    )
-                    userconfig = Path(tmp, "user.npmrc")
-                    userconfig.write_text(f"registry=http://127.0.0.1:{own}/\n")
-                    env = dict(os.environ)
-                    env["NPM_PROBE"] = "probe-value"
-                    env["NPM_CONFIG_USERCONFIG"] = str(userconfig)
-                    env["npm_config_cache"] = str(Path(tmp, "cache"))
-                    run(script, str(project), env=env)
-                    leaked = [r for r in requests if r[1] and "probe-value" in r[1]]
-                    self.assertEqual(leaked, [])
-        finally:
-            for server in servers:
-                server.shutdown()
-                server.server_close()
+        self.attacker, self.own = (s.server_address[1] for s in self.servers)
+
+    def tearDown(self) -> None:
+        for server in self.servers:
+            server.shutdown()
+            server.server_close()
+
+    def attacker_npmrc(self) -> str:
+        return (
+            f"registry=http://127.0.0.1:{self.attacker}/\n"
+            f"//127.0.0.1:{self.attacker}/:_authToken=${{NPM_PROBE}}\n"
+        )
+
+    def audit(self, script: Path, tmp: str, project: Path, **extra: str) -> None:
+        userconfig = Path(tmp, "user.npmrc")
+        userconfig.write_text(f"registry=http://127.0.0.1:{self.own}/\n")
+        # npm settings from the caller's environment outrank a project's
+        # .npmrc and would let the unfixed scanner pass.
+        env = {k: v for k, v in os.environ.items() if not k.lower().startswith("npm_")}
+        env["NPM_PROBE"] = "probe-value"
+        env["NPM_CONFIG_USERCONFIG"] = str(userconfig)
+        env["NPM_CONFIG_CACHE"] = str(Path(tmp, "cache"))
+        env.update(extra)
+        self.requests.clear()
+        run(script, str(project), env=env)
+        self.assertEqual(self.requests.get(self.attacker, []), [])
+        self.assertTrue(self.requests.get(self.own), "npm did not reach its registry")
+
+    def test_the_project_npmrc_is_not_read(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").write_text(self.attacker_npmrc())
+                self.audit(script, tmp, project)
+
+    def test_a_workspace_root_above_the_temporary_directory_is_not_used(self) -> None:
+        # Another user of a shared /tmp can plant a workspace root there.
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").unlink()
+                shared = Path(tmp, "shared-tmp")
+                shared.mkdir()
+                Path(shared, "package.json").write_text(
+                    '{"name":"root","version":"1.0.0","workspaces":["*"]}\n'
+                )
+                Path(shared, "package-lock.json").write_text(
+                    '{"name":"root","version":"1.0.0","lockfileVersion":3,'
+                    '"packages":{"":{"name":"root","workspaces":["*"]}}}\n'
+                )
+                Path(shared, ".npmrc").write_text(self.attacker_npmrc())
+                self.audit(script, tmp, project, TMPDIR=str(shared))
 
 
 if __name__ == "__main__":

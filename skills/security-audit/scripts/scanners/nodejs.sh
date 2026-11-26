@@ -246,15 +246,19 @@ if [[ -f "$PROJECT_DIR/package-lock.json" || -f "$PROJECT_DIR/yarn.lock" || -f "
         # auditor's environment variables into the request, so npm audit
         # runs on a copy of the manifest and lock file in an empty
         # directory, where npm reads only the auditor's own
-        # configuration. A run that could not check is an error, not a
+        # configuration. --prefix keeps npm from taking a parent of that
+        # directory (for example a shared /tmp) as its project or
+        # workspace root. A run that could not check is an error, not a
         # clean result.
         AUDIT_DIR=$(mktemp -d)
         cp "$PROJECT_DIR/package-lock.json" "$AUDIT_DIR/"
-        if [[ -f "$PROJECT_DIR/package.json" ]]; then
-            cp "$PROJECT_DIR/package.json" "$AUDIT_DIR/"
-        fi
+        for NPM_FILE in package.json npm-shrinkwrap.json; do
+            if [[ -f "$PROJECT_DIR/$NPM_FILE" ]]; then
+                cp "$PROJECT_DIR/$NPM_FILE" "$AUDIT_DIR/"
+            fi
+        done
         AUDIT_RC=0
-        AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json 2>/dev/null) || AUDIT_RC=$?
+        AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json --prefix "$AUDIT_DIR" 2>/dev/null) || AUDIT_RC=$?
         rm -rf "$AUDIT_DIR"
         VULN_COUNT=$(printf '%s' "$AUDIT_OUTPUT" | node -e '
             let s = "";
