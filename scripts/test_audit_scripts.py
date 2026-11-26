@@ -439,7 +439,8 @@ class NpmAuditTest(unittest.TestCase):
                 self.assertTrue(cwd, "npm was not called")
                 self.assertNotEqual(Path(cwd).resolve(), project.resolve())
                 self.assertEqual(
-                    sorted(files.split()), ["package-lock.json", "package.json"]
+                    sorted(files.split()),
+                    ["node_modules", "package-lock.json", "package.json"],
                 )
 
     def test_a_shrinkwrap_file_is_copied(self) -> None:
@@ -544,14 +545,39 @@ class NpmAuditRegistryTest(unittest.TestCase):
             f"//127.0.0.1:{self.attacker}/:_authToken=${{NPM_PROBE}}\n"
         )
 
-    def audit(self, script: Path, tmp: str, project: Path, **extra: str) -> None:
+    def plant_workspace_root(self, tmp: str) -> Path:
+        shared = Path(tmp, "shared-tmp")
+        shared.mkdir()
+        Path(shared, "package.json").write_text(
+            '{"name":"root","version":"1.0.0","workspaces":["*"]}\n'
+        )
+        Path(shared, "package-lock.json").write_text(
+            '{"name":"root","version":"1.0.0","lockfileVersion":3,'
+            '"packages":{"":{"name":"root","workspaces":["*"]}}}\n'
+        )
+        Path(shared, ".npmrc").write_text(self.attacker_npmrc())
+        return shared
+
+    def audit(
+        self,
+        script: Path,
+        tmp: str,
+        project: Path,
+        user_registry: bool = True,
+        keep_manifest: bool = True,
+        **extra: str,
+    ) -> None:
         # A dependency, so that npm sends the bulk advisory request at all.
         Path(project, "package.json").write_text(
             '{"name":"p","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}\n'
         )
+        if not keep_manifest:
+            Path(project, "package.json").unlink()
         Path(project, "package-lock.json").write_text(LEFT_PAD_LOCK)
         userconfig = Path(tmp, "user.npmrc")
-        userconfig.write_text(f"registry=http://127.0.0.1:{self.own}/\n")
+        userconfig.write_text(
+            f"registry=http://127.0.0.1:{self.own}/\n" if user_registry else ""
+        )
         # npm settings from the caller's environment outrank a project's
         # .npmrc and would let the unfixed scanner pass.
         env = {k: v for k, v in os.environ.items() if not k.lower().startswith("npm_")}
@@ -566,6 +592,34 @@ class NpmAuditRegistryTest(unittest.TestCase):
         paths = [path for path, _auth in self.requests.get(self.own, [])]
         self.assertIn("/-/npm/v1/security/advisories/bulk", paths)
 
+    def test_the_global_npmrc_is_read(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").write_text(self.attacker_npmrc())
+                global_prefix = Path(tmp, "global")
+                Path(global_prefix, "etc").mkdir(parents=True)
+                Path(global_prefix, "etc", "npmrc").write_text(
+                    f"registry=http://127.0.0.1:{self.own}/\n"
+                )
+                self.audit(
+                    script,
+                    tmp,
+                    project,
+                    user_registry=False,
+                    NPM_CONFIG_PREFIX=str(global_prefix),
+                )
+
+    def test_a_lock_file_only_project_under_a_workspace_root(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                Path(project, ".npmrc").unlink()
+                shared = self.plant_workspace_root(tmp)
+                self.audit(
+                    script, tmp, project, keep_manifest=False, TMPDIR=str(shared)
+                )
+
     def test_the_project_npmrc_is_not_read(self) -> None:
         for script in NPM_SCANNERS:
             with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
@@ -579,16 +633,7 @@ class NpmAuditRegistryTest(unittest.TestCase):
             with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
                 project = npm_project(tmp)
                 Path(project, ".npmrc").unlink()
-                shared = Path(tmp, "shared-tmp")
-                shared.mkdir()
-                Path(shared, "package.json").write_text(
-                    '{"name":"root","version":"1.0.0","workspaces":["*"]}\n'
-                )
-                Path(shared, "package-lock.json").write_text(
-                    '{"name":"root","version":"1.0.0","lockfileVersion":3,'
-                    '"packages":{"":{"name":"root","workspaces":["*"]}}}\n'
-                )
-                Path(shared, ".npmrc").write_text(self.attacker_npmrc())
+                shared = self.plant_workspace_root(tmp)
                 self.audit(script, tmp, project, TMPDIR=str(shared))
 
 
