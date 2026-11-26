@@ -382,6 +382,13 @@ class GoVulncheckTest(unittest.TestCase):
 
 NPM_STUB = (
     "#!/bin/sh\n"
+    'if [ "$1" = config ]; then\n'
+    '  if [ -n "$STUB_CONFIG_EXIT" ]; then\n'
+    '    echo "The globalconfig option is protected"; exit "$STUB_CONFIG_EXIT"\n'
+    "  fi\n"
+    "  echo /etc/npmrc; exit 0\n"
+    "fi\n"
+    'printf "%s\\n" "$*" > "$RECORD_DIR/npm.args"\n'
     'pwd > "$RECORD_DIR/npm.cwd"\n'
     'ls -A > "$RECORD_DIR/npm.files"\n'
     'printf "%s" "${STUB_OUTPUT:-}"\n'
@@ -443,6 +450,28 @@ class NpmAuditTest(unittest.TestCase):
                     sorted(files.split()),
                     ["package-lock.json", "package.json"],
                 )
+
+    def test_a_failed_globalconfig_lookup_is_an_error(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                result = self.scan(script, STUB_CONFIG_EXIT="1", STUB_OUTPUT=NPM_CLEAN)[
+                    3
+                ]
+                self.assertIn(
+                    "ERROR: npm audit could not check the dependencies", result.stdout
+                )
+                self.assertIn("could not read npm's globalconfig", result.stdout)
+                self.assertNotIn("No known vulnerable dependencies", result.stdout)
+                self.assertEqual(result.returncode, 1, result.stdout)
+
+    def test_the_global_config_path_is_passed_on(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name), tempfile.TemporaryDirectory() as tmp:
+                project = npm_project(tmp)
+                env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp}
+                env["STUB_OUTPUT"] = NPM_CLEAN
+                run(script, str(project), env=env)
+                self.assertIn("--globalconfig /etc/npmrc", recorded(tmp, "npm", "args"))
 
     def test_a_shrinkwrap_file_is_copied(self) -> None:
         for script in NPM_SCANNERS:

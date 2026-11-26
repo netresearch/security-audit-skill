@@ -240,13 +240,18 @@ if [[ -f "$PROJECT_DIR/package-lock.json" ]] || [[ -f "$PROJECT_DIR/yarn.lock" ]
                 cp "$PROJECT_DIR/$NPM_FILE" "$AUDIT_DIR/"
             fi
         done
-        NPM_ARGS=(--prefix "$AUDIT_DIR")
-        NPM_GLOBALCONFIG=$(cd / && npm config get globalconfig 2>/dev/null) || NPM_GLOBALCONFIG=""
-        if [[ -n "$NPM_GLOBALCONFIG" ]]; then
-            NPM_ARGS+=(--globalconfig "$NPM_GLOBALCONFIG")
-        fi
+        # Without the path, the audit would silently skip the global
+        # npmrc, so a failed lookup ends the check as an error.
         AUDIT_RC=0
-        AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json "${NPM_ARGS[@]}" 2>/dev/null) || AUDIT_RC=$?
+        NPM_GLOBALCONFIG=$(cd / && npm config get globalconfig 2>&1) || AUDIT_RC=$?
+        if [[ "$AUDIT_RC" -ne 0 || -z "$NPM_GLOBALCONFIG" ]]; then
+            AUDIT_OUTPUT="could not read npm's globalconfig: $NPM_GLOBALCONFIG"
+            if [[ "$AUDIT_RC" -eq 0 ]]; then
+                AUDIT_RC=1
+            fi
+        else
+            AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json --prefix "$AUDIT_DIR" --globalconfig "$NPM_GLOBALCONFIG" 2>/dev/null) || AUDIT_RC=$?
+        fi
         rm -rf "$AUDIT_DIR"
         trap - EXIT
         VULN_COUNT=$(printf '%s' "$AUDIT_OUTPUT" | node -e '
