@@ -221,13 +221,38 @@ echo ""
 echo "=== Checking Dependencies ==="
 if [[ -f "$PROJECT_DIR/package-lock.json" ]] || [[ -f "$PROJECT_DIR/yarn.lock" ]]; then
     if command -v npm &> /dev/null && [[ -f "$PROJECT_DIR/package-lock.json" ]]; then
-        AUDIT_OUTPUT=$(cd "$PROJECT_DIR" && npm audit --json 2>/dev/null | head -50 || true)
-        VULN_COUNT=$(echo "$AUDIT_OUTPUT" | grep -o '"vulnerabilities"' | wc -l || echo "0")
-        if [[ "$VULN_COUNT" -gt 0 ]]; then
-            echo "WARNING: Vulnerable dependencies found (run 'npm audit' for details)"
+        # npm reads the .npmrc of the directory it runs in. The audited
+        # project's .npmrc could name its own registry and put the
+        # auditor's environment variables into the request, so npm audit
+        # runs on a copy of the manifest and lock file in an empty
+        # directory, where npm reads only the auditor's own
+        # configuration. A run that could not check is an error, not a
+        # clean result.
+        AUDIT_DIR=$(mktemp -d)
+        cp "$PROJECT_DIR/package-lock.json" "$AUDIT_DIR/"
+        if [[ -f "$PROJECT_DIR/package.json" ]]; then
+            cp "$PROJECT_DIR/package.json" "$AUDIT_DIR/"
+        fi
+        AUDIT_RC=0
+        AUDIT_OUTPUT=$(cd "$AUDIT_DIR" && npm audit --json 2>/dev/null) || AUDIT_RC=$?
+        rm -rf "$AUDIT_DIR"
+        VULN_COUNT=$(printf '%s' "$AUDIT_OUTPUT" | node -e '
+            let s = "";
+            process.stdin.on("data", (d) => (s += d)).on("end", () => {
+                try {
+                    const total = JSON.parse(s).metadata.vulnerabilities.total;
+                    if (Number.isInteger(total)) console.log(total);
+                } catch {}
+            });' 2>/dev/null || true)
+        if [[ -n "$VULN_COUNT" && "$VULN_COUNT" -gt 0 ]]; then
+            echo "WARNING: Vulnerable dependencies found: $VULN_COUNT (run 'npm audit' for details)"
             WARNINGS=$((WARNINGS + 1))
-        else
+        elif [[ "$VULN_COUNT" == "0" && "$AUDIT_RC" -eq 0 ]]; then
             echo "OK: No known vulnerable dependencies"
+        else
+            echo "ERROR: npm audit could not check the dependencies (exit $AUDIT_RC):"
+            echo "$AUDIT_OUTPUT" | head -10
+            ERRORS=$((ERRORS + 1))
         fi
     else
         echo "WARNING: npm not available or no package-lock.json for dependency audit"

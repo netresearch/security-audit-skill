@@ -3,9 +3,12 @@
 # SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Behavioural tests for the shell audit scripts under skills/security-audit/scripts/."""
 
+import http.server
 import os
+import shutil
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -374,6 +377,148 @@ class GoVulncheckTest(unittest.TestCase):
 
     def test_vendored_module(self) -> None:
         self.assertIn("GOFLAGS=-mod=vendor -buildvcs=false", self.check(vendored=True))
+
+
+NPM_STUB = (
+    "#!/bin/sh\n"
+    'pwd > "$RECORD_DIR/npm.cwd"\n'
+    'ls -A > "$RECORD_DIR/npm.files"\n'
+    'printf "%s" "${STUB_OUTPUT:-}"\n'
+    'exit "${STUB_EXIT:-0}"\n'
+)
+
+NPM_CLEAN = '{"vulnerabilities":{},"metadata":{"vulnerabilities":{"total":0}}}'
+NPM_FINDING = (
+    '{"vulnerabilities":{"minimist":{}},"metadata":{"vulnerabilities":{"total":1}}}'
+)
+NPM_FAILED = '{"message":"request failed","error":{"summary":"","detail":""}}'
+
+NPM_SCANNERS = (
+    SCRIPTS / "scanners" / "javascript.sh",
+    SCRIPTS / "scanners" / "nodejs.sh",
+)
+
+
+def npm_project(tmp: str) -> Path:
+    """A project whose .npmrc points npm at its own registry."""
+    project = Path(tmp, "project")
+    project.mkdir()
+    Path(project, "src").mkdir()
+    Path(project, "src", "index.js").write_text("module.exports = {};\n")
+    Path(project, "package.json").write_text('{"name":"p","version":"1.0.0"}\n')
+    Path(project, "package-lock.json").write_text(
+        '{"name":"p","version":"1.0.0","lockfileVersion":3,"packages":{}}\n'
+    )
+    Path(project, ".npmrc").write_text(
+        "registry=http://127.0.0.1:9/\n//127.0.0.1:9/:_authToken=${NPM_PROBE}\n"
+    )
+    return project
+
+
+class NpmAuditTest(unittest.TestCase):
+    """npm audit reads the audited project's lock file but not its .npmrc."""
+
+    def scan(
+        self, script: Path, **extra: str
+    ) -> tuple[Path, str, str, subprocess.CompletedProcess]:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = npm_project(tmp)
+            env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp, **extra}
+            result = run(script, str(project), env=env)
+            return (
+                project,
+                recorded(tmp, "npm", "cwd").strip(),
+                recorded(tmp, "npm", "files"),
+                result,
+            )
+
+    def test_npm_runs_outside_the_project_without_its_npmrc(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                project, cwd, files, _result = self.scan(script, STUB_OUTPUT=NPM_CLEAN)
+                self.assertTrue(cwd, "npm was not called")
+                self.assertNotEqual(Path(cwd).resolve(), project.resolve())
+                self.assertEqual(
+                    sorted(files.split()), ["package-lock.json", "package.json"]
+                )
+
+    def test_a_clean_run_is_ok(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                result = self.scan(script, STUB_OUTPUT=NPM_CLEAN)[3]
+                self.assertIn("OK: No known vulnerable dependencies", result.stdout)
+                self.assertNotIn("Vulnerable dependencies found", result.stdout)
+
+    def test_a_finding_is_a_warning(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                result = self.scan(script, STUB_EXIT="1", STUB_OUTPUT=NPM_FINDING)[3]
+                self.assertIn(
+                    "WARNING: Vulnerable dependencies found: 1", result.stdout
+                )
+
+    def test_a_run_that_could_not_check_is_an_error(self) -> None:
+        for script in NPM_SCANNERS:
+            with self.subTest(script=script.name):
+                result = self.scan(script, STUB_EXIT="1", STUB_OUTPUT=NPM_FAILED)[3]
+                self.assertIn(
+                    "ERROR: npm audit could not check the dependencies", result.stdout
+                )
+                self.assertNotIn("No known vulnerable dependencies", result.stdout)
+                self.assertEqual(result.returncode, 1, result.stdout)
+
+
+@unittest.skipUnless(shutil.which("npm"), "npm is not installed")
+class NpmAuditRegistryTest(unittest.TestCase):
+    """End to end with npm: the project's .npmrc sends nothing to its registry."""
+
+    def test_project_registry_receives_no_request(self) -> None:
+        requests: list[tuple[str, str | None]] = []
+
+        class Registry(http.server.BaseHTTPRequestHandler):
+            def handle_one(self) -> None:
+                length = int(self.headers.get("content-length") or 0)
+                self.rfile.read(length)
+                requests.append((self.path, self.headers.get("authorization")))
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+            do_GET = do_POST = handle_one
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        servers = [http.server.HTTPServer(("127.0.0.1", 0), Registry) for _ in range(2)]
+        for server in servers:
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+        attacker, own = (server.server_address[1] for server in servers)
+        try:
+            for script in NPM_SCANNERS:
+                with (
+                    self.subTest(script=script.name),
+                    tempfile.TemporaryDirectory() as tmp,
+                ):
+                    requests.clear()
+                    project = npm_project(tmp)
+                    Path(project, ".npmrc").write_text(
+                        f"registry=http://127.0.0.1:{attacker}/\n"
+                        f"//127.0.0.1:{attacker}/:_authToken=${{NPM_PROBE}}\n"
+                    )
+                    userconfig = Path(tmp, "user.npmrc")
+                    userconfig.write_text(f"registry=http://127.0.0.1:{own}/\n")
+                    env = dict(os.environ)
+                    env["NPM_PROBE"] = "probe-value"
+                    env["NPM_CONFIG_USERCONFIG"] = str(userconfig)
+                    env["npm_config_cache"] = str(Path(tmp, "cache"))
+                    run(script, str(project), env=env)
+                    leaked = [r for r in requests if r[1] and "probe-value" in r[1]]
+                    self.assertEqual(leaked, [])
+        finally:
+            for server in servers:
+                server.shutdown()
+                server.server_close()
 
 
 if __name__ == "__main__":
