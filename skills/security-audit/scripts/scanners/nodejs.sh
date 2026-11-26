@@ -263,9 +263,9 @@ if [[ -f "$PROJECT_DIR/package-lock.json" || -f "$PROJECT_DIR/yarn.lock" || -f "
         # Without the path, the audit would silently skip the global
         # npmrc, so a failed lookup ends the check as an error.
         AUDIT_RC=0
-        NPM_GLOBALCONFIG=$(cd / && npm config get globalconfig 2>&1) || AUDIT_RC=$?
-        if [[ "$AUDIT_RC" -ne 0 || -z "$NPM_GLOBALCONFIG" ]]; then
-            AUDIT_OUTPUT="could not read npm's globalconfig: $NPM_GLOBALCONFIG"
+        NPM_GLOBALCONFIG=$(cd / && npm config get globalconfig 2>/dev/null) || AUDIT_RC=$?
+        if [[ "$AUDIT_RC" -ne 0 || "$NPM_GLOBALCONFIG" != /* || "$NPM_GLOBALCONFIG" == *$'\n'* ]]; then
+            AUDIT_OUTPUT="could not read npm's globalconfig (npm config get globalconfig, exit $AUDIT_RC)"
             if [[ "$AUDIT_RC" -eq 0 ]]; then
                 AUDIT_RC=1
             fi

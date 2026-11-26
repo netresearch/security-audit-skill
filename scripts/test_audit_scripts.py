@@ -384,8 +384,9 @@ NPM_STUB = (
     "#!/bin/sh\n"
     'if [ "$1" = config ]; then\n'
     '  if [ -n "$STUB_CONFIG_EXIT" ]; then\n'
-    '    echo "The globalconfig option is protected"; exit "$STUB_CONFIG_EXIT"\n'
+    '    echo "The globalconfig option is protected" >&2; exit "$STUB_CONFIG_EXIT"\n'
     "  fi\n"
+    '  echo "npm warn Unknown user config \\"always-auth\\"" >&2\n'
     "  echo /etc/npmrc; exit 0\n"
     "fi\n"
     'printf "%s\\n" "$*" > "$RECORD_DIR/npm.args"\n'
@@ -471,7 +472,9 @@ class NpmAuditTest(unittest.TestCase):
                 env = {**with_stub(tmp, "npm", NPM_STUB), "RECORD_DIR": tmp}
                 env["STUB_OUTPUT"] = NPM_CLEAN
                 run(script, str(project), env=env)
-                self.assertIn("--globalconfig /etc/npmrc", recorded(tmp, "npm", "args"))
+                args = recorded(tmp, "npm", "args")
+                self.assertIn("--globalconfig /etc/npmrc", args)
+                self.assertNotIn("warn", args)
 
     def test_a_shrinkwrap_file_is_copied(self) -> None:
         for script in NPM_SCANNERS:
@@ -637,7 +640,10 @@ class NpmAuditRegistryTest(unittest.TestCase):
             Path(project, "package-lock.json").write_text(LEFT_PAD_LOCK)
         userconfig = Path(tmp, "user.npmrc")
         userconfig.write_text(
-            f"registry=http://127.0.0.1:{self.own}/\n" if user_registry else ""
+            f"registry=http://127.0.0.1:{self.own}/\n"
+            if user_registry
+            # An unknown key makes npm print a warning on every command.
+            else "always-auth=true\n"
         )
         # npm settings from the caller's environment outrank a project's
         # .npmrc and would let the unfixed scanner pass.
