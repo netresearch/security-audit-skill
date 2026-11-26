@@ -1034,6 +1034,20 @@ grep -rn "'none'" --include="*.php" src/ Classes/ | grep -i jwt
 grep -rn "alg.*HS256.*RS256\|alg.*none" --include="*.php" src/ Classes/
 ```
 
+### SAML Login CSRF (Unsolicited Responses)
+
+```bash
+# ACS validation: a call without a request ID accepts any signed response
+grep -rn "processResponse(\|->isValid(" --include="*.php" src/ Classes/
+# Is the AuthnRequest ID kept per browser? (login(..., stay: true) returns the URL)
+grep -rn "getLastRequestID\|stay: true" --include="*.php" src/ Classes/
+grep -rn "rejectUnsolicitedResponsesWithInResponseTo" --include="*.php" src/ Classes/ config/ Configuration/
+```
+
+**Finding:** the Assertion Consumer Service calls php-saml `processResponse()` or `Response::isValid()` with no request ID, so any response validly signed by the IdP logs the browser in. An attacker with his own IdP account posts his response from the victim's browser, and the victim works in the attacker's account (login CSRF, CWE-352). Assertion-replay protection does not prevent this; each response is fresh.
+
+**Expected:** after `login(..., stay: true)` the SP stores `Auth::getLastRequestID()` for this browser and passes it to `processResponse($id)` / `isValid($id)`, which then also rejects a response without `InResponseTo`. `security.rejectUnsolicitedResponsesWithInResponseTo` is on; it only rejects a response with `InResponseTo` when no ID was passed, so it binds nothing alone. IdP-initiated login (no `InResponseTo`) is an explicit opt-in. The IdP's POST to the ACS is cross-site, so a session cookie with `SameSite=Lax` (TYPO3 FE default; BE is `Strict`) is not sent with it: the ID needs its own cookie with `SameSite=None; Secure; HttpOnly`, HMAC-signed and valid for minutes. Reference fix: [netresearch/t3x-nr-saml-auth#136](https://github.com/netresearch/t3x-nr-saml-auth/pull/136).
+
 ### Missing MFA
 
 ```bash
