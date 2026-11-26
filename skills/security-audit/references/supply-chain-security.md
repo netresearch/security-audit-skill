@@ -534,10 +534,12 @@ npm run build
 #!/usr/bin/env bash
 set -u
 PROJECT_DIR="${1:?usage: npm-audit-copy.sh <path of the audited repository>}"
-AUDIT_DIR=$(mktemp -d)
+AUDIT_DIR=$(mktemp -d) || { echo "could not check: mktemp failed" >&2; exit 2; }
 trap 'rm -rf "$AUDIT_DIR"' EXIT
 for f in package.json package-lock.json npm-shrinkwrap.json; do
-    if [[ -f "$PROJECT_DIR/$f" ]]; then cp "$PROJECT_DIR/$f" "$AUDIT_DIR/"; fi
+    if [[ -f "$PROJECT_DIR/$f" ]]; then
+        cp "$PROJECT_DIR/$f" "$AUDIT_DIR/" || { echo "could not check: cannot copy $f" >&2; exit 2; }
+    fi
 done
 GLOBALCONFIG=$(cd / && npm config get globalconfig 2>/dev/null) || GLOBALCONFIG=""
 if [[ "$GLOBALCONFIG" != /* || "$GLOBALCONFIG" == *$'\n'* ]]; then
@@ -569,7 +571,7 @@ Each part closes a trap that a simpler version falls into:
 | `2>/dev/null` on `npm audit` | The same warnings land in front of the JSON, and the parse fails. |
 | Read `metadata.vulnerabilities.total` | Every report contains the key `"vulnerabilities"`, so searching for it reports a finding on every run. `npm audit` exits 1 both for findings and for errors, so the exit code alone cannot tell them apart. |
 
-The repository's scanner `skills/security-audit/scripts/scanners/javascript.sh` implements the same steps, and `scripts/test_audit_scripts.py` (both paths from the repository root; classes `NpmAuditTest` and `NpmAuditRegistryTest`) tests each part against the real npm.
+The repository's scanner `skills/security-audit/scripts/scanners/javascript.sh` implements the same steps; `scripts/test_audit_scripts.py` tests them (both paths from the repository root). `NpmAuditRegistryTest` runs the real npm against local registries for the project `.npmrc`, the planted workspace root, the global npmrc and workspace dependencies; `NpmAuditTest` uses an npm stub for the copied files, the shrinkwrap copy, the globalconfig lookup and the result reading.
 
 ### Dependabot / Renovate for Automated Updates
 
