@@ -387,7 +387,7 @@ NPM_STUB = (
     '    echo "The globalconfig option is protected" >&2; exit "$STUB_CONFIG_EXIT"\n'
     "  fi\n"
     '  echo "npm warn Unknown user config \\"always-auth\\"" >&2\n'
-    "  echo /etc/npmrc; exit 0\n"
+    '  printf "%s\\n" "${STUB_CONFIG_OUTPUT:-/etc/npmrc}"; exit 0\n'
     "fi\n"
     'printf "%s\\n" "$*" > "$RECORD_DIR/npm.args"\n'
     'pwd > "$RECORD_DIR/npm.cwd"\n'
@@ -464,6 +464,17 @@ class NpmAuditTest(unittest.TestCase):
                 self.assertIn("could not read npm's globalconfig", result.stdout)
                 self.assertNotIn("No known vulnerable dependencies", result.stdout)
                 self.assertEqual(result.returncode, 1, result.stdout)
+
+    def test_a_globalconfig_that_is_not_one_absolute_path_is_an_error(self) -> None:
+        for script in NPM_SCANNERS:
+            for output in ("etc/npmrc", "Usage:\n/etc/npmrc"):
+                with self.subTest(script=script.name, output=output):
+                    result = self.scan(
+                        script, STUB_CONFIG_OUTPUT=output, STUB_OUTPUT=NPM_CLEAN
+                    )[3]
+                    self.assertIn("could not read npm's globalconfig", result.stdout)
+                    self.assertNotIn("No known vulnerable dependencies", result.stdout)
+                    self.assertEqual(result.returncode, 1, result.stdout)
 
     def test_the_global_config_path_is_passed_on(self) -> None:
         for script in NPM_SCANNERS:
