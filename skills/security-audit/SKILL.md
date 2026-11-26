@@ -38,6 +38,7 @@ Security audit patterns (OWASP Top 10, LLM Top 10 2025, CWE Top 25 2025, CVSS v4
 - **Threats**: modern-attacks, cve-patterns
 - **DevSecOps**: ci-security-pipeline, supply-chain-security, automated-scanning, gha-security, git-history-secrets
 - **Incident**: supply-chain-incident-response
+- **Fixing a reported vulnerability** in a client that builds request URLs from keys or ids: path-traversal-prevention § Identifiers in Outgoing Request Paths
 
 ## Security Checklist
 

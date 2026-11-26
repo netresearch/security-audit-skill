@@ -351,6 +351,7 @@ A client that builds a REST URL from an identifier it was given (`f"rest/api/2/i
 | Identifier | What is sent |
 |---|---|
 | `../../PROJ-2` as the worklog id | `DELETE issue/PROJ-2`: requests removes dot segments before sending |
+| `PROJ-2?x=` as the key, worklog `42` | `DELETE issue/PROJ-2`: the rest of the path (`/worklog/42`) moves into the query |
 | `PROJ-1#` as the key | `DELETE issue/PROJ-1`: the rest is a fragment and never sent |
 | `PROJ-1?deleteSubtasks=true` as the key | `?deleteSubtasks=true&deleteSubtasks=false`: the library appends its own parameter with `&`; which value the server reads depends on its framework |
 | `PROJ-1/comment/7` as the key | a sub-resource of the named issue |
@@ -358,8 +359,8 @@ A client that builds a REST URL from an identifier it was given (`f"rest/api/2/i
 
 A check on the final URL alone misses the query case, because `?a=b` without a `/` looks like an ordinary query. Use two layers:
 
-1. **Allowlist each identifier where it enters**, before any request: an issue key `[A-Za-z]\w*-\d+`, an id `\d+`, both with `re.ASCII` (without it, `\d` also matches digits of other scripts, such as `٤٢`).
-2. **Check the final URL in the HTTP session**, for paths a library builds and ids no allowlist covers: refuse `#`, a `.` or `..` segment (also percent-encoded, and with a `;` parameter), a backslash or `%2F`/`%5C` in the path, and a `/` in the query. A request sent outside that session, such as a plain `requests.get`, runs the check itself.
+1. **Allowlist each identifier where it enters**, before any request: an issue key `[A-Za-z]\w*-\d+`, an id `\d+`, each matched against the whole value (`re.fullmatch`; `re.match` and `re.search` accept `PROJ-1?deleteSubtasks=true` by its prefix) and with `re.ASCII` (without it, `\d` also matches digits of other scripts, such as `٤٢`).
+2. **Check the final URL in the HTTP session**, for paths a library builds and ids no allowlist covers: refuse `#`, a `.` or `..` segment (also percent-encoded, and with a `;` parameter), a backslash or `%2F`/`%5C` in the path, and a `/` in the query. A request sent outside that session, such as a plain `requests.get`, must call the same check before it is sent.
 
 For a destructive call, also compare the resource that a preceding GET returned with the id you were given before sending the DELETE.
 
